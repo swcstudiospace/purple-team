@@ -226,6 +226,11 @@ Requires: Target hostname or IP.`,
   }
   ,
   {
+    name: 'tempest_blue_gaps',
+    description: `Blue detection-coverage gaps for the whole findings ledger (GET /api/teams/blue/gaps). Use when: the operator asks which findings lack telemetry coverage or which detectors to build.`,
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
     name: 'tempest_hats_list',
     description: `Specialist hats with parent teams and live tool grants (GET /api/teams/tool-grants + /api/operators/prompts). Use when: the operator asks which hats are spawnable or what each hat may wield.`,
     inputSchema: { type: 'object', properties: {} }
@@ -417,6 +422,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     case 'tempest_purple_synthesize': {
       const { findings, detections } = args as { findings?: unknown; detections?: unknown };
       return tempestPost('/api/teams/purple/synthesize', { findings: findings ?? [], detections: detections ?? [] });
+    }
+
+    case 'tempest_blue_gaps': {
+      return tempestGet('/api/teams/blue/gaps');
     }
 
     case 'tempest_hats_list': {

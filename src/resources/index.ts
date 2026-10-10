@@ -753,3 +753,5 @@ export function runbookForFamily(family = ''): OperatorRunbook | undefined {
 export function forefrontPressureForFamily(family = ''): ForefrontPressureLane[] {
   return family ? FOREFRONT_PRESSURE_LANES.filter(lane => lane.family === family) : FOREFRONT_PRESSURE_LANES;
 }
+
+export * from './ai-defense-playbook.js';

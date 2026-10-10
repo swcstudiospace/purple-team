@@ -33,26 +33,35 @@ The operator must see the ack before any backend call resolves.
 
 Pull the findings first with the `tempest_findings` MCP tool (or
 `curl -s http://127.0.0.1:3333/api/findings?missionId=<mission-id>`),
-then drive `tempest_hat_dispatch` with hat `sentinel` — or directly,
-composing the canonical calls:
+then read the coverage report the backend computes over the whole
+findings ledger:
 
-```bash
-SPAWN=$(curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"sentinel"}')
-OP=$(echo "$SPAWN" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-curl -s -X POST http://127.0.0.1:3333/api/operators/$OP/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"detection mapping","taskDescription":"<findings>"}'
-```
+- Coverage gaps — the `tempest_blue_gaps` MCP tool, or
+  `curl -s http://127.0.0.1:3333/api/teams/blue/gaps`.
+- Detector build list —
+  `curl -s http://127.0.0.1:3333/api/teams/blue/rules` (one
+  experimental Sigma rule per uncovered gap, keyed to its unresolved
+  D3FEND countermeasures).
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+Relay the `gaps` array as the backend returned it — `findingId`,
+`coverage` (`none`/`partial`/`covered`), and `recommendation` — and
+cite the Sigma rule from the rule pack for every gap whose
+`uncoveredCountermeasures` is non-empty. Never rewrite D3FEND ids,
+never present a covered finding as a gap, and never guess a detector
+the backend did not emit.
 
 Relay short progress updates quoting the mission id.
 
 ## 3. Completion summary
 
-Close with: scope, mission id, gaps ordered by severity (finding,
-telemetry, covered/partial/uncovered, detector recommendation), and the
-report pointer (`/tempest-report <mission id>`). If the backend is
+Close with: scope, mission id, the coverage gaps (finding id,
+`none`/`partial`/`covered`, the backend's detector recommendation,
+Sigma rule for uncovered ones), and the report pointer
+(`/tempest-report <mission id>`). If the backend is
 unreachable, say so in one line —
 
 > t3mp3st backend unreachable — start it with npm run server; this mapping

@@ -1,0 +1,54 @@
+schema: t3mp3st.bench/detection-coverage/v1
+name: T3MP3ST Detection Coverage Bench — v0
+description: |
+  Blue-pipeline benchmark. Each case pairs a labeled findings ledger with a
+  declared telemetry stack and a ground-truth coverage verdict per finding
+  (covered / partial / none) plus the exact uncovered countermeasure ids and,
+  where applicable, the unresolvable ids that must surface. Decoy findings
+  carry wrong countermeasure keys — invented D3FEND ids, or real ids from the
+  wrong countermeasure family — that must NOT score as covered.
+
+hunter: dist/teams/blue/coverage.js (coverageGaps) — the real pipeline via the
+  built dist/ output, never a vendored copy of the logic. Telemetry source
+  slugs are validated against dist/teams/blue/telemetry.js (TELEMETRY_REGISTRY)
+  and countermeasure ids against dist/teams/blue/d3fend.js (D3FEND_BY_ID).
+
+scoring:
+  axes:
+    coverage:        { rule: 'per-finding verdict + uncovered/unresolvable id sets equal ground truth' }
+    discrimination:  { rule: 'decoy findings never score covered; invented ids surface as unresolvedCountermeasures, never silently used' }
+  decoy_penalty: 5         # subtracted per decoy finding scored covered
+  report: bench/detection-coverage/report.json   # deterministic JSON (no timestamps)
+  self_test_default: true  # --self-test is the default; offline and deterministic
+
+cases:
+  - id: case-lateral-movement-endpoint
+    domains: [endpoint, identity]
+    difficulty: medium
+  - id: case-identity-attack-spray
+    domains: [identity]
+    difficulty: medium
+  - id: case-web-exploitation
+    domains: [web, network]
+    difficulty: medium
+  - id: case-greenfield-no-telemetry
+    domains: [endpoint]
+    difficulty: easy
+  - id: case-deception-grid
+    domains: [deception]
+    difficulty: easy
+  - id: case-legacy-direct-finding-coverage
+    domains: [endpoint, identity]
+    difficulty: hard
+  - id: case-full-stack-detection
+    domains: [endpoint, network]
+    difficulty: hard
+  - id: case-email-phishing
+    domains: [email]
+    difficulty: medium
+  - id: DECOY-invented-ids
+    path: decoy-invented-ids
+    difficulty: decoy
+  - id: DECOY-wrong-family-keys
+    path: decoy-wrong-family-keys
+    difficulty: decoy

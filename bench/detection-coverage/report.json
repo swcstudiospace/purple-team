@@ -1,0 +1,83 @@
+{
+  "schema": "t3mp3st.bench/detection-coverage/v1",
+  "hunter": "dist/teams/blue/coverage.js coverageGaps",
+  "cases": 10,
+  "score": {
+    "coverage": {
+      "hits": 24,
+      "total": 24,
+      "rate": 1
+    },
+    "discrimination": {
+      "decoyFindings": 2,
+      "decoyCovered": 0
+    },
+    "penalty": {
+      "perDecoy": 5,
+      "applied": 0,
+      "penalizedHits": 24
+    },
+    "perCase": [
+      {
+        "id": "case-lateral-movement-endpoint",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-identity-attack-spray",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-web-exploitation",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-greenfield-no-telemetry",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-deception-grid",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-legacy-direct-finding-coverage",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-full-stack-detection",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "case-email-phishing",
+        "decoy": false,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "decoy-invented-ids",
+        "decoy": true,
+        "ok": true,
+        "misses": []
+      },
+      {
+        "id": "decoy-wrong-family-keys",
+        "decoy": true,
+        "ok": true,
+        "misses": []
+      }
+    ]
+  }
+}

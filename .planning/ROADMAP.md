@@ -18,7 +18,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 ## Phases
 
 - [x] **Phase 15: Blue Suite Core** - `detection` catalog category + adapters, `src/teams/blue/` v2 pipeline (telemetry registry, D3FEND-keyed coverage, Sigma rule packs), blue routes + grants (2026-10-10)
-- [ ] **Phase 16: Blue Playbook & Bench** - `ai-defense-playbook.ts`, `detection-coverage-bench` corpus harness, blue-sentinel/warden skill backends + MCP `tempest_blue_gaps`
+- [x] **Phase 16: Blue Playbook & Bench** - `ai-defense-playbook.ts`, `detection-coverage-bench` corpus harness, blue-sentinel/warden skill backends + MCP `tempest_blue_gaps` (2026-10-10)
 - [ ] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants
 - [ ] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover`
 - [ ] **Phase 19: White Suite** - `governance` data packs, white v2 modules (ROE parser, evidence-chain validator, report auditor), ROE bench, white routes/skills/MCP
@@ -50,6 +50,11 @@ Plans:
   2. Playbook techniques brief into operator context via the existing resources pattern
   3. Skills grammar files stay intact (GRAMMAR.md rules); index rows paired with SKILL.md
   4. MCP tool registers, proxies via the tempest loopback/bearer path, no child processes
+
+**Plans**: 1 plan
+
+Plans:
+- [x] 16-01: Blue playbook + bench + wiring (parallel units)
 
 ### Phase 17: Black Suite Core
 **Goal**: Black owns tradecraft-analysis tooling: emulation catalog data, structured noise budget, egress path cost model.
@@ -92,7 +97,7 @@ Plans:
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 15. Blue Suite Core | 1/1 | Complete | 2026-10-10 |
-| 16. Blue Playbook & Bench | 0/0 | Not Started | — |
+| 16. Blue Playbook & Bench | 1/1 | Complete | 2026-10-10 |
 | 17. Black Suite Core | 0/0 | Not Started | — |
 | 18. Black Playbook & Bench | 0/0 | Not Started | — |
 | 19. White Suite | 0/0 | Not Started | — |
