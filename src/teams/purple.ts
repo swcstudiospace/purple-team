@@ -6,23 +6,42 @@
  * into a single ledger-record-shaped result: a coverage matrix, the unresolved
  * items, and the concrete next missions that close them.
  *
- * Correlation convention: white verdicts are matched to findings positionally —
- * verdict i is the ROE verdict for the action that surfaced finding i. Verdicts
- * beyond the finding list are ignored.
+ * Correlation convention (v2): verdicts join to findings by FINDING ID via the
+ * optional `verdictsByFinding` map — the verdict stored under key X always lands
+ * on finding X, regardless of insertion order. When that map is absent the v1
+ * positional join remains as a fallback (verdict i is the ROE verdict for the
+ * action that surfaced finding i; verdicts beyond the finding list are ignored)
+ * and the result declares it via `correlation: 'positional-fallback'`.
  */
 
 import { detectionGaps, type DetectionGap, type RedFindingShape, type TelemetrySourceShape } from './blue.js';
 import { roeAudit, type AuditedAction, type RoeSpec, type RoeVerdict } from './white.js';
+
+/** One white verdict keyed by finding id — the v2 id-keyed correlation input. */
+export interface PurpleVerdictByFinding {
+  verdict: RoeVerdict['verdict'];
+  rationale?: string;
+}
+
+/** How verdicts were joined to findings; declared on every synthesis result. */
+export type PurpleCorrelationMode = 'id' | 'positional-fallback';
+
+/** Residual-risk tier — same vocabulary as finding severity, not free prose. */
+export type PurpleRiskTier = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
 export interface DarkPurpleSynthesis {
   coverageMatrix: Array<{
     findingId: string;
     detection: 'none' | 'partial' | 'covered';
     verdict?: string;
+    /** Deterministic f(severity, detection coverage, verdict); see the RISK_TIER_* constants. */
+    riskTier: PurpleRiskTier;
     residualRisk: string;
   }>;
   unresolved: string[];
   nextMissions: string[];
+  /** 'id' when verdictsByFinding drove the join, 'positional-fallback' otherwise. */
+  correlation: PurpleCorrelationMode;
 }
 
 const RISK_BY_SEVERITY: Record<string, string> = {
@@ -37,24 +56,73 @@ function riskWord(severity: string | undefined): string {
   return (severity && RISK_BY_SEVERITY[severity]) || 'moderate';
 }
 
+// ── Residual-risk tier model ────────────────────────────────────────────────
+// Deterministic f(severity, detection coverage, verdict), never prose:
+//   1. Base tier from severity — critical=4, high=3, medium=2, low=1, info=0.
+//   2. Detection 'none' bumps the tier one step up (an undetected finding is
+//      one tier worse than its severity implies), capped at the top of the scale.
+//   3. A 'violation' verdict floors the tier at high — a ROE violation never
+//      carries low residual risk, even when fully detected.
+// Missing or unknown severity falls back to MEDIUM (index 2): the honest
+// default when the input never stated a severity, rather than guessing low.
+const RISK_TIER_SCALE: readonly PurpleRiskTier[] = ['info', 'low', 'medium', 'high', 'critical'];
+const RISK_TIER_BY_SEVERITY: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  low: 1,
+  info: 0,
+};
+const RISK_TIER_DEFAULT_INDEX = 2; // medium — missing/unknown severity input
+const RISK_TIER_NONE_DETECTION_BUMP = 1;
+const RISK_TIER_VIOLATION_FLOOR = 3; // high
+
+function residualRiskTier(
+  severity: string | undefined,
+  detection: DetectionGap['coverage'],
+  verdict: string | undefined,
+): PurpleRiskTier {
+  const baseIndex = severity !== undefined && RISK_TIER_BY_SEVERITY[severity] !== undefined
+    ? RISK_TIER_BY_SEVERITY[severity]
+    : RISK_TIER_DEFAULT_INDEX;
+  let tierIndex = baseIndex;
+  if (detection === 'none') tierIndex = Math.min(baseIndex + RISK_TIER_NONE_DETECTION_BUMP, RISK_TIER_SCALE.length - 1);
+  if (verdict === 'violation') tierIndex = Math.max(tierIndex, RISK_TIER_VIOLATION_FLOOR);
+  return RISK_TIER_SCALE[tierIndex];
+}
+
 /**
  * Correlate the three team outputs into the dark-purple posture ledger. A finding is
  * unresolved when detection coverage is absent or a white verdict flagged a
  * violation; every unresolved item gets a concrete follow-up mission.
+ *
+ * Verdict correlation: when `verdictsByFinding` is provided (an object, even an
+ * empty one) it wins outright — each finding looks up its verdict by its own id
+ * and the positional `verdicts` array is ignored, so map insertion order cannot
+ * skew the join. Without it, the v1 positional join applies and the result says
+ * so via `correlation: 'positional-fallback'`.
  */
 export function synthesize(input: {
   findings: Array<{ id: string; title?: string; severity?: string }>;
   detections: DetectionGap[];
   verdicts: RoeVerdict[];
+  verdictsByFinding?: Record<string, PurpleVerdictByFinding>;
 }): DarkPurpleSynthesis {
   const coverageByFinding = new Map<string, DetectionGap['coverage']>();
   for (const gap of input.detections) coverageByFinding.set(gap.findingId, gap.coverage);
 
+  const verdictById = input.verdictsByFinding && typeof input.verdictsByFinding === 'object'
+    ? input.verdictsByFinding
+    : undefined;
+
   const coverageMatrix = input.findings.map((finding, index) => {
     const detection = coverageByFinding.get(finding.id) || 'none';
-    const verdict = input.verdicts[index]?.verdict;
+    const verdict = verdictById
+      ? verdictById[finding.id]?.verdict
+      : input.verdicts[index]?.verdict;
     const risk = riskWord(finding.severity);
     const subject = finding.title ? ` (${finding.title})` : '';
+    const riskTier = residualRiskTier(finding.severity, detection, verdict);
 
     let residualRisk: string;
     if (detection === 'none') {
@@ -67,7 +135,7 @@ export function synthesize(input: {
       residualRisk = `low residual risk — detection covers ${finding.id}${subject}`;
     }
 
-    return { findingId: finding.id, detection, verdict, residualRisk };
+    return { findingId: finding.id, detection, verdict, riskTier, residualRisk };
   });
 
   const unresolved: string[] = [];
@@ -98,7 +166,12 @@ export function synthesize(input: {
 
   nextMissions.push('Purple regression: retest remediated findings end-to-end and re-run the dark-purple coverage matrix');
 
-  return { coverageMatrix, unresolved, nextMissions };
+  return {
+    coverageMatrix,
+    unresolved,
+    nextMissions,
+    correlation: verdictById ? 'id' : 'positional-fallback',
+  };
 }
 
 // Re-exported so wave-2 server integration can mount the whole loop from one module.

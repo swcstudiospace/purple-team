@@ -57,7 +57,7 @@ import { initGrammars } from './recon/ts-grammars.js';
 import { redactCredential } from './evidence/index.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
-import { synthesize } from './teams/purple.js';
+import { synthesize, type DarkPurpleSynthesis, type PurpleVerdictByFinding } from './teams/purple.js';
 import { hardeningPlan, type DetectionGap } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
 import { sigmaRulepack } from './teams/blue/rulepacks.js';
@@ -905,6 +905,15 @@ const watchCycleLedger = new Map<string, WatchCycleRecord>();
 const memoryCapsule = new Map<string, MemoryEntry>();
 const memoryProposals = new Map<string, MemoryProposal>();
 
+/** Latest dark-purple synthesis result — one slot, overwritten per synthesis. */
+interface PurpleSynthesisRecord {
+  id: string;
+  createdAt: string;
+  correlation: DarkPurpleSynthesis['correlation'];
+  synthesis: DarkPurpleSynthesis;
+}
+const purpleSyntheses = new Map<string, PurpleSynthesisRecord>();
+
 /**
  * Mirror a live mission finding into the persistent findingsLedger (the one the
  * Evidence Vault reads via /api/findings). Mission findings otherwise live only in
@@ -1178,6 +1187,7 @@ function buildStateSnapshot(): Record<string, unknown> {
     watchCycleLedger: [...watchCycleLedger.values()],
     memoryCapsule: [...memoryCapsule.values()],
     memoryProposals: [...memoryProposals.values()],
+    purpleSyntheses: [...purpleSyntheses.values()],
   };
 }
 
@@ -1248,6 +1258,7 @@ async function loadPersistedState(): Promise<void> {
     replaceMapContents(watchCycleLedger, state.watchCycleLedger);
     replaceMapContents(memoryCapsule, state.memoryCapsule);
     replaceMapContents(memoryProposals, state.memoryProposals);
+    replaceMapContents(purpleSyntheses, state.purpleSyntheses);
     console.log(`[T3MP3ST] State restored from ${file}`);
   } catch (error: any) {
     if (error?.code !== 'ENOENT') {
@@ -6370,11 +6381,17 @@ app.get('/api/teams/tool-grants', (_req: Request, res: Response) => {
  * and white ROE verdicts into a dark-purple posture ledger.
  *
  * Body: { findings: [{ id, title?, severity? }], detections: DetectionGap[],
- *         verdicts: RoeVerdict[] }
+ *         verdicts: RoeVerdict[], verdictsByFinding?: Record<findingId,
+ *         { verdict: 'compliant' | 'violation' | 'needs_approval', rationale? }> }
+ * verdictsByFinding switches the correlation to id-keyed (verdict X always joins
+ * finding X regardless of insertion order); without it the v1 positional join
+ * applies and the result declares correlation: 'positional-fallback'. A present
+ * but invalid verdictsByFinding is rejected 400 — never coerced.
  * Findings whose id exists in the findingsLedger get their stored title/severity
  * merged in READ-ONLY (the ledger is never mutated by this route). Responds 201
  * with the DarkPurpleSynthesis; the counts event reaches the SSE stream + state
- * event log via emitContractEvent.
+ * event log via emitContractEvent, and the LATEST synthesis persists through the
+ * same snapshot machinery (purpleSyntheses slot in buildStateSnapshot).
  */
 app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as Record<string, unknown>;
@@ -6384,6 +6401,31 @@ app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => 
   if (!Array.isArray(findings) || !Array.isArray(detections) || !Array.isArray(verdicts)) {
     res.status(400).json({ error: 'findings, detections, and verdicts must each be an array' });
     return;
+  }
+  const rawVerdictsByFinding = body.verdictsByFinding;
+  let verdictsByFinding: Record<string, PurpleVerdictByFinding> | undefined;
+  if (rawVerdictsByFinding !== undefined && rawVerdictsByFinding !== null) {
+    if (typeof rawVerdictsByFinding !== 'object' || Array.isArray(rawVerdictsByFinding)) {
+      res.status(400).json({ error: 'verdictsByFinding must be an object of findingId → { verdict, rationale? }' });
+      return;
+    }
+    const byFinding: Record<string, PurpleVerdictByFinding> = {};
+    for (const [findingId, rawEntry] of Object.entries(rawVerdictsByFinding as Record<string, unknown>)) {
+      if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
+        res.status(400).json({ error: `verdictsByFinding[${findingId}] must be an object with a verdict` });
+        return;
+      }
+      const entry = rawEntry as Record<string, unknown>;
+      const verdict = entry.verdict;
+      if (verdict !== 'compliant' && verdict !== 'violation' && verdict !== 'needs_approval') {
+        res.status(400).json({ error: `verdictsByFinding[${findingId}].verdict must be one of: compliant, violation, needs_approval` });
+        return;
+      }
+      byFinding[findingId] = typeof entry.rationale === 'string' && entry.rationale
+        ? { verdict, rationale: entry.rationale }
+        : { verdict };
+    }
+    verdictsByFinding = byFinding;
   }
   const correlated = (findings as unknown[])
     .filter((raw): raw is Record<string, unknown> => Boolean(raw) && typeof raw === 'object')
@@ -6407,11 +6449,22 @@ app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => 
     findings: correlated,
     detections: gapInputs,
     verdicts: verdictInputs,
+    verdictsByFinding,
+  });
+  // Persist the LATEST synthesis through the existing snapshot machinery: one
+  // slot keyed 'latest', overwritten per synthesis; emitContractEvent below
+  // schedules the debounced full-snapshot write that flushes it to state.json.
+  purpleSyntheses.set('latest', {
+    id: 'latest',
+    createdAt: nowIso(),
+    correlation: synthesis.correlation,
+    synthesis,
   });
   emitContractEvent('purple.synthesis', {
     findings: correlated.length,
     detections: gapInputs.length,
     verdicts: verdictInputs.length,
+    correlation: synthesis.correlation,
     unresolved: synthesis.unresolved.length,
     nextMissions: synthesis.nextMissions.length,
   });

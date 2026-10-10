@@ -66,7 +66,7 @@ The response is JSON text containing DNS records, nmap output, command summaries
 
 ## Tempest Bot Proxy Tools (`tempest_*`)
 
-Nine tools proxy the local t3mp3st HTTP API over `T3MP3ST_URL` (default
+Twelve tools proxy the local t3mp3st HTTP API over `T3MP3ST_URL` (default
 `http://127.0.0.1:3333`). Reads use GET, state changes use POST; no shells,
 no child processes. Every failure degrades to `{ ok: false, error }` instead
 of throwing — an unreachable backend answers with a "start it with
@@ -83,6 +83,9 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_findings` | `GET /api/findings` (optional `missionId` filter) |
 | `tempest_providers` | `GET /api/llm/status` + `GET /api/oauth/status` |
 | `tempest_purple_synthesize` | `POST /api/teams/purple/synthesize` (`findings`, `detections`) |
+| `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (detection-coverage gaps over the whole findings ledger) |
+| `tempest_black_cover` | `GET /api/teams/black/cover` (phase-grouped opsec review of the active red plan) |
+| `tempest_white_roe` | `GET /api/teams/white/roe` (on-record ROE parse: `ok`, `resolved`, `unresolved`) |
 
 Loopback guard: with no bearer set, the proxy refuses any `T3MP3ST_URL`
 whose host is not exactly `localhost`, `::1`, or a full dotted quad in

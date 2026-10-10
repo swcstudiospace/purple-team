@@ -1,7 +1,7 @@
 # T3MP3ST UI information architecture
 
 Legacy single-page compartments (the fourteen `page-*` sections of the old
-`docs/index.html`) are now grouped into ten static pages sharing one shell
+`docs/index.html`) are now grouped into eleven static pages sharing one shell
 (`docs/assets/shell.js` plus the styles in `docs/assets/tokens.css`). Every
 existing function is reachable below; `docs/index.html` remains the `/ui/`
 landing (same document as `overview.html`) so existing bookmarks keep working.
@@ -25,6 +25,7 @@ landing (same document as `overview.html`) so existing bookmarks keep working.
 | page-configs | engagements.html | Workflow presets and runbooks (`?view=configs`) |
 | page-about | about.html | Brief, contract, live snapshot |
 | specialist hats (Phase 6) | operators.html | Hats panel: all six hats from `/api/operators/prompts`, grant slices from `/api/teams/tool-grants`, per-hat dispatch via `POST /api/operators/spawn`; shares the roster search/team filter |
+| color suites (Phase 20) | defend.html | Defense posture from the color GET routes: blue gap matrix (`?coverage=none\|partial\|covered` filter), black noise budget, white evidence-chain audit, white report audit; read-only, honest empty states |
 
 ## Navigation contract
 

@@ -1,10 +1,10 @@
 ---
 gsd_state_version: '1.0'
-status: in_progress
+status: phases_complete
 progress:
   total_phases: 6
-  completed_phases: 5
-  percent: 83
+  completed_phases: 6
+  percent: 100
 ---
 
 # Project State — v1.3
@@ -14,37 +14,38 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the archived v1.0–v1.2 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** v1.3 — color suites at red parity
+**Current focus:** v1.3 complete — color suites at red parity
 
 ## Current Position
 
-Phase: 20 of 20 (Purple v2 & Defend UI)
-Plan: not yet planned
-Status: Phases 15–19 complete
-Last activity: 2026-10-10 — Phase 19: governance packs, white v2 engines (bench-caught scope bug fixed), ROE bench, white routes/skills/MCP
+Phase: 20 of 20 (Purple v2 & Defend UI) — complete
+Plan: 1 of 1
+Status: All v1.3 phases complete. Full gates green at close (lint 0 errors, typecheck, 1103 tests, doctor, prompt audit 39/39).
+Last activity: 2026-10-10 — Phase 20: purple v2 id-keyed synthesis + persistence, Defend UI, wiring sweep, full gates
 
-Progress: [████████▍░] 83%
+Progress: [██████████] 100%
 
 ## Completed Context
 
-- **v1.0–v1.2:** archived (see `.planning/milestones/`); v1.2 tagged `v1.2` 2026-10-10.
+- **v1.0–v1.2:** archived (see `.planning/milestones/`); v1.2 tagged `v1.2`.
 - **Phase 15** (`f654ea1`): detection category, D3FEND vendor, blue pipeline + routes; 109→115.
-- **Phase 16** (`7c87fa4`): defense playbook, detection-coverage bench, blue wiring.
-- **Phase 17** (`7d7d7f0`): emulation category, ATT&CK v19.2 vendor, black engines + routes; 115→117.
+- **Phase 16** (`7c87fa4`): defense playbook (20), detection-coverage bench, blue wiring.
+- **Phase 17** (`7d7d7f0`): emulation category, ATT&CK v19.2 vendor (61), black engines + routes; 115→117.
 - **Phase 18** (`22375c0`): tradecraft playbook, opsec-review bench, black wiring.
-- **Phase 19 (2026-10-10):** governance packs; white v2 engines (bench-caught `allowedTargets` bug fixed + pinned); adjudication playbook (18); `roe-adjudication-bench` (12 missions/25 groups/2 decoys); white routes + `tempest_white_roe`; 117→120.
+- **Phase 19** (`b0a5e9c`): governance packs, white v2 engines (bench-caught scope bug fixed + pinned), adjudication playbook, ROE bench, white wiring; 117→120.
+- **Phase 20 (2026-10-10):** purple v2 (`verdictsByFinding` id-keyed join, `correlation` honesty field, `riskTier` model, persisted synthesis); `docs/defend.html` (four live color panels); dark-purple skill + MCP_GUIDE sync; full gates green.
 
 ## Pending Todos
 
-- Phase 20: purple v2 (id-keyed synthesis), Defend UI page, dark-purple skill rewiring, MCP_GUIDE sync, full gates, planning final.
+- Milestone lifecycle: audit → complete → cleanup → final push.
 
 ## Blockers/Concerns
 
-- Count pins stable at 120 (no adapter wave in 20 unless purple adds one — plan says none).
-- Full gate suite (lint/typecheck/`npm test`/doctor/prompt:audit) runs at Phase 20 close per roadmap.
+- Bench-caught engine defects this milestone: parseRoe `allowedTargets` (silently permissive scope) — fixed + pinned; test fixture corrected to v1 semantics twice (coverage tiers, target extraction) — the pins now document actual engine contracts.
+- White verdicts-on-record still need a ROE text source in server state.
 
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Phase 20 next
+Stopped at: v1.3 phases complete; lifecycle next
 Resume file: None

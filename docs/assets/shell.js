@@ -10,6 +10,7 @@
     { id: 'mission', file: 'mission.html', label: 'Mission', icon: 'M' },
     { id: 'operators', file: 'operators.html', label: 'Operatives', icon: 'P' },
     { id: 'evidence', file: 'evidence.html', label: 'Evidence', icon: 'E' },
+    { id: 'defend', file: 'defend.html', label: 'Defend', icon: 'D' },
     { group: 'Toolkit' },
     { id: 'arsenal', file: 'arsenal.html', label: 'Arsenal', icon: 'A' },
     { id: 'terminal', file: 'terminal.html', label: 'Terminal', icon: 'T' },

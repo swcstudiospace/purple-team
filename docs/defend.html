@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Defend</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Color Posture</div>
+<h1 class="page-head__title" id="pageTitle">Defend</h1>
+<p class="page-head__sub">The defense side of the ledger, read live from the color teams: blue detection coverage over the findings ledger, black noise budget over the active RED plan, white evidence-chain and report audits. Read-only analysis — nothing on this page operates a target. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="coverageTitle">
+<h2 class="card__title" id="coverageTitle">Detection coverage (blue)</h2>
+<p class="text-secondary">D3FEND-keyed gap matrix over the findings ledger — <span class="mono">GET /api/teams/blue/gaps</span>. Countermeasure ids absent from the vendored ontology are shown as unresolved, never dropped.</p>
+<div class="form-row">
+<div><label class="flabel" for="coverageSel">Coverage</label><select class="form-input" id="coverageSel"><option value="all">all</option><option value="none">none</option><option value="partial">partial</option><option value="covered">covered</option></select></div>
+<div><label class="flabel" for="coverageRefresh">Refresh</label><button class="btn btn--sm" id="coverageRefresh" type="button">Reload gaps</button></div>
+</div>
+<div data-state-root id="coverageState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No coverage rows to show — the findings ledger is empty or nothing matches the filter.</p><a class="btn btn--sm btn--primary" href="overview.html">Run a mission</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Coverage matrix unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Coverage updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Coverage</th><th>Covered controls</th><th>Uncovered controls</th><th>Unresolved ids</th><th>Recommendation</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="noiseTitle">
+<h2 class="card__title" id="noiseTitle">Noise budget (black)</h2>
+<p class="text-secondary">Structured noise ledger over the most recent RED plan draft — <span class="mono">GET /api/teams/black/noise</span>. No active draft is an empty, quiet ledger, not an error.</p>
+<div class="card__row" id="noiseSummary" hidden></div>
+<div class="st-warn-box" id="noiseViolations" hidden><p><strong>Doctrine violations.</strong></p><ul class="feed" id="noiseViolationList"></ul></div>
+<div data-state-root id="noiseState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No noise entries — no RED plan draft is on record.</p><a class="btn btn--sm btn--primary" href="mission.html">Open Mission</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Noise budget unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Noise budget updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="noiseTable"><thead><tr><th>Action</th><th>Technique matches</th><th>Cost</th><th>Rationale</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="chainTitle">
+<h2 class="card__title" id="chainTitle">Evidence chain (white)</h2>
+<p class="text-secondary">Replay-chain audit over the evidence ledger — <span class="mono">GET /api/teams/white/evidence</span>. A link is intact only at tool-grade provenance or better with a replay hook attached.</p>
+<div class="card__row" id="chainSummary" hidden></div>
+<div data-state-root id="chainState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No evidence entries on the ledger yet.</p><a class="btn btn--sm btn--primary" href="evidence.html">Open the ledger</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Chain audit unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Chain audit updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="chainTable"><thead><tr><th>Evidence</th><th>Status</th><th>Strength</th><th>Verdict</th><th>Replay</th><th>Reason</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="reportTitle">
+<h2 class="card__title" id="reportTitle">Report audit (white)</h2>
+<p class="text-secondary">Findings ↔ evidence coverage audit — <span class="mono">GET /api/teams/white/report-audit</span>. A finding ships only when every referenced evidence id resolves at tool-grade-or-better links and the report contract holds.</p>
+<div class="card__row" id="reportSummary" hidden></div>
+<div data-state-root id="reportState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No findings to audit — the ledger is empty.</p><a class="btn btn--sm btn--primary" href="overview.html">Run a mission</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Report audit unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Report audit updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden>
+<div class="table-wrap"><table class="table" id="reportTable"><thead><tr><th>Finding</th><th>Severity</th><th>Status</th><th>Gaps</th><th>Conditions</th></tr></thead><tbody></tbody></table></div>
+<h3 class="card__title" style="margin-top:16px">Unclaimed evidence</h3>
+<ul class="feed" id="unclaimedList"></ul>
+</div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Defend page: /api/teams/blue/gaps, /api/teams/black/noise,
+// /api/teams/white/evidence, /api/teams/white/report-audit. Read-only —
+// every panel renders exactly what the route returned, honest empties included.
+var coverageCache = [];
+
+var COVERAGE_TIERS = ['none', 'partial', 'covered'];
+var COVERAGE_BADGE = { none: 'badge badge--danger', partial: 'badge badge--warn', covered: 'badge badge--ok' };
+var TIER_BADGE = { quiet: 'badge badge--ok', low: 'badge badge--ok', moderate: 'badge badge--warn', loud: 'badge badge--danger' };
+var LINK_BADGE = { intact: 'badge badge--ok', broken: 'badge badge--danger' };
+var AUDIT_BADGE = { report_ready: 'badge badge--ok', coverage_gaps: 'badge badge--warn' };
+
+function badgeFor(map, key) {
+  return (map && map[key]) || 'badge badge--neutral';
+}
+
+function idsOrDash(arr) {
+  return arr && arr.length ? arr.join(', ') : '—';
+}
+
+function countBadge(label, n, zeroClass) {
+  return '<span class="badge ' + (n > 0 ? zeroClass : 'badge--ok') + '">' + n + ' ' + Shell.escHtml(label) + '</span>';
+}
+
+function failState(root, e) {
+  var el = root.querySelector('[data-err]');
+  if (el) el.textContent = e.message || String(e);
+  Shell.showState(root, 'error');
+}
+
+function okState(root, shown, total) {
+  Shell.showState(root, 'data');
+  var okEl = root.querySelector('[data-ok]');
+  if (okEl) okEl.textContent = shown + ' of ' + total + ' row(s) shown.';
+}
+
+function renderCoverage() {
+  var root = document.getElementById('coverageState');
+  var sel = document.getElementById('coverageSel');
+  var want = (sel && sel.value) || 'all';
+  var rows = coverageCache.filter(function (g) { return want === 'all' || g.coverage === want; });
+  var tbody = document.getElementById('coverageTable').querySelector('tbody');
+  tbody.innerHTML = rows.map(function (g) {
+    return '<tr><td class="mono">' + Shell.escHtml(g.findingId || '') + '</td>'
+      + '<td><span class="' + badgeFor(COVERAGE_BADGE, g.coverage) + '">' + Shell.escHtml(g.coverage || 'unknown') + '</span></td>'
+      + '<td class="mono">' + Shell.escHtml(idsOrDash(g.coveredCountermeasures)) + '</td>'
+      + '<td class="mono">' + Shell.escHtml(idsOrDash(g.uncoveredCountermeasures)) + '</td>'
+      + '<td class="mono">' + Shell.escHtml(idsOrDash(g.unresolvedCountermeasures)) + '</td>'
+      + '<td>' + Shell.escHtml(g.recommendation || '') + '</td></tr>';
+  }).join('');
+  if (!rows.length) {
+    Shell.showState(root, 'empty');
+  } else {
+    okState(root, rows.length, coverageCache.length);
+  }
+}
+
+async function loadCoverage() {
+  var root = document.getElementById('coverageState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/teams/blue/gaps');
+    coverageCache = Array.isArray(d.gaps) ? d.gaps : [];
+    renderCoverage();
+  } catch (e) {
+    failState(root, e);
+  }
+}
+
+async function loadNoise() {
+  var root = document.getElementById('noiseState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/teams/black/noise');
+    var entries = Array.isArray(d.entries) ? d.entries : [];
+    var violations = Array.isArray(d.violations) ? d.violations : [];
+    var summary = document.getElementById('noiseSummary');
+    summary.innerHTML = '<span class="mono">' + Shell.escHtml((d.total || 0) + ' / ' + (d.budget || 0) + ' noise points') + '</span>'
+      + '<span class="' + badgeFor(TIER_BADGE, d.tier) + '">' + Shell.escHtml(d.tier || 'unknown') + '</span>'
+      + '<span class="badge ' + (d.within ? 'badge--ok' : 'badge--danger') + '">' + (d.within ? 'within budget' : 'over budget') + '</span>';
+    summary.hidden = false;
+    var vWrap = document.getElementById('noiseViolations');
+    vWrap.hidden = violations.length === 0;
+    document.getElementById('noiseViolationList').innerHTML = violations.map(function (v) {
+      return '<li>' + Shell.escHtml(v) + '</li>';
+    }).join('');
+    document.getElementById('noiseTable').querySelector('tbody').innerHTML = entries.map(function (e) {
+      return '<tr><td>' + Shell.escHtml(e.action || '') + '</td>'
+        + '<td>' + Shell.escHtml((e.matches || []).map(function (m) { return (m.name || m.id || '?') + ' (' + (m.tactic || '?') + ')'; }).join('; ') || '—') + '</td>'
+        + '<td class="mono">' + Shell.escHtml(e.cost == null ? '—' : String(e.cost)) + '</td>'
+        + '<td class="text-secondary">' + Shell.escHtml(e.rationale || '') + '</td></tr>';
+    }).join('');
+    if (!entries.length) {
+      Shell.showState(root, 'empty');
+      summary.hidden = true;
+    } else {
+      okState(root, entries.length, entries.length);
+    }
+  } catch (e) {
+    failState(root, e);
+  }
+}
+
+async function loadChain() {
+  var root = document.getElementById('chainState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/teams/white/evidence');
+    var links = Array.isArray(d.links) ? d.links : [];
+    var summary = document.getElementById('chainSummary');
+    summary.innerHTML = '<span class="badge badge--ok">' + (d.intact || 0) + ' intact</span>'
+      + '<span class="badge ' + ((d.broken || 0) > 0 ? 'badge--danger' : 'badge--ok') + '">' + (d.broken || 0) + ' broken</span>'
+      + '<span class="text-secondary">' + Shell.escHtml(d.summary || '') + '</span>';
+    summary.hidden = false;
+    document.getElementById('chainTable').querySelector('tbody').innerHTML = links.map(function (l) {
+      var appeal = l.conditions && l.conditions.length ? ' Appeal: ' + l.conditions.join('; ') : '';
+      return '<tr><td class="mono">' + Shell.escHtml(l.evidenceId || '') + '</td>'
+        + '<td><span class="' + badgeFor(LINK_BADGE, l.status) + '">' + Shell.escHtml(l.status || 'unknown') + '</span></td>'
+        + '<td class="mono">' + Shell.escHtml(l.strength || '—') + '</td>'
+        + '<td>' + Shell.escHtml(l.verdict || '—') + '</td>'
+        + '<td class="mono">' + Shell.escHtml(l.replayHook || '—') + '</td>'
+        + '<td class="text-secondary">' + Shell.escHtml((l.reason || '') + appeal) + '</td></tr>';
+    }).join('');
+    if (!links.length) {
+      Shell.showState(root, 'empty');
+      summary.hidden = true;
+    } else {
+      okState(root, links.length, links.length);
+    }
+  } catch (e) {
+    failState(root, e);
+  }
+}
+
+async function loadReport() {
+  var root = document.getElementById('reportState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/teams/white/report-audit');
+    var audits = Array.isArray(d.findings) ? d.findings : [];
+    var unclaimed = Array.isArray(d.unclaimedEvidence) ? d.unclaimedEvidence : [];
+    var summary = document.getElementById('reportSummary');
+    summary.innerHTML = '<span class="badge badge--ok">' + (d.reportReady || 0) + ' report-ready</span>'
+      + '<span class="badge ' + ((d.withGaps || 0) > 0 ? 'badge--warn' : 'badge--ok') + '">' + (d.withGaps || 0) + ' with gaps</span>'
+      + '<span class="badge ' + (unclaimed.length > 0 ? 'badge--warn' : 'badge--neutral') + '">' + unclaimed.length + ' unclaimed evidence</span>'
+      + '<span class="text-secondary">' + Shell.escHtml(d.summary || '') + '</span>';
+    summary.hidden = false;
+    document.getElementById('reportTable').querySelector('tbody').innerHTML = audits.map(function (f) {
+      return '<tr><td><span class="mono">' + Shell.escHtml(f.findingId || '') + '</span> ' + Shell.escHtml(f.title || '') + '</td>'
+        + '<td><span class="badge badge--neutral">' + Shell.escHtml(f.severity || 'n/a') + '</span></td>'
+        + '<td><span class="' + badgeFor(AUDIT_BADGE, f.status) + '">' + Shell.escHtml(f.status || 'unknown') + '</span></td>'
+        + '<td>' + Shell.escHtml(idsOrDash(f.gaps)) + '</td>'
+        + '<td>' + Shell.escHtml(idsOrDash(f.conditions)) + '</td></tr>';
+    }).join('');
+    document.getElementById('unclaimedList').innerHTML = unclaimed.map(function (u) {
+      return '<li><span class="mono">' + Shell.escHtml(u.evidenceId || '') + '</span> — ' + Shell.escHtml(u.reason || '') + '</li>';
+    }).join('');
+    if (!audits.length) {
+      Shell.showState(root, 'empty');
+      summary.hidden = true;
+    } else {
+      okState(root, audits.length, audits.length);
+    }
+  } catch (e) {
+    failState(root, e);
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  var sel = document.getElementById('coverageSel');
+  if (COVERAGE_TIERS.indexOf(q.get('coverage')) >= 0) sel.value = q.get('coverage');
+  loadCoverage();
+  loadNoise();
+  loadChain();
+  loadReport();
+  sel.addEventListener('change', function () {
+    Shell.params.set({ coverage: sel.value === 'all' ? '' : sel.value });
+    renderCoverage();
+  });
+  document.getElementById('coverageRefresh').addEventListener('click', loadCoverage);
+  document.querySelector('#coverageState [data-retry]').addEventListener('click', loadCoverage);
+  document.querySelector('#noiseState [data-retry]').addEventListener('click', loadNoise);
+  document.querySelector('#chainState [data-retry]').addEventListener('click', loadChain);
+  document.querySelector('#reportState [data-retry]').addEventListener('click', loadReport);
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    sel.value = COVERAGE_TIERS.indexOf(nq.get('coverage')) >= 0 ? nq.get('coverage') : 'all';
+    renderCoverage();
+  });
+})();
+</script>
+</body>
+</html>

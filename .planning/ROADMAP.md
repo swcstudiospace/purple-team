@@ -22,7 +22,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 - [x] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants (2026-10-10)
 - [x] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover` (2026-10-10)
 - [x] **Phase 19: White Suite** - `governance` data packs, white v2 modules (ROE parser, evidence-chain validator, report auditor), ROE bench, white routes/skills/MCP (2026-10-10)
-- [ ] **Phase 20: Purple v2 & Defend UI** - id-keyed synthesis + residual-risk model, persisted color artifacts, Defend UI page, full gates & close-out
+- [x] **Phase 20: Purple v2 & Defend UI** - id-keyed synthesis + residual-risk model, persisted color artifacts, Defend UI page, full gates & close-out (2026-10-10)
 
 ## Phase Details
 
@@ -107,6 +107,11 @@ Plans:
   2. Defend page renders the gap matrix from live routes; pins/tests updated
   3. All gates green; ROADMAP/STATE reflect completion
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 20-01: Purple v2 + Defend UI + wiring sweep + full gates
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -116,4 +121,4 @@ Plans:
 | 17. Black Suite Core | 1/1 | Complete | 2026-10-10 |
 | 18. Black Playbook & Bench | 1/1 | Complete | 2026-10-10 |
 | 19. White Suite | 1/1 | Complete | 2026-10-10 |
-| 20. Purple v2 & Defend UI | 0/0 | Not Started | — |
+| 20. Purple v2 & Defend UI | 1/1 | Complete | 2026-10-10 |

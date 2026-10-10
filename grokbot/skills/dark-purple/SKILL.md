@@ -18,7 +18,10 @@ lifecycle, parked/resume): see `../GRAMMAR.md`.
 
 Dark purple composes the hats without replacing them: specter pressure
 ("covert tradecraft"), sentinel coverage ("detection-engineering"), and
-arbiter rulings ("ROE adjudication") stay attributed to their hats.
+arbiter rulings ("ROE adjudication") stay attributed to their hats. The
+per-color projections the loop reads are the backend's own color routes
+(`/api/teams/black/*`, `/api/teams/blue/*`, `/api/teams/white/*`) — never
+a seat's improvisation.
 
 ## Grammar
 
@@ -44,39 +47,80 @@ curl -s 'http://127.0.0.1:3333/api/findings?missionId=<mission-id>'
 
 Relay the finding count before moving on, quoting the mission id.
 
-## 3. Black pressure, then blue detection
+## 3. Black pressure
 
 Dispatch the tradecraft critique and the exfil check with
-`tempest_hat_dispatch` (hats `specter`, then `wraith`), then the coverage
-work (hats `sentinel`, then `warden`). One hat per call; the reply says
-which task went where. Direct form composes the canonical calls:
+`tempest_hat_dispatch` (hats `specter`, then `wraith`), then read the
+cover review the backend computes over the active red plan — the
+`tempest_black_cover` MCP tool, or:
 
 ```bash
-curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"<specter|wraith|sentinel|warden>"}'
-curl -s -X POST http://127.0.0.1:3333/api/operators/<operator-id>/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"<name>","taskDescription":"<what to do>"}'
+curl -s http://127.0.0.1:3333/api/teams/black/cover
 ```
 
-## 4. White verdict, then synthesize
+Relay the `phases` array as the backend returned it — each tripped
+doctrine phase with its matched technique ids and checklist items
+(`id`, `check`, `why`).
 
-Dispatch hats `arbiter` and `auditor` the same way, then close the loop
-with the `tempest_purple_synthesize` MCP tool — or directly:
+## 4. Blue detection
+
+Dispatch the coverage work with `tempest_hat_dispatch` (hats `sentinel`,
+then `warden`), then read the detection-coverage report over the whole
+findings ledger — the `tempest_blue_gaps` MCP tool, or:
+
+```bash
+curl -s http://127.0.0.1:3333/api/teams/blue/gaps
+```
+
+Relay the `gaps` array as the backend returned it — per finding
+`findingId`, `coverage` (`none`/`partial`/`covered`), and
+`recommendation`.
+
+## 5. White verdict
+
+Dispatch hats `arbiter`, then `auditor`, with `tempest_hat_dispatch`,
+then read the ROE state on record — the `tempest_white_roe` MCP tool, or:
+
+```bash
+curl -s http://127.0.0.1:3333/api/teams/white/roe
+```
+
+Relay the parsed `roe` spec (`ok`, `summary`), the `resolved` directives,
+and every `unresolved` line with its `reason`. No ROE text is on record
+yet, so the backend derives no per-action verdicts until a real source
+lands — say so, never "everything allowed".
+
+## 6. Synthesize
+
+Close the loop with the `tempest_purple_synthesize` MCP tool for the
+plain findings + detections call — or directly:
 
 ```bash
 curl -s -X POST http://127.0.0.1:3333/api/teams/purple/synthesize \
   -H 'Content-Type: application/json' \
-  -d '{"findings":[],"detections":[],"verdicts":[]}'
+  -d '{"findings":[],"detections":[],"verdicts":[],"verdictsByFinding":{"<finding-id>":{"verdict":"compliant|violation|needs_approval","rationale":"<why>"}}}'
 ```
 
-## 5. Completion summary
+`verdictsByFinding` keys each verdict to its finding id, so the backend
+correlates by id no matter how the arrays are ordered; omit it and the
+backend pairs `verdicts` positionally. Quote the response's
+`correlation` field (`id` or `positional-fallback`) and relay each
+`coverageMatrix` row — `findingId`, `detection`, `verdict`,
+`residualRisk` — plus `unresolved` and `nextMissions`, exactly as
+returned.
+
+## 7. Completion summary
 
 Close with: scope, mission id, findings by severity, hat verdicts in
-loop order (red, black, blue, white), the synthesis pointer, and the
-report pointer (`/tempest-report <mission id>`). If the backend is
-unreachable at any step, say so in one line —
+loop order (red, black, blue, white), the synthesis correlation mode and
+per-finding residual risks, the synthesis pointer, and the report
+pointer (`/tempest-report <mission id>`).
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+If the backend is unreachable at any step, say so in one line —
 
 > t3mp3st backend unreachable — start it with npm run server; this loop is
 > parked under its mission id and resumes when the backend answers.
