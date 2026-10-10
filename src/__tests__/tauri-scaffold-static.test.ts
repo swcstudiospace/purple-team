@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-// Tauri 2.0 scaffold pins (v1.1 Wave 1, unit B): the desktop shell wraps the
-// static docs/ UI plus the alongside loopback server — no bundled backend, no
-// webview privileges beyond the bare core. These tests pin the SHAPE (config
-// markers, capability deny-list, script wiring, decision-record coverage),
-// not Tauri behavior itself (the CLI was absent when scaffolded; see
-// docs/TAURI.md toolchain probe).
+// Tauri 2.0 scaffold pins (v1.1 Wave 1, unit B; updated v1.2 Phase 11): the
+// desktop shell wraps the static docs/ UI plus the alongside loopback server —
+// no bundled backend, no webview privileges beyond the bare core. These tests
+// pin the SHAPE (config markers, capability deny-list, script wiring,
+// decision-record coverage), not Tauri behavior itself (see docs/TAURI.md
+// toolchain probe + 2026-10-10 re-probe).
 
 const root = process.cwd();
 interface TauriWindow {
@@ -22,12 +22,12 @@ interface TauriConf {
   version: string;
   build: { frontendDist: string; devUrl: string; beforeDevCommand: string };
   app: { windows: TauriWindow[]; security: { csp: string } };
-  bundle: { targets: string[] };
+  bundle: { targets: string[]; icon: string[] };
 }
 
-// tauri.conf.json carries full-line // comments (idiomatic Tauri) — strip
-// them before parsing. Only full-line comments are stripped, so http://
-// URLs inside string values survive.
+// Both Tauri JSON files are strict JSON since v1.2 Phase 11 (the Rust
+// toolchain rejects comments — cargo check proved it). The stripper stays as
+// a no-op guard; only full-line comments would be stripped.
 const stripJsonComments = (src: string): string =>
   src.replace(/^[ \t]*\/\/.*$/gm, '');
 const conf = JSON.parse(
@@ -95,9 +95,9 @@ describe('package.json wiring', () => {
     }
   });
 
-  it('adds no new npm dependencies (CLI resolves on maintainer machines)', () => {
+  it('pins @tauri-apps/cli as a devDependency only (installed 2026-10-10, Phase 11)', () => {
     expect(pkg.dependencies ?? {}).not.toHaveProperty('@tauri-apps/cli');
-    expect(pkg.devDependencies ?? {}).not.toHaveProperty('@tauri-apps/cli');
+    expect(pkg.devDependencies ?? {}).toHaveProperty('@tauri-apps/cli');
   });
 });
 
@@ -134,6 +134,11 @@ describe('build.rs', () => {
 describe('bundled frontendDist asset set', () => {
   it('points frontendDist at ../docs', () => {
     expect(conf.build.frontendDist).toBe('../docs');
+  });
+  it('resolves every bundle.icon path to a committed file', () => {
+    for (const icon of conf.bundle.icon) {
+      expect(existsSync(join(root, 'src-tauri', icon)), `missing icon ${icon}`).toBe(true);
+    }
   });
 
   it.each([

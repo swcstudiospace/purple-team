@@ -36,6 +36,15 @@ Consequences:
   committed static test (`src/__tests__/tauri-scaffold-static.test.ts`) pins the
   scaffold shape without needing the CLI, Rust build, or icon binaries.
 
+**Re-probe 2026-10-10 (v1.2 Phase 11):** `@tauri-apps/cli` 2.12.1 installed as
+a devDependency (registry reachable); `src-tauri/Cargo.toml` + `src/main.rs` +
+`src/lib.rs` added (mobile-template shape — the v1.1 scaffold shipped no Rust
+sources, so the wrapper was unbuildable); icons generated and committed
+(section 9); `tauri.conf.json` + `capabilities/default.json` converted to
+strict JSON (`cargo check` rejected the commented JSON: `key must be a string
+at line 4 column 3`); mobile init attempted with recorded blockers (section 5);
+`cargo check` outcome recorded in section 10.
+
 ## 2. Backend strategy (decision record)
 
 Node is NOT bundled as a sidecar in this unit. The Tauri webview is a pure UI
@@ -91,34 +100,40 @@ shell; all execution stays in the existing server process:
    Unblock: a bundling decision (which runtime, sidecar wiring in
    `tauri.conf.json` + capabilities) made on a CLI-equipped machine that can
    actually build and smoke-test the bundle.
-3. **CLI-dependent generation:** `tauri icon src-tauri/icons/t3mp3st.svg` and
-   `tauri ios init` / `tauri android init` on a CLI-equipped machine (mobile:
-   section 5; icons: section 9). Unblock: `npm i -D @tauri-apps/cli@2` on a
-   machine with registry access (plus Xcode for iOS, Android SDK+NDK for Android).
+3. **CLI-dependent generation (closed 2026-10-10, Phase 11):** icons generated
+   and committed (section 9); `tauri android init` / `tauri ios init` attempted
+   with exact blockers recorded (section 5 — Java/SDK missing; iOS is
+   macOS-gated). Remaining unblock conditions live in section 5.
 
 ## 4. Capabilities lockdown
 
 `src-tauri/capabilities/default.json` grants only `core:default` on the `main`
-window. Each grant (and each deliberate absence — no `shell:*`, no `fs:*`, no
-`dialog:*`) carries its why-comment in that file; the deny-list is pinned by
-the static test. Rationale: execution already lives server-side behind the
-loopback guards, so the renderer gets no new capability — a compromised
-webview gains nothing.
+window. The file is strict JSON (comments moved here at v1.2 Phase 11): the
+deliberate absences are no `shell:*` (no child processes from the webview —
+execution stays server-side), no `fs:*` (the UI persists via the API, not
+disk), no `dialog:*`, and no request backends beyond the loopback CSP. The
+deny-list is pinned by the static test. Rationale: execution already lives
+server-side behind the loopback guards, so the renderer gets no new
+capability — a compromised webview gains nothing.
 
-## 5. Mobile init (deferred — CLI absent)
+## 5. Mobile init (attempted 2026-10-10 — outcomes recorded)
 
-Run on a machine with the Tauri CLI (`@tauri-apps/cli@2`) and the mobile
-prerequisites (Xcode for iOS; Android Studio/SDK+NDK for Android):
+Both commands were run for real on this Linux host with `@tauri-apps/cli` 2.12.1:
 
-```sh
-npm i -D @tauri-apps/cli@2
-npx tauri ios init        # expected: src-tauri/gen/apple/ + ios/ Xcode project
-npx tauri android init    # expected: src-tauri/gen/android/ + android/ Gradle project
-```
+- `tauri android init` → **blocked: Java missing.** Exact error: `failed to
+  ensure Android environment: Java not found in PATH, default Android Studio
+  Java installation not found at /opt/android-studio/jbr and JAVA_HOME
+  environment variable is not set. Please install Java before proceeding`.
+  No `gen/android` was generated. Unblock: JDK (apt candidate
+  `openjdk-17-jdk-headless` exists) + Android SDK/NDK with `ANDROID_HOME` set,
+  then rerun `npx tauri android init`.
+- `tauri ios init` → **blocked: macOS-gated subcommand.** The CLI exposes no
+  `ios` subcommand on Linux (`tauri --help` lists `android` only; the command
+  errors `unrecognized subcommand 'ios'`). No `gen/apple` was generated.
+  Unblock: run on macOS with Xcode.
 
-Neither command was run here (CLI absent — see probe); no `gen/` output is
-committed, and no `ios/`/`android/` project directories were invented.
-Re-run the probe row after init and update this section.
+No `gen/` output exists to commit and none was invented; rerun the above on an
+equipped machine and commit the result.
 
 Viewport-safe UI contract the redesigned pages already satisfy (so no page
 work blocks init — verified against `docs/assets/tokens.css` 2026-10-09):
@@ -163,31 +178,23 @@ over the LAN opt-in bind with the Bearer-auth upgrade still the named
 follow-up (section 3.1). CI builds the desktop matrix on push/PR touching
 `src-tauri/**` or `docs/**` and keeps iOS/Android manual (section 7).
 
-## 9. Icons (deferred — CLI absent)
+## 9. Icons (generated + committed 2026-10-10)
 
-Source of truth `src-tauri/icons/t3mp3st.svg` (512x512 shield + bolt) plus its
-README stay committed; no raster/ICNS/ICO binaries are committed and none were
-faked. On a CLI-equipped machine run:
+Source of truth `src-tauri/icons/t3mp3st.svg` (512x512 shield + bolt). Rasters
+generated with `@tauri-apps/cli` 2.12.1 (`npx tauri icon src-tauri/icons/t3mp3st.svg`)
+and committed: the four `bundle.icon` paths (`128x128.png`, `128x128@2x.png`,
+`icon.icns`, `icon.ico`) plus the CLI's extra sizes (`32x32.png`, `64x64.png`,
+`icon.png`, Windows Store logos, `android/` + `ios/` asset sets). Regenerate
+after editing the SVG; the static test pins every `bundle.icon` entry to a real
+file on disk.
 
-```sh
-npm i -D @tauri-apps/cli@2
-npx tauri icon src-tauri/icons/t3mp3st.svg
-```
+## 10. Smoke: cargo check (PASS — 2026-10-10)
 
-Expected outputs: the four `bundle.icon` paths `tauri.conf.json` references —
-`src-tauri/icons/128x128.png`, `src-tauri/icons/128x128@2x.png`,
-`src-tauri/icons/icon.icns`, `src-tauri/icons/icon.ico` — regenerated from the
-SVG. Nothing else is expected; if the CLI emits additional sizes, leave the
-conf's list as-is unless the bundle build demands otherwise.
-
-## 10. Smoke: cargo check (not runnable here — no Cargo.toml)
-
-`cargo check --manifest-path src-tauri/Cargo.toml` was NOT run: there is no
-`src-tauri/Cargo.toml` on disk (verified 2026-10-09 — `src-tauri/` holds only
-`tauri.conf.json`, `capabilities/`, `build.rs`, `icons/`). The manifest is
-created by `tauri init` / the CLI on a CLI-equipped machine, which also pulls
-the `tauri`/`tauri-build` crates `build.rs` already references — so a check
-here would only prove the absence, not the build. Outcome honestly recorded:
-not verifiable offline on this machine. CI (section 7) runs the real bundle
-build once the manifest exists; re-record the outcome here after the first
-CLI-backed `tauri build`.
+`cargo check` in `src-tauri/` completed green once Phase 11 added the
+manifest + sources and converted the config to strict JSON. First run failed
+on the commented JSON (`key must be a string at line 4 column 3` — recorded in
+the re-probe above); after the strict-JSON fix: `Finished 'dev' profile
+[unoptimized + debuginfo] target(s) in 37.61s`, exit 0, with `tauri 2.12.2` /
+`wry 0.57.0` / `tauri-runtime-wry 2.12.1` resolved. CI (section 7) runs the
+real bundle build on pushes touching `src-tauri/**` — re-record the bundle
+artifact outcome there after the first CI-backed `tauri build`.

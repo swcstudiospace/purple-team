@@ -1,0 +1,21 @@
+[package]
+name = "t3mp3st"
+version = "1.0.0"
+description = "T3MP3ST — Tactical Execution Multi-agent Platform for Elite Security Testing"
+edition = "2021"
+
+# Mirrors the repo-root package.json version — bump together.
+# The mobile-ready lib shape (staticlib/cdylib/rlib) follows the Tauri 2
+# mobile template so `tauri android init` / `tauri ios init` work unchanged.
+
+[lib]
+name = "t3mp3st_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

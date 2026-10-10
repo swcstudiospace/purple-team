@@ -1,16 +1,10 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "T3MP3ST",
-  // Mirrors the "version" field in the repo-root package.json — bump together.
   "version": "1.0.0",
-  // No tenant/id hint exists in package.json ("t3mp3st") or tenants.json
-  // (docs-tenant only), so the repo-consistent reverse-DNS id below is used.
   "identifier": "com.t3mp3st.app",
   "build": {
-    // The static UI in docs/ is the frontend (served at /ui by `npm run server`).
     "frontendDist": "../docs",
-    // Dev webview points at the loopback server's UI mount (src/server.ts:
-    // app.use('/ui', express.static('docs')), PORT defaults to 3333).
     "devUrl": "http://127.0.0.1:3333/ui",
     "beforeDevCommand": "npm run server",
     "beforeBuildCommand": "npm run build"
@@ -20,23 +14,14 @@
       {
         "label": "main",
         "title": "T3MP3ST",
-        // Content column max-width: 1200px (tokens.css .shell__content) —
-        // 1280 wide fits it with chrome to spare, 800 tall keeps nav usable.
         "width": 1280,
         "height": 800,
-        // minWidth 360: 360px mobile pass (tokens.css @max-width 640px block)
-        // + .toast max-width min(360px, 90vw); drawer nav takes over below
-        // 900px (tokens.css @max-width 900px) so 360 stays single-column
-        // usable. minHeight 600 keeps nav + content visible; coarse-pointer
-        // targets stay >= 44px (tokens.css --touch).
         "minWidth": 360,
         "minHeight": 600,
         "resizable": true
       }
     ],
     "security": {
-      // Bundled UI calls the alongside loopback API; only that origin may be
-      // fetched from the webview. No remote connect sources are allowed.
       "csp": "default-src 'self' tauri: asset: http://127.0.0.1:3333/ui; connect-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' asset: data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },

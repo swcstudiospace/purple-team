@@ -2,6 +2,8 @@ node_modules/
 dist/
 .env
 *.tsbuildinfo
+# Rust build output (cargo check/build in src-tauri/)
+src-tauri/target/
 
 # --- excluded from the published repo ---
 # raw upstream Cybench corpus (181M third-party content incl. writeups/flags/solutions — do not redistribute)

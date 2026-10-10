@@ -18,7 +18,7 @@ Grok Bot integration recorded as a follow-up. Closes with full gates and docs.
 
 ## Phases
 
-- [ ] **Phase 11: Tauri Bundle Completion** - install @tauri-apps/cli, generate icon rasters from the committed SVG, init mobile targets where the host toolchain permits, verify bundle config
+- [x] **Phase 11: Tauri Bundle Completion** - install @tauri-apps/cli, generate icon rasters from the committed SVG, init mobile targets where the host toolchain permits, verify bundle config (2026-10-10)
 - [ ] **Phase 12: Node Server Sidecar** - bundle the loopback server as a Tauri sidecar so `tauri build` yields a self-contained desktop app
 - [ ] **Phase 13: Remote-Access Hardening** - bearer-token auth for non-loopback bot hosting + bot rate limits, with tests
 - [ ] **Phase 14: v1.2 Hardening & Close-out** - full gates, docs, planning final
@@ -34,6 +34,11 @@ Grok Bot integration recorded as a follow-up. Closes with full gates and docs.
   2. Mobile init outcomes are real: generated project dirs committed, or a recorded toolchain blocker (e.g. no Xcode on Linux) with the exact error
   3. `npm run tauri:build`-path config validates as far as the host allows; static scaffold test still green
   4. docs/TAURI.md reflects the new state; no "deferred" language remains for completed items
+
+**Plans**: 1 plan
+
+Plans:
+- [x] 11-01: Tauri bundle completion (icons + mobile init + docs)
 
 ### Phase 12: Node Server Sidecar
 **Goal**: The desktop app runs without the operator manually starting `npm run server` alongside.
@@ -67,7 +72,7 @@ Grok Bot integration recorded as a follow-up. Closes with full gates and docs.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 11. Tauri Bundle Completion | 0/0 | Not Started | — |
+| 11. Tauri Bundle Completion | 1/1 | Complete | 2026-10-10 |
 | 12. Node Server Sidecar | 0/0 | Not Started | — |
 | 13. Remote-Access Hardening | 0/0 | Not Started | — |
 | 14. v1.2 Hardening & Close-out | 0/0 | Not Started | — |
