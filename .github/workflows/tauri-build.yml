@@ -1,0 +1,102 @@
+name: Tauri shell build
+
+# Desktop bundles build on push/PR; mobile jobs are manual dispatch only
+# (they need signing identities plus Xcode / Android SDK+NDK toolchains).
+on:
+  push:
+    branches: [main]
+    paths: ['src-tauri/**', 'docs/**', '.github/workflows/tauri-build.yml']
+  pull_request:
+    branches: [main]
+    paths: ['src-tauri/**', 'docs/**', '.github/workflows/tauri-build.yml']
+  workflow_dispatch:
+    inputs:
+      mobile:
+        description: 'Also run the manual mobile init-check jobs (ios/android)'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: t3mp3st-tauri-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  desktop:
+    name: Desktop bundle (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: linux
+            args: --bundles deb,appimage
+          - os: windows-latest
+            target: windows
+            args: --bundles msi,nsis
+          - os: macos-latest
+            target: macos
+            args: --bundles app,dmg
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux webkit/ayatana deps
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - run: npm ci
+      - run: npm run build
+      - name: Build Tauri bundle
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+
+  ios:
+    name: iOS init check (manual only)
+    if: github.event_name == 'workflow_dispatch' && inputs.mobile == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - run: npm ci
+      - run: npx --no-install @tauri-apps/cli ios init
+      - run: npx --no-install @tauri-apps/cli ios build --export-method debugging
+
+  android:
+    name: Android init check (manual only)
+    if: github.event_name == 'workflow_dispatch' && inputs.mobile == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android,i686-linux-android
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npx --no-install @tauri-apps/cli android init
+      - run: npx --no-install @tauri-apps/cli android build

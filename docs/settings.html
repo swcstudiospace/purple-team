@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Settings</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Providers · Keys · Server</div>
+<h1 class="page-head__title" id="pageTitle">Settings</h1>
+<p class="page-head__sub">Sign in with a subscription, connect a local agent, or store API keys. Tokens stay on this machine. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="signinTitle">
+<h2 class="card__title" id="signinTitle">Subscription sign-in</h2>
+<p class="text-secondary">Use your Super Grok Heavy, Claude Pro/Max, or ChatGPT Plan subscription instead of API keys.</p>
+<div class="provider-grid">
+<div class="card provider-card" aria-labelledby="xaiName">
+<div class="provider-card__head"><h3 class="provider-card__name" id="xaiName">Super Grok Heavy</h3><span class="badge badge--neutral" id="oauthXaiStatus">offline</span></div>
+<p class="provider-card__desc">Device-code login. Bills against SuperGrok / Super Grok Heavy.</p>
+<div class="provider-card__body" id="oauthXaiBody">Sign in to unlock grok-4-heavy models.</div>
+<div class="card__row"><button class="btn btn--sm btn--primary" onclick="startXaiOAuth()">Sign in with SuperGrok</button><button class="btn btn--sm" onclick="logoutOAuth('xai')">Sign out</button></div>
+</div>
+<div class="card provider-card" aria-labelledby="claudeName">
+<div class="provider-card__head"><h3 class="provider-card__name" id="claudeName">Claude Pro / Max</h3><span class="badge badge--neutral" id="oauthAnthropicStatus">offline</span></div>
+<p class="provider-card__desc">Browser PKCE against Claude.ai. Bills against Claude Pro or Max.</p>
+<div class="provider-card__body" id="oauthAnthropicBody">Sign in, then paste the callback code. Opus / Sonnet run on your subscription.</div>
+<div class="card__row"><button class="btn btn--sm btn--primary" onclick="startAnthropicOAuth()">Sign in with Claude</button><button class="btn btn--sm" onclick="logoutOAuth('anthropic')">Sign out</button></div>
+</div>
+<div class="card provider-card" aria-labelledby="chatgptName">
+<div class="provider-card__head"><h3 class="provider-card__name" id="chatgptName">ChatGPT Plan</h3><span class="badge badge--neutral" id="oauthOpenaiStatus">offline</span></div>
+<p class="provider-card__desc">Browser PKCE against ChatGPT. Bills against your ChatGPT Plan.</p>
+<div class="provider-card__body" id="oauthOpenaiBody">Sign in, then paste the callback code.</div>
+<div class="card__row"><button class="btn btn--sm btn--primary" onclick="startOpenaiOAuth()">Sign in with ChatGPT</button><button class="btn btn--sm" onclick="logoutOpenaiOAuth()">Sign out</button></div>
+</div>
+<div class="card provider-card" aria-labelledby="cursorName">
+<div class="provider-card__head"><h3 class="provider-card__name" id="cursorName">Cursor</h3><span class="badge badge--neutral" id="cursorStatus">unknown</span></div>
+<p class="provider-card__desc">Drive the Cursor agent already authed on this machine — no API key needed.</p>
+<div class="provider-card__body" id="cursorBody">Detect agents, then connect Cursor as a local backbone.</div>
+<div class="card__row"><button class="btn btn--sm btn--primary" onclick="connectCursorAgent()">Connect Cursor</button><button class="btn btn--sm" onclick="detectLocalAgents()">Re-scan</button></div>
+</div>
+<div class="card provider-card" aria-labelledby="orName">
+<div class="provider-card__head"><h3 class="provider-card__name" id="orName">OpenRouter</h3><span class="badge badge--neutral" id="openrouterStatus">not saved</span></div>
+<p class="provider-card__desc">OpenAI-compatible routing across models. Stored locally, masked everywhere.</p>
+<div class="key-row"><input type="password" class="form-input mono" id="openrouterKey" placeholder="sk-or-..." autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('openrouterKey')">Show</button></div>
+<div class="card__row"><button class="btn btn--sm btn--primary" onclick="saveApiKey('openrouter')">Save</button></div>
+</div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="uacTitle">
+<h2 class="card__title" id="uacTitle">Universal API config</h2>
+<p class="text-secondary">One place for provider, key, base URL, model, and context cap — shared with the provider cards.</p>
+<div class="form-row">
+<div><label class="flabel" for="uacProvider">API Provider</label><select class="form-input" id="uacProvider">
+<option value="openrouter">OpenRouter · OpenAI-compatible</option>
+<option value="venice">Venice · OpenAI-compatible</option>
+<option value="openai">OpenAI · OpenAI-compatible</option>
+<option value="nanogpt">NanoGPT · OpenAI-compatible</option>
+<option value="novita">Novita AI · OpenAI-compatible</option>
+<option value="xai">xAI Grok · SuperGrok OAuth or API key</option>
+<option value="anthropic">Claude · Anthropic Messages API / Pro-Max OAuth</option>
+</select></div>
+<div><label class="flabel" for="uacBaseUrl">Base URL (optional)</label><input type="text" class="form-input mono" id="uacBaseUrl" placeholder="https://openrouter.ai/api/v1"></div>
+</div>
+<div class="form-row" style="margin-top:8px">
+<div><label class="flabel" for="uacApiKey">API Key</label><div class="key-row"><input type="password" class="form-input mono" id="uacApiKey" placeholder="sk-..." autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('uacApiKey')">Show</button></div></div>
+<div><label class="flabel" for="uacModel">Model</label><div class="key-row"><select class="form-input" id="uacModel"><option value="">— none selected —</option></select><button class="btn btn--sm" id="uacFetchBtn" onclick="uacFetchModels()">Fetch models</button></div><div class="form-hint" id="uacModelHint"></div></div>
+</div>
+<div style="margin-top:8px"><label class="flabel" for="uacMaxTokens">Max Context Tokens (optional)</label><input type="number" class="form-input" id="uacMaxTokens" placeholder="e.g. 200000" min="0" step="1000" style="max-width:240px"></div>
+<div class="card__row" style="margin-top:8px"><button class="btn btn--sm btn--primary" onclick="uacSave()">Save config</button></div>
+</section>
+
+<section class="card" aria-labelledby="keysTitle">
+<h2 class="card__title" id="keysTitle">API keys</h2>
+<div class="provider-grid" id="keysGrid">
+<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name">Venice</h3><span class="badge badge--neutral" data-key-status="venice">not saved</span></div><div class="key-row"><input type="password" class="form-input mono" id="veniceKey" placeholder="venice key…" autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('veniceKey')">Show</button></div><div class="card__row"><button class="btn btn--sm btn--primary" onclick="saveApiKey('venice')">Save</button></div></div>
+<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name">Hugging Face</h3><span class="badge badge--neutral" data-key-status="huggingface">not saved</span></div><div class="key-row"><input type="password" class="form-input mono" id="huggingfaceKey" placeholder="hf_..." autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('huggingfaceKey')">Show</button></div><div class="card__row"><button class="btn btn--sm btn--primary" onclick="saveApiKey('huggingface')">Save</button></div></div>
+<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name">Anthropic</h3><span class="badge badge--neutral" data-key-status="anthropic">not saved</span></div><div class="key-row"><input type="password" class="form-input mono" id="anthropicKey" placeholder="sk-ant-..." autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('anthropicKey')">Show</button></div><div class="card__row"><button class="btn btn--sm btn--primary" onclick="saveApiKey('anthropic')">Save</button></div></div>
+<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name">OpenAI</h3><span class="badge badge--neutral" data-key-status="openai">not saved</span></div><div class="key-row"><input type="password" class="form-input mono" id="openaiKey" placeholder="sk-..." autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('openaiKey')">Show</button></div><div class="card__row"><button class="btn btn--sm btn--primary" onclick="saveApiKey('openai')">Save</button></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="agentsTitle">
+<h2 class="card__title" id="agentsTitle">Local agents</h2>
+<p class="text-secondary">Enlist agents already authed on this machine — Claude Code / Codex / Hermes / Cursor. Pin one as the active backbone.</p>
+<div class="card__row"><span class="badge badge--neutral" id="localAgentsSummary">scanning</span><button class="btn btn--sm btn--primary" onclick="connectSelectedLocalAgents()">Connect selected</button><button class="btn btn--sm" onclick="detectLocalAgents()">Re-scan</button></div>
+<div class="provider-grid" id="localAgentsList" style="margin-top:8px"><p class="text-secondary">Detecting local agents…</p></div>
+</section>
+
+<section class="card" aria-labelledby="modelTitle">
+<h2 class="card__title" id="modelTitle">Model selection</h2>
+<div data-state-root id="modelState">
+<div data-state="loading" class="st-loading"><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No model reported. Connect a backend first.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Check again</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Model status unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Model status current.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><p class="mono" id="modelLine"></p></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="serverTitle">
+<h2 class="card__title" id="serverTitle">API server</h2>
+<div class="key-row"><input type="text" class="form-input mono" id="apiServerUrl" placeholder="http://localhost:3333"><button class="btn btn--sm btn--primary" onclick="saveApiServerUrl()">Save</button><button class="btn btn--sm" onclick="testApiConnection()">Test</button></div>
+<p class="form-hint">Default: http://localhost:3333 — change if your server runs on a different host/port.</p>
+</section>
+
+<section class="card" aria-labelledby="dataTitle">
+<h2 class="card__title" id="dataTitle">Data</h2>
+<div class="card__row"><button class="btn btn--danger" onclick="clearAllData()">Clear all data</button></div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Settings page: five-provider sign-in, keys, agents, models, server.
+var settingsState = { settings: {} };
+try { settingsState = JSON.parse(window.localStorage.getItem('t3mp3st_state_v1') || '{"settings":{}}'); } catch (e) { settingsState = { settings: {} }; }
+if (!settingsState.settings) settingsState.settings = {};
+var settingsFlows = { xai: null, anthropic: null, openai: null };
+var settingsAgents = [];
+var settingsConnected = [];
+
+function persistSettings() {
+  try { window.localStorage.setItem('t3mp3st_state_v1', JSON.stringify(settingsState)); } catch (e) { /* storage unavailable */ }
+}
+function settingsApi(path, body) {
+  var base = Shell.apiBase();
+  return fetch(base + path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+}
+function escSettings(s) { return Shell.escHtml(s); }
+
+function toggleApiKey(id) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+function saveApiKey(provider) {
+  var el = document.getElementById(provider + 'Key');
+  var key = el ? el.value : '';
+  if (!key) { Shell.toast('Enter a key', 'error'); return; }
+  settingsState.settings[provider + 'Key'] = key;
+  persistSettings();
+  paintKeyStatus();
+  if (el) el.value = '';
+  Shell.toast(provider + ' key saved (masked)', 'success');
+}
+function paintKeyStatus() {
+  document.querySelectorAll('[data-key-status]').forEach(function (el) {
+    var p = el.getAttribute('data-key-status');
+    var saved = !!(settingsState.settings && settingsState.settings[p + 'Key']);
+    el.textContent = saved ? 'saved' : 'not saved';
+    el.className = 'badge ' + (saved ? 'badge--ok' : 'badge--neutral');
+  });
+  var or = document.getElementById('openrouterStatus');
+  if (or) {
+    var savedOr = !!(settingsState.settings && settingsState.settings.openrouterKey);
+    or.textContent = savedOr ? 'saved' : 'not saved';
+    or.className = 'badge ' + (savedOr ? 'badge--ok' : 'badge--neutral');
+  }
+}
+
+function paintSettingsOAuth(oauth) {
+  [['xai', 'oauthXaiStatus', 'oauthXaiBody', 'Super Grok Heavy models are available.'],
+   ['anthropic', 'oauthAnthropicStatus', 'oauthAnthropicBody', 'Claude Opus / Sonnet run on your subscription.'],
+   ['openai', 'oauthOpenaiStatus', 'oauthOpenaiBody', 'ChatGPT Plan models run on your subscription.']].forEach(function (t) {
+    var info = oauth && oauth[t[0]];
+    var badge = document.getElementById(t[1]);
+    if (badge) {
+      badge.textContent = info && info.connected ? 'connected' : 'offline';
+      badge.className = 'badge ' + (info && info.connected ? 'badge--ok' : 'badge--neutral');
+    }
+    var body = document.getElementById(t[2]);
+    if (body && info && info.connected) body.textContent = 'Signed in. ' + t[3];
+  });
+}
+async function refreshSettingsOAuth() {
+  try {
+    var r = await settingsApi('/api/oauth/status');
+    if (!r.ok) return;
+    paintSettingsOAuth(await r.json());
+  } catch (e) { /* server may be down */ }
+}
+async function startXaiOAuth() {
+  var body = document.getElementById('oauthXaiBody');
+  try {
+    var r = await settingsApi('/api/oauth/xai/start', {});
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    settingsFlows.xai = d.flowId;
+    var link = d.verificationUriComplete || d.verificationUri;
+    if (body) body.innerHTML = '<div>Open this URL and enter the code:</div><div class="mono">' + escSettings(d.userCode || '') + '</div><div><a href="' + escSettings(link) + '" target="_blank" rel="noopener noreferrer">' + escSettings(link) + '</a></div>';
+    Shell.toast('Approve SuperGrok in the browser, then wait…', 'info');
+    var n = 0;
+    var timer = setInterval(async function () {
+      n += 1;
+      if (n > 120) { clearInterval(timer); if (body) body.textContent = 'Timed out — start again.'; return; }
+      try {
+        var pr = await settingsApi('/api/oauth/xai/poll', { flowId: settingsFlows.xai });
+        var pd = await pr.json();
+        if (pd.status === 'authorized') {
+          clearInterval(timer);
+          paintSettingsOAuth(pd.oauth);
+          Shell.toast('Super Grok Heavy connected', 'success');
+        } else if (pd.status === 'denied' || pd.status === 'expired') {
+          clearInterval(timer);
+          if (body) body.textContent = pd.error || pd.status;
+          Shell.toast(pd.error || 'SuperGrok sign-in failed', 'error');
+        }
+      } catch (e) { /* keep polling */ }
+    }, Math.max(2000, (d.interval || 5) * 1000));
+  } catch (e) {
+    if (body) body.textContent = e.message || String(e);
+    Shell.toast('SuperGrok sign-in failed: ' + (e.message || e), 'error');
+  }
+}
+async function startAnthropicOAuth() {
+  var body = document.getElementById('oauthAnthropicBody');
+  try {
+    var r = await settingsApi('/api/oauth/anthropic/start', {});
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    settingsFlows.anthropic = d.flowId;
+    if (d.authorizeUrl) window.open(d.authorizeUrl, '_blank', 'noopener');
+    if (body) body.innerHTML = '<div>Authorize in the browser, then paste the callback code:</div><input id="settingsAnthropicCode" class="form-input mono" placeholder="code#state"><button class="btn btn--primary btn--sm" style="margin-top:8px;" onclick="completeAnthropicOAuth()">Complete sign-in</button>';
+  } catch (e) {
+    if (body) body.textContent = e.message || String(e);
+    Shell.toast('Claude sign-in failed: ' + (e.message || e), 'error');
+  }
+}
+async function completeAnthropicOAuth() {
+  var input = document.getElementById('settingsAnthropicCode');
+  var code = input ? input.value.trim() : '';
+  if (!code || !settingsFlows.anthropic) { Shell.toast('Paste the Claude callback code first', 'error'); return; }
+  try {
+    var r = await settingsApi('/api/oauth/anthropic/complete', { flowId: settingsFlows.anthropic, code: code });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    paintSettingsOAuth(d.oauth);
+    Shell.toast('Claude Pro/Max connected', 'success');
+  } catch (e) {
+    Shell.toast('Claude complete failed: ' + (e.message || e), 'error');
+  }
+}
+async function startOpenaiOAuth() {
+  var body = document.getElementById('oauthOpenaiBody');
+  try {
+    var r = await settingsApi('/api/oauth/openai/start', {});
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    settingsFlows.openai = d.flowId;
+    if (d.authorizeUrl) window.open(d.authorizeUrl, '_blank', 'noopener');
+    if (body) body.innerHTML = '<div>Authorize in the browser, then paste the callback code:</div><input id="settingsOpenaiCode" class="form-input mono" placeholder="code#state"><button class="btn btn--primary btn--sm" style="margin-top:8px;" onclick="completeOpenaiOAuth()">Complete sign-in</button>';
+  } catch (e) {
+    if (body) body.textContent = e.message || String(e);
+    Shell.toast('ChatGPT sign-in failed: ' + (e.message || e), 'error');
+  }
+}
+async function completeOpenaiOAuth() {
+  var input = document.getElementById('settingsOpenaiCode');
+  var code = input ? input.value.trim() : '';
+  if (!code || !settingsFlows.openai) { Shell.toast('Paste the ChatGPT callback code first', 'error'); return; }
+  try {
+    var r = await settingsApi('/api/oauth/openai/complete', { flowId: settingsFlows.openai, code: code });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    paintSettingsOAuth(d.oauth);
+    Shell.toast('ChatGPT Plan connected', 'success');
+  } catch (e) {
+    Shell.toast('ChatGPT complete failed: ' + (e.message || e), 'error');
+  }
+}
+async function logoutOpenaiOAuth() {
+  try {
+    var r = await settingsApi('/api/oauth/openai/logout', {});
+    var d = await r.json();
+    paintSettingsOAuth(d.oauth);
+    Shell.toast('ChatGPT signed out', 'info');
+  } catch (e) {
+    Shell.toast('Sign-out failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function logoutOAuth(vendor) {
+  try {
+    var r = await settingsApi('/api/oauth/' + vendor + '/logout', {});
+    var d = await r.json();
+    paintSettingsOAuth(d.oauth);
+    Shell.toast(vendor + ' signed out', 'info');
+  } catch (e) {
+    Shell.toast('Sign-out failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function detectLocalAgents() {
+  var list = document.getElementById('localAgentsList');
+  try {
+    var r = await settingsApi('/api/agents/local/detect');
+    var d = await r.json();
+    settingsAgents = d.agents || [];
+    settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
+    renderAgents();
+    paintCursor();
+  } catch (e) {
+    if (list) list.innerHTML = '<p class="text-secondary">Detection failed — is the server running?</p>';
+  }
+}
+function renderAgents() {
+  var list = document.getElementById('localAgentsList');
+  if (!list) return;
+  var sum = document.getElementById('localAgentsSummary');
+  if (sum) sum.textContent = settingsAgents.length + ' detected · ' + settingsConnected.length + ' connected';
+  list.innerHTML = settingsAgents.map(function (a) {
+    var connected = settingsConnected.indexOf(a.id) >= 0;
+    return '<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name">' + escSettings(a.label || a.id) + '</h3>'
+      + '<span class="badge ' + (connected ? 'badge--ok' : (a.ready ? 'badge--info' : 'badge--neutral')) + '">' + (connected ? 'connected' : (a.ready ? 'ready' : 'unavailable')) + '</span></div>'
+      + '<p class="provider-card__desc">' + escSettings(a.vendor || '') + ' · ' + escSettings(a.invokeHint || a.bin || '') + '</p>'
+      + '<div class="card__row"><input type="checkbox" class="la-sel" data-id="' + escSettings(a.id) + '" aria-label="Select ' + escSettings(a.id) + '">'
+      + (connected
+        ? '<button class="btn btn--sm" onclick="disconnectSettingsAgent(\'' + escSettings(a.id) + '\')">Disconnect</button>'
+        : (a.ready ? '<button class="btn btn--sm btn--primary" onclick="connectSettingsAgent(\'' + escSettings(a.id) + '\')">Connect</button>' : ''))
+      + '</div></div>';
+  }).join('') || '<p class="text-secondary">No agents detected.</p>';
+}
+function paintCursor() {
+  var badge = document.getElementById('cursorStatus');
+  var body = document.getElementById('cursorBody');
+  var found = settingsAgents.find(function (a) { return a.id === 'cursor'; });
+  var connected = settingsConnected.indexOf('cursor') >= 0;
+  if (badge) {
+    badge.textContent = connected ? 'connected' : (found ? (found.authed ? 'detected' : 'not authed') : 'not detected');
+    badge.className = 'badge ' + (connected ? 'badge--ok' : (found && found.authed ? 'badge--info' : 'badge--neutral'));
+  }
+  if (body && found) body.textContent = 'Cursor ' + (found.version || '') + ' · ' + (connected ? 'connected as a local backbone.' : 'detected — connect to enlist it.');
+}
+async function connectSettingsAgent(id) {
+  try {
+    var r = await settingsApi('/api/agents/local/connect', { ids: [id], ping: false });
+    var d = await r.json();
+    settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
+    renderAgents();
+    paintCursor();
+    Shell.toast(id + ' connected', 'success');
+  } catch (e) {
+    Shell.toast('Connect failed: ' + (e.message || e), 'error');
+  }
+}
+async function connectCursorAgent() {
+  try {
+    var r = await settingsApi('/api/agents/local/connect', { id: 'cursor', ping: false });
+    var d = await r.json();
+    settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
+    renderAgents();
+    paintCursor();
+    Shell.toast('Cursor connected', 'success');
+  } catch (e) {
+    Shell.toast('Cursor connect failed: ' + (e.message || e), 'error');
+  }
+}
+async function disconnectSettingsAgent(id) {
+  try {
+    var r = await settingsApi('/api/agents/local/disconnect', { id: id });
+    var d = await r.json();
+    settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
+    renderAgents();
+    paintCursor();
+    Shell.toast(id + ' disconnected', 'info');
+  } catch (e) {
+    Shell.toast('Disconnect failed: ' + (e.message || e), 'error');
+  }
+}
+async function connectSelectedLocalAgents() {
+  var checked = Array.prototype.map.call(document.querySelectorAll('.la-sel:checked'), function (el) { return el.getAttribute('data-id'); });
+  if (!checked.length) { Shell.toast('Select at least one agent', 'error'); return; }
+  try {
+    var r = await settingsApi('/api/agents/local/connect', { ids: checked, ping: false });
+    var d = await r.json();
+    settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
+    renderAgents();
+    paintCursor();
+    Shell.toast('Connected ' + settingsConnected.length + ' agent(s)', 'success');
+  } catch (e) {
+    Shell.toast('Connect failed: ' + (e.message || e), 'error');
+  }
+}
+
+var UAC_BASE = {
+  openrouter: 'https://openrouter.ai/api/v1',
+  venice: 'https://api.venice.ai/api/v1',
+  openai: 'https://api.openai.com/v1',
+  nanogpt: 'https://nano-gpt.com/api/v1',
+  novita: 'https://api.novita.ai/openai/v1',
+  xai: 'https://api.x.ai/v1',
+  anthropic: 'https://api.anthropic.com'
+};
+function uacProvider() {
+  var el = document.getElementById('uacProvider');
+  return el ? el.value : 'openrouter';
+}
+function uacSave() {
+  var p = uacProvider();
+  settingsState.settings.activeProvider = p;
+  settingsState.settings[p + 'Key'] = document.getElementById('uacApiKey').value || settingsState.settings[p + 'Key'] || '';
+  settingsState.settings.baseUrl = document.getElementById('uacBaseUrl').value || '';
+  settingsState.settings.selectedModel = document.getElementById('uacModel').value || settingsState.settings.selectedModel || '';
+  persistSettings();
+  paintKeyStatus();
+  Shell.toast('Provider config saved', 'success');
+}
+async function uacFetchModels() {
+  var btn = document.getElementById('uacFetchBtn');
+  var hint = document.getElementById('uacModelHint');
+  var p = uacProvider();
+  var key = document.getElementById('uacApiKey').value || settingsState.settings[p + 'Key'] || '';
+  var base = document.getElementById('uacBaseUrl').value || UAC_BASE[p] || '';
+  if (btn) { btn.disabled = true; }
+  try {
+    var r = await settingsApi('/api/models', { provider: p, apiKey: key, baseUrl: base });
+    var d = await r.json();
+    var models = d.models || [];
+    var sel = document.getElementById('uacModel');
+    sel.innerHTML = '<option value="">— none selected —</option>' + models.map(function (m) {
+      var id = typeof m === 'string' ? m : m.id;
+      var opt = document.createElement('option');
+      opt.value = id;
+      opt.textContent = id;
+      return opt.outerHTML;
+    }).join('');
+    if (hint) hint.textContent = models.length + ' model(s) · ' + (d.source === 'live' ? 'live from provider' : 'built-in list');
+  } catch (e) {
+    if (hint) hint.textContent = 'Fetch failed: ' + (e.message || e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function refreshModelStatus() {
+  var root = document.getElementById('modelState');
+  try {
+    var oauth = {};
+    try {
+      var or = await settingsApi('/api/oauth/status');
+      if (or.ok) oauth = await or.json();
+    } catch (e) { /* oauth best-effort */ }
+    var lr = await settingsApi('/api/llm/status');
+    var llm = await lr.json();
+    var line = document.getElementById('modelLine');
+    var names = [];
+    if (oauth.xai && oauth.xai.connected) names.push('Super Grok Heavy');
+    if (oauth.anthropic && oauth.anthropic.connected) names.push('Claude Pro/Max');
+    if (oauth.openai && oauth.openai.connected) names.push('ChatGPT Plan');
+    if (line) line.textContent = 'LLM connected: ' + (!!llm.connected) + (llm.provider ? ' · provider ' + llm.provider : '') + (llm.model ? ' · model ' + llm.model : '') + (names.length ? ' · subscriptions: ' + names.join(', ') : '');
+    Shell.showState(root, 'data');
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+function saveApiServerUrl() {
+  var el = document.getElementById('apiServerUrl');
+  try { window.localStorage.setItem('t3mp3st_api_url', el.value.trim()); } catch (e) { /* storage unavailable */ }
+  Shell.toast('API server URL saved', 'success');
+}
+async function testApiConnection() {
+  try {
+    var base = Shell.apiBase();
+    var r = await fetch(base + '/api/health');
+    var d = await r.json();
+    Shell.toast(d.status === 'operational' ? 'API server reachable' : 'Server responded: ' + d.status, d.status === 'operational' ? 'success' : 'warning');
+  } catch (e) {
+    Shell.toast('Connection failed: ' + (e.message || e), 'error');
+  }
+}
+function clearAllData() {
+  try { window.localStorage.clear(); } catch (e) { /* storage unavailable */ }
+  settingsState = { settings: {} };
+  paintKeyStatus();
+  Shell.toast('All local data cleared', 'info');
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  if (q.get('provider')) {
+    var sel = document.getElementById('uacProvider');
+    if (sel) sel.value = q.get('provider');
+  }
+  try {
+    var saved = window.localStorage.getItem('t3mp3st_api_url');
+    if (saved) document.getElementById('apiServerUrl').value = saved;
+  } catch (e) { /* storage unavailable */ }
+  paintKeyStatus();
+  refreshSettingsOAuth();
+  detectLocalAgents();
+  refreshModelStatus();
+  document.getElementById('uacProvider').addEventListener('change', function (ev) {
+    Shell.params.set({ provider: ev.target.value });
+  });
+  document.querySelectorAll('#modelState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', refreshModelStatus);
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    if (nq.get('provider')) document.getElementById('uacProvider').value = nq.get('provider');
+  });
+})();
+</script>
+</body>
+</html>

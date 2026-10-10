@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Overview</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">War Room</div>
+<h1 class="page-head__title" id="pageTitle">Overview</h1>
+<p class="page-head__sub">Launch missions, watch live status, and review findings. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="backendTitle">
+<h2 class="card__title" id="backendTitle">Backend status</h2>
+<div class="card__row">
+<span class="badge badge--neutral" id="apiBadge">checking</span>
+<span class="text-secondary" id="apiText">Contacting the API server…</span>
+<button class="btn btn--sm" id="healthRetry" type="button">Retry</button>
+</div>
+<p class="form-hint" id="llmLine">LLM backbone: unknown yet.</p>
+</section>
+
+<section class="card" aria-labelledby="keylessTitle">
+<h2 class="card__title" id="keylessTitle">Run keyless</h2>
+<p class="text-secondary" id="keylessCalloutText">Sign in with <strong>Super Grok Heavy</strong> or <strong>Claude Pro/Max</strong>, or connect Claude Code / Codex / Hermes. No API key required.</p>
+<div class="card__row">
+<span class="badge badge--neutral" id="oauthXaiStatus">offline</span>
+<span class="text-secondary">Super Grok Heavy</span>
+<span class="badge badge--neutral" id="oauthAnthropicStatus">offline</span>
+<span class="text-secondary">Claude Pro/Max</span>
+<span class="badge badge--neutral" id="oauthOpenaiStatus">offline</span>
+<span class="text-secondary">ChatGPT Plan</span>
+<a class="btn btn--sm" href="settings.html">Set up in Settings</a>
+</div>
+<div class="provider-card__body" id="oauthXaiBody" hidden></div>
+<div class="provider-card__body" id="oauthAnthropicBody" hidden></div>
+<div class="provider-card__body" id="oauthOpenaiBody" hidden></div>
+</section>
+
+<section class="card" aria-labelledby="huntTitle">
+<h2 class="card__title" id="huntTitle">Launch a hunt</h2>
+<div class="form-row">
+<div><label class="flabel" for="heroHuntTarget">Target</label><input class="form-input mono" id="heroHuntTarget" type="text" placeholder="github.com/org/repo · npm package · host or IP"></div>
+<div style="max-width:220px"><label class="flabel" for="quickProvider">Backend</label><select class="form-input" id="quickProvider">
+<option value="openrouter">OpenRouter · OpenAI-compatible</option>
+<option value="venice">Venice · OpenAI-compatible</option>
+<option value="openai">OpenAI · OpenAI-compatible</option>
+<option value="nanogpt">NanoGPT · OpenAI-compatible</option>
+<option value="novita">Novita AI · OpenAI-compatible</option>
+<option value="xai">xAI Grok · SuperGrok OAuth or API key</option>
+<option value="anthropic">Claude · Anthropic Messages API / Pro-Max OAuth</option>
+</select></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<label class="text-secondary" style="font-size:12px"><input type="checkbox" id="heroAutonomousMode"> Autonomous mode (receipts still logged)</label>
+<button class="btn btn--primary" id="huntBtn" type="button">Hunt</button>
+<button class="btn" id="missionStopBtn" type="button">Stop</button>
+</div>
+<div id="approvalBanner" hidden></div>
+<div data-state-root id="missionState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No mission running. Type a target and hit Hunt.</p></div>
+<div data-state="error" class="st-error" hidden><p><strong>Mission failed.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Mission launched.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="statusTitle">
+<h2 class="card__title" id="statusTitle">Live status</h2>
+<div data-state-root id="statusState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
+<div data-state="error" class="st-error" hidden><p><strong>Status unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Live.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><p class="mono" id="statusLine"></p><ul class="feed" id="phaseList"></ul></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="findingsTitle">
+<h2 class="card__title" id="findingsTitle">Findings</h2>
+<div class="card__row">
+<label class="flabel" for="sevFilter">Severity</label>
+<select class="form-input" id="sevFilter" style="max-width:180px"><option value="all">all</option><option value="critical">critical</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select>
+<button class="btn btn--sm" id="findingsRetry" type="button">Refresh</button>
+<a class="btn btn--sm btn--ghost" href="evidence.html">Open Evidence Vault</a>
+</div>
+<div data-state-root id="findingsState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No findings yet. Findings land here with provenance once a mission runs.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Refresh</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Findings unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Findings updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><table class="table" id="findingsTable"><thead><tr><th>Severity</th><th>Title</th><th>Source</th></tr></thead><tbody></tbody></table></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="admiralTitle">
+<h2 class="card__title" id="admiralTitle">Op Admiral — quick operation</h2>
+<p class="text-secondary" id="admBackboneLine">Backbone: resolving…</p>
+<div class="form-row">
+<div><label class="flabel" for="generalDirective">Directive</label><input class="form-input" id="generalDirective" type="text" placeholder="Assess the exposure of example.com"></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--primary" id="generalAutoBtn" type="button">Full auto</button>
+<button class="btn" id="sitrepBtn" type="button">Request sitrep</button>
+<a class="btn btn--ghost" href="engagements.html">Open Engagements</a>
+</div>
+<p class="mono" id="generalState"></p>
+<span class="badge badge--danger" id="generalStatusBadge" hidden>live</span>
+<div id="generalPlanOut"></div>
+<div id="generalSitrepFeed"></div>
+</section>
+
+<section class="card" aria-labelledby="eventsTitle">
+<h2 class="card__title" id="eventsTitle">System events</h2>
+<ul class="feed" id="sysEventTerminal" aria-live="polite"><li>Waiting for the event stream…</li></ul>
+</section>
+
+<section class="card" aria-labelledby="receiptsTitle">
+<h2 class="card__title" id="receiptsTitle">Scope receipts</h2>
+<div data-state-root id="receiptsState">
+<div data-state="loading" class="st-loading"><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No pending receipts. Approval requests appear here before live execution.</p><a class="btn btn--sm btn--primary" href="mission.html?view=receipts">Review receipts</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Receipts unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Receipts current.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><ul class="feed" id="receiptsList"></ul></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="agentsTitle">
+<h2 class="card__title" id="agentsTitle">Local agents</h2>
+<p class="text-secondary" id="agentsSummary">Detecting local agents…</p>
+<div class="card__row"><a class="btn btn--sm" href="settings.html?section=agents">Manage agents</a></div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Shared core 1/4 — state, API client, subscription OAuth (all vendors).
+var state = {
+  targets: [],
+  operators: [],
+  settings: { openrouterKey: '', anthropicKey: '', openaiKey: '', selectedModel: 'anthropic/claude-sonnet-4', fallbackModel: 'nousresearch/hermes-3-llama-3.1-405b', localHost: '127.0.0.1', localPort: '8080', localPath: '/v1', localModel: '', localApiKey: '', useLocal: false, activeProvider: 'openrouter' },
+  approvalId: null
+};
+function saveState() {
+  try { window.localStorage.setItem('t3mp3st_state_v1', JSON.stringify({ targets: state.targets, settings: state.settings })); } catch (e) { /* storage unavailable */ }
+}
+function loadState() {
+  try {
+    var raw = window.localStorage.getItem('t3mp3st_state_v1');
+    if (!raw) return;
+    var d = JSON.parse(raw);
+    if (Array.isArray(d.targets)) state.targets = d.targets;
+    if (d.settings) state.settings = Object.assign(state.settings, d.settings);
+  } catch (e) { /* storage unavailable */ }
+}
+function esc(s) { return window.Shell ? Shell.escHtml(s) : String(s); }
+function getApiBase() { return (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.baseUrl) || ''; }
+function getApiKey() {
+  var s = state.settings || {};
+  var p = s.activeProvider || 'openrouter';
+  var byProvider = { openrouter: s.openrouterKey, venice: s.veniceKey, anthropic: s.anthropicKey, openai: s.openaiKey, xai: s.xaiKey, huggingface: s.huggingfaceKey, nanogpt: s.nanogptKey, novita: s.novitaKey };
+  return byProvider[p] || s.openrouterKey || s.veniceKey || s.anthropicKey || s.openaiKey || '';
+}
+function buildLocalBaseUrl() {
+  var s = state.settings || {};
+  var host = (s.localHost || '127.0.0.1').trim();
+  var port = (s.localPort || '8080').trim();
+  var path = (s.localPath || '/v1').trim() || '/v1';
+  return 'http://' + host + ':' + port + path;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// T3MP3ST API CLIENT
+// ═══════════════════════════════════════════════════════════════
+var T3MP3ST_API = {
+  _isLocal: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1',
+  _isStandalone: false,
+  baseUrl: (function () {
+    try {
+      var custom = window.localStorage.getItem('t3mp3st_api_url');
+      if (custom) return custom;
+    } catch (e) { /* storage unavailable */ }
+    return (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://' + window.location.hostname + ':3333'
+      : '';
+  })(),
+  connected: false,
+  llmAvailable: false,
+  serverLLM: null,
+  async checkHealth() {
+    var badge = document.getElementById('apiBadge');
+    var text = document.getElementById('apiText');
+    if (!this.baseUrl) {
+      this._isStandalone = true;
+      this.connected = false;
+      this.llmAvailable = false;
+      if (badge) { badge.className = 'badge badge--warn'; badge.textContent = 'standalone'; }
+      if (text) text.textContent = 'Standalone Mode — direct LLM mode, no API server needed';
+      return { status: 'standalone' };
+    }
+    try {
+      var controller = new AbortController();
+      var timeout = setTimeout(function () { controller.abort(); }, 5000);
+      var res = await fetch(this.baseUrl + '/api/health', { signal: controller.signal });
+      clearTimeout(timeout);
+      var data = await res.json();
+      this._isStandalone = false;
+      this.connected = data.status === 'operational';
+      // /api/health returns llm as an object ({connected:true,...}); accept that or the legacy string
+      this.llmAvailable = data.llm === 'connected' || !!(data.llm && data.llm.connected);
+      this.serverLLM = data.llm && typeof data.llm === 'object' ? data.llm : null;
+      // Keep the dispatch latch honest: BackendDispatch.available is otherwise write-only-true.
+      if (typeof BackendDispatch !== 'undefined') {
+        BackendDispatch.available = !!(this.connected && data.missionDispatch);
+      }
+      if (badge) {
+        if (this.llmAvailable) { badge.className = 'badge badge--ok'; badge.textContent = 'api + llm ready'; }
+        else if (this.connected) { badge.className = 'badge badge--info'; badge.textContent = 'api connected'; }
+        else { badge.className = 'badge badge--danger'; badge.textContent = 'unreachable'; }
+      }
+      if (text) text.textContent = this.llmAvailable ? 'API + LLM Ready' : (this.connected ? 'API connected — LLM backbone pending' : 'API unreachable — is the server running?');
+      var llmLine = document.getElementById('llmLine');
+      if (llmLine) {
+        llmLine.textContent = this.serverLLM
+          ? ('LLM backbone: server default (' + (this.serverLLM.provider || 'configured') + ' / ' + (this.serverLLM.model || 'default model') + ') — no browser API key sent')
+          : 'LLM backbone: none reported by the server.';
+      }
+      return data;
+    } catch (e) {
+      this.connected = false;
+      this.llmAvailable = false;
+      if (badge) { badge.className = 'badge badge--danger'; badge.textContent = 'unreachable'; }
+      if (text) text.textContent = 'API unreachable — is the server running?';
+      return { status: 'down' };
+    }
+  },
+  async get(path) {
+    var r = await fetch(this.baseUrl + path);
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    return d;
+  },
+  async post(path, body) {
+    var r = await fetch(this.baseUrl + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    return d;
+  }
+};
+
+// ── Subscription OAuth (Super Grok Heavy + Claude Pro/Max + ChatGPT Plan) ──
+var oauthXaiTimer = null;
+var oauthXaiFlowId = null;
+var oauthAnthropicFlowId = null;
+var oauthOpenaiFlowId = null;
+function oauthApi(path, body) {
+  var base = getApiBase();
+  return fetch(base + path, {
+    method: body === undefined ? 'GET' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body)
+  });
+}
+function paintOAuthStatus(oauth) {
+  var x = oauth && oauth.xai;
+  var a = oauth && oauth.anthropic;
+  var o = oauth && oauth.openai;
+  var xs = document.getElementById('oauthXaiStatus');
+  var as = document.getElementById('oauthAnthropicStatus');
+  var os = document.getElementById('oauthOpenaiStatus');
+  if (xs) { xs.textContent = x && x.connected ? 'connected' : 'offline'; xs.className = 'badge ' + (x && x.connected ? 'badge--ok' : 'badge--neutral'); }
+  if (as) { as.textContent = a && a.connected ? 'connected' : 'offline'; as.className = 'badge ' + (a && a.connected ? 'badge--ok' : 'badge--neutral'); }
+  if (os) { os.textContent = o && o.connected ? 'connected' : 'offline'; os.className = 'badge ' + (o && o.connected ? 'badge--ok' : 'badge--neutral'); }
+  var xb = document.getElementById('oauthXaiBody');
+  var ab = document.getElementById('oauthAnthropicBody');
+  var ob = document.getElementById('oauthOpenaiBody');
+  if (xb && x && x.connected) xb.textContent = 'Signed in. Super Grok Heavy models are available in Model Selection.';
+  if (ab && a && a.connected) ab.textContent = 'Signed in. Claude Opus / Sonnet run on your Pro or Max subscription.';
+  if (ob && o && o.connected) ob.textContent = 'Signed in. ChatGPT Plan models run on your subscription.';
+  var callout = document.getElementById('keylessCalloutText');
+  if (callout) {
+    var names = [];
+    if (x && x.connected) names.push('Super Grok Heavy');
+    if (a && a.connected) names.push('Claude Pro/Max');
+    if (o && o.connected) names.push('ChatGPT Plan');
+    if (names.length) callout.textContent = 'Keyless backends signed in: ' + names.join(', ') + '. Missions can run without an API key.';
+  }
+}
+async function refreshOAuthStatus() {
+  try {
+    var r = await oauthApi('/api/oauth/status');
+    if (!r.ok) return;
+    paintOAuthStatus(await r.json());
+  } catch (e) { /* server may be down */ }
+}
+async function startXaiOAuth() {
+  var body = document.getElementById('oauthXaiBody');
+  if (oauthXaiTimer) { clearInterval(oauthXaiTimer); oauthXaiTimer = null; }
+  try {
+    var r = await oauthApi('/api/oauth/xai/start', {});
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    oauthXaiFlowId = d.flowId;
+    var link = d.verificationUriComplete || d.verificationUri;
+    if (body) {
+      body.hidden = false;
+      body.innerHTML = '<div>Open this URL and enter the code:</div>'
+        + '<div class="mono">' + esc(d.userCode || '') + '</div>'
+        + '<div><a href="' + esc(link) + '" target="_blank" rel="noopener noreferrer">' + esc(link) + '</a></div>';
+    } else if (link) {
+      window.open(link, '_blank', 'noopener');
+    }
+    toast('Approve SuperGrok in the browser, then wait…', 'info');
+    var n = 0;
+    oauthXaiTimer = setInterval(async function () {
+      n += 1;
+      if (n > 120) { clearInterval(oauthXaiTimer); oauthXaiTimer = null; if (body) body.textContent = 'Timed out — start again.'; return; }
+      try {
+        var pr = await oauthApi('/api/oauth/xai/poll', { flowId: oauthXaiFlowId });
+        var pd = await pr.json();
+        if (pd.status === 'authorized') {
+          clearInterval(oauthXaiTimer); oauthXaiTimer = null;
+          paintOAuthStatus(pd.oauth);
+          if (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.checkHealth) T3MP3ST_API.checkHealth();
+          toast('Super Grok Heavy connected', 'success');
+        } else if (pd.status === 'denied' || pd.status === 'expired') {
+          clearInterval(oauthXaiTimer); oauthXaiTimer = null;
+          if (body) body.textContent = pd.error || pd.status;
+          toast(pd.error || 'SuperGrok sign-in failed', 'error');
+        }
+      } catch (e) { /* keep polling */ }
+    }, Math.max(2000, (d.interval || 5) * 1000));
+  } catch (e) {
+    if (body) { body.hidden = false; body.textContent = e.message || String(e); }
+    toast('SuperGrok sign-in failed: ' + (e.message || e), 'error');
+  }
+}
+async function startAnthropicOAuth() {
+  var body = document.getElementById('oauthAnthropicBody');
+  try {
+    var r = await oauthApi('/api/oauth/anthropic/start', {});
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    oauthAnthropicFlowId = d.flowId;
+    if (d.authorizeUrl) window.open(d.authorizeUrl, '_blank', 'noopener');
+    if (body) {
+      body.hidden = false;
+      body.innerHTML = '<div>Authorize in the browser, then paste the callback code (or the full URL):</div>'
+        + '<input id="oauthAnthropicCode" class="form-input" placeholder="code#state">'
+        + '<button class="btn btn--primary btn--sm" style="margin-top:8px;" onclick="completeAnthropicOAuth()">Complete sign-in</button>';
+    }
+  } catch (e) {
+    if (body) { body.hidden = false; body.textContent = e.message || String(e); }
+    toast('Claude sign-in failed: ' + (e.message || e), 'error');
+  }
+}
+async function completeAnthropicOAuth() {
+  var input = document.getElementById('oauthAnthropicCode');
+  var code = input ? input.value.trim() : '';
+  if (!code || !oauthAnthropicFlowId) { toast('Paste the Claude callback code first', 'error'); return; }
+  try {
+    var r = await oauthApi('/api/oauth/anthropic/complete', { flowId: oauthAnthropicFlowId, code: code });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    paintOAuthStatus(d.oauth);
+    if (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.checkHealth) T3MP3ST_API.checkHealth();
+    toast('Claude Pro/Max connected', 'success');
+  } catch (e) {
+    toast('Claude complete failed: ' + (e.message || e), 'error');
+  }
+}
+async function startOpenaiOAuth() {
+  var body = document.getElementById('oauthOpenaiBody');
+  try {
+    var r = await oauthApi('/api/oauth/openai/start', {});
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    oauthOpenaiFlowId = d.flowId;
+    if (d.authorizeUrl) window.open(d.authorizeUrl, '_blank', 'noopener');
+    if (body) {
+      body.hidden = false;
+      body.innerHTML = '<div>Authorize in the browser, then paste the callback code (or the full URL):</div>'
+        + '<input id="oauthOpenaiCode" class="form-input" placeholder="code#state">'
+        + '<button class="btn btn--primary btn--sm" style="margin-top:8px;" onclick="completeOpenaiOAuth()">Complete sign-in</button>';
+    }
+  } catch (e) {
+    if (body) { body.hidden = false; body.textContent = e.message || String(e); }
+    toast('ChatGPT sign-in failed: ' + (e.message || e), 'error');
+  }
+}
+async function completeOpenaiOAuth() {
+  var input = document.getElementById('oauthOpenaiCode');
+  var code = input ? input.value.trim() : '';
+  if (!code || !oauthOpenaiFlowId) { toast('Paste the ChatGPT callback code first', 'error'); return; }
+  try {
+    var r = await oauthApi('/api/oauth/openai/complete', { flowId: oauthOpenaiFlowId, code: code });
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    paintOAuthStatus(d.oauth);
+    if (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.checkHealth) T3MP3ST_API.checkHealth();
+    toast('ChatGPT Plan connected', 'success');
+  } catch (e) {
+    toast('ChatGPT complete failed: ' + (e.message || e), 'error');
+  }
+}
+async function logoutOAuth(vendor) {
+  try {
+    var r = await oauthApi('/api/oauth/' + vendor + '/logout', {});
+    var d = await r.json();
+    paintOAuthStatus(d.oauth);
+    var label = vendor === 'xai' ? 'SuperGrok' : (vendor === 'openai' ? 'ChatGPT' : 'Claude');
+    toast(label + ' signed out', 'info');
+  } catch (e) {
+    toast('Sign-out failed: ' + (e.message || e), 'error');
+  }
+}
+</script>
+<script>
+// Shared core 2/4 — backend dispatch, mission launch, findings, status, receipts.
+var BackendDispatch = {
+  available: false,
+  isAvailable: function () { return this.available && T3MP3ST_API.connected; },
+  async startMission(missionName, targets, operators, missionKey, provider, model, approvalId) {
+    var body = { name: missionName, targets: targets, operators: operators, missionKey: missionKey, provider: provider, model: model, approvalId: approvalId };
+    return T3MP3ST_API.post('/api/mission/start', body);
+  },
+  async stopMission() {
+    return T3MP3ST_API.post('/api/mission/stop', {});
+  },
+  async pauseMission() {
+    return T3MP3ST_API.post('/api/mission/pause', {});
+  },
+  async resumeMission() {
+    return T3MP3ST_API.post('/api/mission/resume', {});
+  },
+  async status() {
+    var res = await fetch(getApiBase() + '/api/mission/status');
+    return res.json();
+  }
+};
+
+var missionRunning = false;
+var missionTimer = null;
+function addIntel(source, message, kind) {
+  var feed = document.getElementById('sysEventTerminal');
+  if (!feed) return;
+  var li = document.createElement('li');
+  li.textContent = '[' + source + '] ' + message;
+  feed.prepend(li);
+  while (feed.children.length > 60) feed.lastChild.remove();
+}
+function addMissionLog(level, message) { addIntel('MISSION', message, level); }
+function setFidelity(mode, target) {
+  var badge = document.getElementById('apiBadge');
+  if (badge && mode === 'live') { badge.className = 'badge badge--danger'; badge.textContent = 'live'; }
+}
+function updateKillChain(phase, pct) {
+  var list = document.getElementById('phaseList');
+  if (!list) return;
+  var li = document.createElement('li');
+  li.textContent = 'phase: ' + phase + ' (' + pct + '%)';
+  list.prepend(li);
+}
+function isLoopbackOrLabHost(host) {
+  var h = String(host || '').toLowerCase();
+  return h === 'local-lab' || h === 'localhost' || h === '127.0.0.1' || h.startsWith('127.') || h.startsWith('10.') || h.startsWith('192.168.') || h.endsWith('.lab') || h.endsWith('.local');
+}
+function confirmApproveTarget(target) {
+  return new Promise(function (resolve) {
+    var host = document.getElementById('approvalBanner');
+    if (!host) { resolve(window.confirm('Approve live execution against ' + target + '?')); return; }
+    host.hidden = false;
+    host.innerHTML = '<div class="st-warn-box"><p>Live execution against <strong>' + esc(target) + '</strong> needs an explicit receipt.</p>'
+      + '<div class="card__row"><button class="btn btn--primary btn--sm" id="apprYes">Approve</button>'
+      + '<button class="btn btn--sm" id="apprNo">Decline</button></div></div>';
+    document.getElementById('apprYes').addEventListener('click', function () { host.hidden = true; host.innerHTML = ''; resolve(true); });
+    document.getElementById('apprNo').addEventListener('click', function () { host.hidden = true; host.innerHTML = ''; resolve(false); });
+  });
+}
+function completeMission(note) {
+  missionRunning = false;
+  if (missionTimer) { clearInterval(missionTimer); missionTimer = null; }
+  addMissionLog('info', 'Mission complete: ' + note);
+  toast('Mission complete: ' + note, 'info');
+}
+function renderTargetCards() {
+  addMissionLog('info', state.targets.length + ' target(s) staged');
+}
+
+async function launchMissionFromOverview() {
+  var input = document.getElementById('heroHuntTarget');
+  var target = (input && input.value.trim()) || Shell.params.get().get('target') || '';
+  if (!target) { toast('Enter a target first', 'error'); return; }
+  state.targets = [{ host: target }];
+  saveState();
+  Shell.params.set({ target: target });
+  var missionName = 'Hunt ' + target;
+  var apiKey = getApiKey();
+  var missionKey = apiKey || undefined;
+  var autonomous = !!(document.getElementById('heroAutonomousMode') && document.getElementById('heroAutonomousMode').checked);
+  var mode = autonomous ? 'autonomous' : 'supervised';
+  var root = document.getElementById('missionState');
+  Shell.showState(root, 'loading');
+  try {
+    if (BackendDispatch.isAvailable()) {
+      addIntel('DISPATCH', 'Backend operators available — dispatching to server', 'success');
+      addMissionLog('info', 'Mode: BACKEND DISPATCH (real operators)');
+      setFidelity('live', target);
+      // Determine the LLM backend. A selected local model wins; otherwise
+      // use a connected agent, infer a keyed provider, or defer to the
+      // server-configured default when the browser has no credentials.
+      let provider;
+      let model;
+      if (state.settings && state.settings.useLocal) {
+        provider = 'local';
+        model = state.settings.localModel || 'llama3';
+        addIntel('BACKEND', 'Local model mode — dispatching mission through local LLM (' + model + ')', 'success');
+        addMissionLog('info', 'LLM backend: local (' + model + ') — no API key needed');
+      } else {
+        // ════════════════════════════════════════════════════════════
+        // BACKEND DISPATCH: Use real operators when server is available
+        // ════════════════════════════════════════════════════════════
+        // Centralized agent resolution (shared with General + Admiral): an EXPLICIT pin
+        // (e.g. Claude Code) outranks a stored key, and the picked model rides along as
+        // "agentId::model" so the mission runs THAT model.
+        const dispatchAgent = (typeof window.t3mpDispatchAgent === 'function') ? window.t3mpDispatchAgent(apiKey) : null;
+        let oauthPick = null;
+        let oauthReady = false;
+        try {
+          var os = await oauthApi('/api/oauth/status');
+          if (os.ok) {
+            var od = await os.json();
+            var wiring = [
+              { id: 'xai', name: 'Super Grok Heavy', backend: 'xai', model: 'xai:grok-4-heavy', auth: 'oauth', ready: !!(od.xai && od.xai.connected) },
+              { id: 'anthropic', name: 'Claude Pro/Max', backend: 'anthropic', model: 'claude-sonnet-4', auth: 'oauth', ready: !!(od.anthropic && od.anthropic.connected) },
+              { id: 'openai', name: 'ChatGPT Plan', backend: 'openai', model: 'gpt-5', auth: 'oauth', ready: !!(od.openai && od.openai.connected) }
+            ];
+            oauthPick = wiring.find(function (w) { return w.ready; }) || null;
+            oauthReady = !!oauthPick;
+          }
+        } catch (e) { /* oauth status best-effort */ }
+        if (dispatchAgent) {
+          provider = 'local-agent';
+          model = dispatchAgent.model;
+          var picked = dispatchAgent.model.indexOf('::') >= 0 ? dispatchAgent.model.split('::')[1] : '';
+          var shownModel = picked ? ' · model: ' + picked : '';
+          addIntel('BACKEND', 'Routing the mission through your connected local agent: ' + dispatchAgent.id.toUpperCase() + shownModel, 'success');
+          addMissionLog('info', 'LLM backend: local agent (' + dispatchAgent.id + ')' + shownModel + ' — no API key needed');
+        } else if (oauthReady) {
+          provider = oauthPick.backend;
+          model = oauthPick.model || oauthPick.id;
+          missionKey = undefined;
+          addIntel('BACKEND', 'Subscription OAuth — ' + oauthPick.name + ' (' + provider + ')', 'success');
+          addMissionLog('info', 'LLM backend: ' + provider + '/' + model + ' via OAuth — no API key sent');
+        } else if (!apiKey) {
+          addIntel('BACKEND', 'No browser API key — using the server-configured LLM backend', 'success');
+          addMissionLog('info', 'LLM backend: server default — no browser API key sent');
+        } else if (apiKey && apiKey.startsWith('sk-ant-')) {
+          provider = 'anthropic';
+          model = state.settings.selectedModel || 'anthropic/claude-sonnet-4';
+          model = model.replace('anthropic/', '');
+        } else if (apiKey && apiKey.startsWith('sk-') && apiKey.indexOf('sk-ant-') !== 0 && apiKey.indexOf('sk-or-') !== 0) {
+          provider = 'openai';
+          model = state.settings.selectedModel || 'anthropic/claude-sonnet-4';
+        } else {
+          provider = 'openrouter';
+          model = state.settings.selectedModel || 'anthropic/claude-sonnet-4';
+        }
+      }
+      try {
+        let result = await BackendDispatch.startMission(
+          missionName,
+          state.targets,
+          state.operators,
+          missionKey,
+          provider,
+          model,
+          state.approvalId
+        );
+        // The backend gates active execution behind an approval receipt. Auto-grant it
+        // when safe — a loopback/lab target you own, or AUTONOMOUS mode — then re-fire
+        // with the receipt. External targets in supervised mode need an explicit decision.
+        if (!result.success && result.approval && result.approval.id) {
+          var safeToAutoApprove = isLoopbackOrLabHost(target) || autonomous;
+          if (safeToAutoApprove) {
+            addMissionLog('info', 'Approval receipt ' + result.approval.id + ' auto-granted — logged server-side');
+            addIntel('RECEIPT', 'Auto-approved: ' + result.approval.id, 'success');
+            await T3MP3ST_API.post('/api/approvals/' + result.approval.id + '/approve', {});
+            state.approvalId = result.approval.id;
+            result = await BackendDispatch.startMission(
+              missionName, state.targets, state.operators, missionKey, provider, model, result.approval.id
+            );
+          } else {
+            var approved = await confirmApproveTarget(target);
+            if (!approved) {
+              addIntel('RECEIPT', 'Approval declined for ' + target + ' — hunt not started', 'warning');
+              completeMission('approval declined');
+              Shell.showState(root, 'empty');
+              return;
+            }
+            addIntel('RECEIPT', 'Approved: ' + result.approval.id, 'success');
+            addMissionLog('info', 'Approval receipt ' + result.approval.id + ' granted by operator for ' + target);
+            await T3MP3ST_API.post('/api/approvals/' + result.approval.id + '/approve', {});
+            state.approvalId = result.approval.id;
+            result = await BackendDispatch.startMission(
+              missionName, state.targets, state.operators, missionKey, provider, model, result.approval.id
+            );
+          }
+        }
+        if (!result.success) throw new Error(result.error || 'Backend mission start failed');
+        missionRunning = true;
+        addIntel('COMMAND', 'Backend mission launched: ' + ((result.operators || []).length) + ' operators spawned', 'success');
+        updateKillChain('recon', 0);
+        var okEl = root.querySelector('[data-ok]');
+        if (okEl) okEl.textContent = 'Backend mission launched with ' + ((result.operators || []).length) + ' operator(s).';
+        Shell.showState(root, 'success');
+        toast('Mission launched', 'success');
+        refreshMissionStatus();
+        refreshFindings();
+      } catch (err) {
+        var errEl = root.querySelector('[data-err]');
+        if (errEl) errEl.textContent = err.message || String(err);
+        Shell.showState(root, 'error');
+      }
+    } else {
+      var errEl2 = root.querySelector('[data-err]');
+      if (errEl2) errEl2.textContent = 'API server unreachable — start it with npm run server.';
+      Shell.showState(root, 'error');
+      toast('API server unreachable — start it with npm run server', 'error');
+    }
+  } catch (e) {
+    var errEl3 = root.querySelector('[data-err]');
+    if (errEl3) errEl3.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function refreshMissionStatus() {
+  var root = document.getElementById('statusState');
+  try {
+    var m = await BackendDispatch.status();
+    var line = document.getElementById('statusLine');
+    if (m && m.active) {
+      var phase = (m.mission && m.mission.currentPhase) || 'running';
+      if (line) line.textContent = 'ACTIVE · phase ' + phase;
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = 'Mission active · phase ' + phase + '.';
+      Shell.showState(root, 'data');
+    } else {
+      Shell.showState(root, missionRunning ? 'data' : 'empty');
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function refreshFindings() {
+  var root = document.getElementById('findingsState');
+  var sev = (document.getElementById('sevFilter') || {}).value || Shell.params.get().get('sev') || 'all';
+  try {
+    var base = getApiBase();
+    var res = await fetch(base + '/api/mission/findings');
+    var d = await res.json();
+    var arr = Array.isArray(d) ? d : (d.findings || []);
+    var filtered = sev === 'all' ? arr : arr.filter(function (f) { return (f.severity || '') === sev; });
+    var tbody = document.getElementById('findingsTable').querySelector('tbody');
+    tbody.innerHTML = filtered.map(function (f) {
+      return '<tr><td><span class="badge badge--neutral">' + esc(f.severity || 'n/a') + '</span></td><td>' + esc(f.title || f.id) + '</td><td>' + esc(f.source || 'mission') + '</td></tr>';
+    }).join('');
+    if (!filtered.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = filtered.length + ' finding(s) shown.';
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+function filterFindings(value) {
+  Shell.params.set({ sev: value === 'all' ? '' : value });
+  refreshFindings();
+}
+
+function hasPendingRetry(id) {
+  return !!(window.__t3mpPendingApprovalReceiptIds?.includes(id) && typeof window.__t3mpPendingApprovalRetry === 'function');
+}
+
+async function refreshReceiptsBadge() {
+  var root = document.getElementById('receiptsState');
+  try {
+    var data = await T3MP3ST_API.get('/api/approvals');
+    var approvals = Array.isArray(data.approvals) ? data.approvals : [];
+    var pending = approvals.filter(function (a) { return a.status === 'pending'; });
+    var list = document.getElementById('receiptsList');
+    if (list) {
+      list.innerHTML = pending.map(function (a) {
+        var resume = '';
+        if (hasPendingRetry(a.id)) {
+          resume = ' <button class="btn btn--sm btn--primary" data-resume>Resume operation</button>';
+        }
+        return '<li>' + esc(a.id) + ' · ' + esc(a.action || 'execution') + ' · ' + esc(a.target || '') + resume + '</li>';
+      }).join('');
+      var rb = list.querySelector('[data-resume]');
+      if (rb) rb.addEventListener('click', function () { window.__t3mpPendingApprovalRetry(); });
+    }
+    if (!pending.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+function connectStream() {
+  try {
+    var es = new EventSource(getApiBase() + '/api/events');
+    es.addEventListener('connected', function () { addIntel('STREAM', 'live event stream connected', 'success'); });
+    es.addEventListener('message', function (ev) { addIntel('STREAM', String(ev.data).slice(0, 200), 'info'); });
+    es.addEventListener('error', function () { es.close(); });
+  } catch (e) { /* streaming is best-effort */ }
+}
+</script>
+<script>
+// Shared core 3/4 — General / Op Admiral resolvers, Full Auto, provider defaults.
+var generalPlanData = null;
+function _generalNeedsApiKey(provider) {
+  if (!provider) return false;
+  return !['codex', 'mock', 'local', 'local-agent'].includes(provider);
+}
+function _generalCodexRequiresBackend(provider) {
+  return provider === 'codex' && _generalIsStandalone();
+}
+/**
+ * Check if Admiral should use client-side (standalone) mode.
+ * Returns true when the backend API is not available.
+ */
+function _generalIsStandalone() {
+  return T3MP3ST_API._isStandalone || !T3MP3ST_API.connected;
+}
+
+// selectedModel), so it is fully backward-compatible — nothing migrates, nothing is lost.
+const UAC_DEFAULT_BASE = {
+  openrouter: 'https://openrouter.ai/api/v1',
+  venice: 'https://api.venice.ai/api/v1',
+  openai: 'https://api.openai.com/v1',
+  nanogpt: 'https://nano-gpt.com/api/v1',
+  novita: 'https://api.novita.ai/openai/v1',
+  xai: 'https://api.x.ai/v1',
+  anthropic: 'https://api.anthropic.com'
+};
+
+function getGeneralConfig() {
+  // Local model (llama.cpp / Ollama) wins — the server dispatches to the base URL /
+  // key from Settings (no cloud key needed).
+  if (state.settings && state.settings.useLocal) {
+    return {
+      apiKey: state.settings.localApiKey || '',
+      provider: 'local',
+      model: state.settings.localModel || 'llama3',
+      baseUrl: (typeof buildLocalBaseUrl === 'function') ? buildLocalBaseUrl() : undefined
+    };
+  }
+  const apiKey = getApiKey();
+  const savedProvider = window.localStorage.getItem('t3mp3st_general_provider');
+  // Centralized resolution: an explicit pin (e.g. Claude Code) outranks a stored key AND a
+  // remembered general-provider value, and the picked Claude model rides along as
+  // "agentId::model" — identical precedence to the mission path.
+  const dispatchAgent = (typeof window.t3mpDispatchAgent === 'function') ? window.t3mpDispatchAgent(apiKey) : null;
+  const explicitPin = (typeof window.t3mpActiveAgentPin === 'function') ? (window.t3mpActiveAgentPin() || '') : '';
+  const provider = (explicitPin && dispatchAgent) ? 'local-agent'
+    : (savedProvider
+      || (dispatchAgent ? 'local-agent' : undefined)
+      || (T3MP3ST_API && T3MP3ST_API.connected && !T3MP3ST_API.llmAvailable ? 'codex' : undefined));
+  const model = provider === 'local-agent'
+    ? (dispatchAgent ? dispatchAgent.model : (typeof window.t3mpPreferredAgent === 'function' ? window.t3mpPreferredAgent() : undefined))
+    : (provider === 'codex' ? 'codex-default' : (provider ? (state.settings && state.settings.selectedModel || 'anthropic/claude-sonnet-4') : undefined));
+  return { apiKey, provider, model };
+}
+
+function _generalNormalizePlan(plan) {
+  if (!plan || typeof plan !== 'object') return { codename: 'op-direct', targets: [], summary: String(plan || '') };
+  if (!plan.codename) plan.codename = 'op-direct';
+  if (!Array.isArray(plan.targets)) plan.targets = [];
+  return plan;
+}
+function renderGeneralPlan(plan) {
+  var out = document.getElementById('generalPlanOut');
+  if (!out) return;
+  out.innerHTML = '<div class="card"><h3 class="card__title">' + esc(plan.codename || 'plan') + '</h3>'
+    + '<p class="text-secondary">' + esc(plan.summary || '') + '</p></div>';
+}
+async function _generalPlanClientSide() {
+  throw new Error('Standalone planning needs the API server — start it with npm run server.');
+}
+
+async function generalFullAuto(approvalIds = []) {
+  const directive = document.getElementById('generalDirective') && document.getElementById('generalDirective').value.trim();
+  if (!directive) { toast('Enter a directive for the Admiral', 'error'); return; }
+
+  const { apiKey, provider, model, baseUrl } = getGeneralConfig();
+  if (_generalNeedsApiKey(provider) && !apiKey) { toast('API key required — configure in Settings', 'error'); return; }
+  if (_generalCodexRequiresBackend(provider)) { toast('Codex mode needs the local T3MP3ST backend', 'warning'); return; }
+
+  const btn = document.getElementById('generalAutoBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'ENGAGING...'; }
+
+  const gs = document.getElementById('generalState');
+  if (gs) { gs.textContent = 'FULL AUTO'; }
+
+  const badge = document.getElementById('generalStatusBadge');
+  if (badge) { badge.hidden = false; badge.textContent = 'AUTO'; }
+
+  addIntel('ADMIRAL', 'FULL AUTONOMOUS MODE ENGAGED', 'danger');
+
+  try {
+    let plan;
+    if (_generalIsStandalone()) {
+      addIntel('ADMIRAL', 'Standalone mode — planning via direct LLM call', 'info');
+      plan = await _generalPlanClientSide(directive);
+    } else {
+      try {
+        const resp = await fetch(getApiBase() + '/api/general/auto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            objective: directive, urgency: 'normal', opsecPreference: 'covert',
+            apiKey, provider, model, approvalIds, ...(baseUrl ? { baseUrl } : {})
+          })
+        });
+
+        const data = await resp.json();
+        if (!resp.ok || !data.success) {
+          if (resp.status === 403 && data.approval?.id) {
+            const retryApprovalIds = [...new Set([...approvalIds, data.approval.id])];
+            window.__t3mpPendingApprovalReceiptIds = [data.approval.id];
+            window.__t3mpPendingApprovalRetry = () => generalFullAuto(retryApprovalIds);
+            try { window.localStorage.setItem('t3mp3st_pending_retry', JSON.stringify({ kind: 'full-auto', approvalIds: retryApprovalIds })); } catch (e) { /* storage unavailable */ }
+            addIntel('SCOPEGUARD', 'Full Auto receipt created — approve it in Scope Receipts to resume this operation', 'warning');
+            toast('Approval required — approve the receipt to resume Full Auto', 'warning');
+            if (typeof navigateTo === 'function') navigateTo('receipts');
+            return;
+          }
+          if (data.plan || data.review || data.missionGate) {
+            plan = _generalNormalizePlan(data.plan || {});
+            if (data.review) plan.review = data.review;
+            if (data.missionGate) plan.missionGate = data.missionGate;
+            generalPlanData = _generalNormalizePlan(plan);
+            renderGeneralPlan(generalPlanData);
+            addIntel('ADMIRAL', 'Full auto held by gate: ' + (data.error || 'review required'), 'warning');
+            toast(data.error || 'Admiral gate held execution', 'warning');
+            return;
+          }
+          throw new Error(data.error || 'Full auto failed');
+        }
+        plan = data.plan;
+        if (data.execution && data.execution.review) plan.review = data.execution.review;
+        if (data.execution && data.execution.missionGate) plan.missionGate = data.execution.missionGate;
+      } catch (apiErr) {
+        if (apiErr.message && (apiErr.message.indexOf('NetworkError') >= 0 || apiErr.message.indexOf('fetch') >= 0)) {
+          addIntel('ADMIRAL', 'Backend unreachable — falling back to direct LLM', 'warning');
+          plan = await _generalPlanClientSide(directive);
+        } else {
+          throw apiErr;
+        }
+      }
+    }
+
+    plan = _generalNormalizePlan(plan);
+    if (plan && plan.missionGate && plan.missionGate.status === 'hold') {
+      generalPlanData = plan;
+      renderGeneralPlan(plan);
+      const reason = (plan.missionGate.blockers && plan.missionGate.blockers[0]) || 'Admiral gate is HOLD';
+      addIntel('ADMIRAL', 'Full auto held: ' + reason, 'warning');
+      toast('Admiral gate is HOLD — ' + reason, 'warning');
+      return;
+    }
+
+    generalPlanData = plan;
+    renderGeneralPlan(plan);
+    if (badge) { badge.textContent = 'LIVE'; }
+    if (gs) { gs.textContent = 'EXECUTING'; }
+    addIntel('ADMIRAL', 'Operation ' + plan.codename + ' planned successfully', 'success');
+    addIntel('ADMIRAL', 'Operation ' + plan.codename + ' is LIVE in full auto mode', 'success');
+    toast(plan.codename + ' — FULL AUTO ENGAGED', 'success');
+    missionRunning = true;
+  } catch (err) {
+    addIntel('ADMIRAL', 'Full auto failed: ' + err.message, 'danger');
+    toast('Full auto failed: ' + err.message, 'error');
+    if (gs) { gs.textContent = 'FAILED'; }
+    if (badge) { badge.hidden = true; }
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Full auto'; }
+  }
+}
+
+        /**
+         * REQUEST SITREP — Force a situation report from the Admiral
+         */
+async function generalRequestSitrep() {
+  var feed = document.getElementById('generalSitrepFeed');
+  try {
+    var resp = await fetch(getApiBase() + '/api/general/sitrep', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    var d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+    if (feed) {
+      var li = document.createElement('div');
+      li.className = 'card';
+      li.innerHTML = '<h3 class="card__title">Situation report</h3><p class="text-secondary">' + esc((d.sitrep && d.sitrep.summary) || d.summary || JSON.stringify(d).slice(0, 500)) + '</p>';
+      feed.prepend(li);
+    }
+    toast('Sitrep received', 'success');
+  } catch (err) {
+    toast('Sitrep failed: ' + (err.message || err), 'error');
+  }
+}
+
+async function generalRequestAssessment() {
+  try {
+    var resp = await fetch(getApiBase() + '/api/general/assess', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    var d = await resp.json();
+    if (!resp.ok) throw new Error(d.error || ('HTTP ' + resp.status));
+    toast('Assessment ready', 'success');
+    addIntel('ADMIRAL', 'Strategic assessment: ' + String((d.assessment && d.assessment.summary) || d.summary || 'ready').slice(0, 160), 'success');
+  } catch (err) {
+    toast('Assessment failed: ' + (err.message || err), 'error');
+  }
+}
+
+function paintAdmiralBackbone() {
+  var el = document.getElementById('admBackboneLine');
+  if (!el) return;
+  var bb = _admBackbone();
+  el.textContent = 'Backbone: ' + (bb.provider || 'none') + (bb.model ? ' / ' + bb.model : '') + ' (pin, key, or server default)';
+}
+
+// Resolve the LLM backbone the way missions do: a connected local agent (no key) or a configured key.
+  function _admBackbone(){
+    // Local-model config from Settings feeds the centralized path as the resolved
+    // provider — it wins by precedence, never by bypassing dispatch.
+    const localCfg = (typeof state !== 'undefined' && state.settings && state.settings.useLocal)
+      ? { provider: 'local', model: state.settings.localModel || 'llama3', apiKey: state.settings.localApiKey || undefined, baseUrl: (typeof buildLocalBaseUrl === 'function') ? buildLocalBaseUrl() : undefined }
+      : null;
+    const apiKey = (typeof getApiKey === 'function') ? (getApiKey() || '') : '';
+    // Centralized agent resolution: an explicit pin (e.g. Claude Code) outranks a stored key, and the
+    // picked Claude model rides along as "agentId::model" — identical precedence to the mission path.
+    const dispatchAgent = (typeof window.t3mpDispatchAgent === 'function') ? window.t3mpDispatchAgent(localCfg ? '' : apiKey) : null;
+    let provider, model, resolvedKey = apiKey || undefined, resolvedBase = undefined;
+    if (localCfg) { provider = localCfg.provider; model = localCfg.model; resolvedKey = localCfg.apiKey; resolvedBase = localCfg.baseUrl; }
+    else if (dispatchAgent) { provider = 'local-agent'; model = dispatchAgent.model; }
+    else if (apiKey && apiKey.startsWith('sk-ant-')) { provider = 'anthropic'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4').replace('anthropic/', ''); }
+    else if (apiKey && apiKey.startsWith('sk-') && !apiKey.startsWith('sk-or-')) { provider = 'openai'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4'); }
+    else if (apiKey) { provider = 'openrouter'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4'); }
+    return { provider: provider, model: model, apiKey: resolvedKey, baseUrl: resolvedBase };
+  }
+</script>
+<script>
+// Shared core 4/4 — local agents: detect, connect, pin, dispatch resolver.
+// ═══════════ Connect Local Agents — detect + enlist already-authed CLIs ═══════════
+(function(){
+  const ICONS = { claude: 'C', codex: 'X', hermes: 'H', opencode: 'O', omp: 'P', cursor: 'U' };
+  let lastDetected = [];
+  let connectedIds = [];
+  const pingStatus = {};   // id -> { ok, latencyMs, error } from a real round-trip
+
+  // Explicit operator choice of WHICH connected agent to drive as the LLM backbone. Persisted so
+  // a refresh keeps it. When set, preferredAgent() honors it over the codex→hermes→claude default
+  // order — this is how "use my local Claude from Claude Code" becomes a first-class, sticky choice.
+  function getActiveAgent(){ try { return localStorage.getItem('t3mp3st_active_agent') || ''; } catch(e) { return ''; } }
+  function setActiveAgentStored(id){ try { if (id) localStorage.setItem('t3mp3st_active_agent', id); else localStorage.removeItem('t3mp3st_active_agent'); } catch(e) {} }
+
+  // Which Claude model the local Claude Code CLI should run (passed through as its --model flag).
+  // '' = the CLI's own account default. Claude Code accepts the aliases opus/sonnet/haiku or a full id.
+  const CLAUDE_MODELS = [
+    { id: '',       label: 'Account default (Claude Code setting)' },
+    { id: 'opus',   label: 'Claude Opus (latest)' },
+    { id: 'sonnet', label: 'Claude Sonnet (latest)' },
+    { id: 'haiku',  label: 'Claude Haiku (latest, fast)' }
+  ];
+  function getClaudeModel(){ try { return localStorage.getItem('t3mp3st_claude_model') || ''; } catch(e) { return ''; } }
+  function setClaudeModelStored(m){ try { if (m) localStorage.setItem('t3mp3st_claude_model', m); else localStorage.removeItem('t3mp3st_claude_model'); } catch(e) {} }
+  // The underlying model to run for a given agent id — only Claude Code exposes a picker today.
+  function agentModelFor(id){ return id === 'claude' ? (getClaudeModel() || undefined) : undefined; }
+  window.t3mpAgentModel = agentModelFor;
+
+  function pill(text, color) {
+    var cls = { green: 'badge--ok', amber: 'badge--warn', gray: 'badge--neutral', red: 'badge--danger', cyan: 'badge--info' }[color] || 'badge--neutral';
+    return '<span class="badge ' + cls + '">' + esc(text) + '</span>';
+  }
+
+  function rowHtml(a) {
+    const connected = connectedIds.indexOf(a.id) !== -1;
+    const ps = pingStatus[a.id];
+    const live = ps && ps.ok, stale = ps && !ps.ok;
+    let status, color;
+    if (!a.installed) { status = 'Not installed'; color = 'gray'; }
+    else if (!a.authed) { status = 'Not authed'; color = 'amber'; }
+    else if (stale) { status = 'Auth stale'; color = 'red'; }
+    else if (live) { status = 'Live'; color = 'green'; }
+    else if (connected) { status = 'Connected'; color = 'amber'; }
+    else { status = 'Detected'; color = 'cyan'; }
+    const disabled = !a.ready;
+    const isActive = connected && getActiveAgent() === a.id;
+    const sub = !a.installed ? 'binary not found on PATH'
+      : stale ? ('auth failed — re-login this CLI')
+      : (a.invokeHint || a.bin || a.vendor || '');
+    return '<div class="card provider-card">'
+      + '<div class="provider-card__head"><h3 class="provider-card__name">' + esc(a.label || a.id) + '</h3>' + pill(status, color) + '</div>'
+      + '<p class="provider-card__desc">' + esc(sub) + (isActive ? ' · ACTIVE BACKBONE' : '') + '</p>'
+      + '<div class="card__row">'
+      + (connected ? '<button class="btn btn--sm" onclick="setActiveLocalAgent(\'' + a.id + '\')" title="Drive this agent as the LLM backbone">' + (isActive ? 'Active' : 'Use') + '</button>' : '')
+      + (a.ready ? '<button class="btn btn--sm" onclick="pingOneLocalAgent(\'' + a.id + '\')" title="Send a real one-shot to verify it responds">Test</button>' : '')
+      + (connected ? '<button class="btn btn--sm btn--danger" onclick="disconnectLocalAgent(\'' + a.id + '\')" title="Disconnect this agent and remove its saved reconnect preference">Disconnect</button>'
+        : (a.ready && !disabled ? '<button class="btn btn--sm btn--primary" onclick="connectOneLocalAgent(\'' + a.id + '\')">Connect</button>' : ''))
+      + '</div>'
+      + '</div>';
+  }
+
+  async function api(path, body) {
+    // Prepend the configured API base so local-agent detect/connect/ping work when the UI and API
+    // are on different origins (matches every other fetch in the app; '' => same-origin relative).
+    const b = (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.baseUrl) || '';
+    const opt = body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : undefined;
+    const r = await fetch(b + path, opt || {});
+    return r.json();
+  }
+
+  function render(agents, ids) {
+    if (ids) connectedIds = ids;
+    const list = document.getElementById('localAgentsList');
+    const summary = document.getElementById('agentsSummary');
+    const ready = agents.filter(function(a){ return a.ready; }).length;
+    const clientLive = Object.keys(pingStatus).filter(function(k){ return pingStatus[k].ok; }).length;
+    const serverLive = Array.isArray(window.__t3mpServerAgents)
+      ? window.__t3mpServerAgents.filter(function(a){ return a.lastPing && a.lastPing.ok; }).length : 0;
+    const live = Math.max(clientLive, serverLive);
+    if (summary) summary.textContent = agents.length + ' detected · ' + ready + ' ready · ' + connectedIds.length + ' connected · ' + live + ' live';
+    if (!list) return;
+    list.innerHTML = agents.map(function(a){ return rowHtml(a); }).join('');
+    const sum = document.getElementById('localAgentsSummary');
+    if (sum) sum.textContent = agents.length + ' detected · ' + connectedIds.length + ' connected';
+  }
+
+  window.detectLocalAgents = async function(){
+    try {
+      const data = await api('/api/agents/local/detect');
+      lastDetected = data.agents || [];
+      render(lastDetected, data.connected || []);
+      // Remember the server's own view so preferredAgent() works on pages that
+      // never visited Settings (see the fallback inside preferredAgent).
+      try {
+        const s = await api('/api/agents/local/status?check=1');
+        window.__t3mpServerAgents = s.connected || [];
+      } catch (e) { /* status check is best-effort */ }
+    } catch (e) {
+      const summary = document.getElementById('agentsSummary');
+      if (summary) summary.textContent = 'Detection failed — is the server running?';
+    }
+  };
+
+  function persistConnected(ids){ try { localStorage.setItem('t3mp3st_connected_agents', JSON.stringify(ids || [])); } catch(e) {} }
+
+  window.connectOneLocalAgent = async function(id){
+    try {
+      const data = await api('/api/agents/local/connect', { ids: [id], ping: false });
+      const ids = (data.connected || []).map(function(c){ return c.id; });
+      render(lastDetected, ids);
+      persistConnected(ids);
+      toast(id + ' connected', 'success');
+    } catch (e) { toast('Connect failed: ' + (e.message || e), 'error'); }
+  };
+
+  window.connectSelectedLocalAgents = async function(){
+    try {
+      var checked = Array.prototype.map.call(document.querySelectorAll('.la-sel:checked'), function (el) { return el.getAttribute('data-id'); });
+      if (!checked.length) { toast('Select at least one agent', 'error'); return; }
+      const data = await api('/api/agents/local/connect', { ids: checked, ping: false });
+      const ids = (data.connected || []).map(function(c){ return c.id; });
+      render(lastDetected, ids);
+      persistConnected(ids);
+      toast('Connected ' + ids.length + ' agent(s)', 'success');
+    } catch (e) { toast('Connect failed: ' + (e.message || e), 'error'); }
+  };
+
+  window.connectCursorAgent = async function(){
+    try {
+      const data = await api('/api/agents/local/connect', { id: 'cursor', ping: false });
+      const ids = (data.connected || []).map(function(c){ return c.id; });
+      render(lastDetected, ids);
+      persistConnected(ids);
+      toast('Cursor connected', 'success');
+      refreshOAuthStatus();
+    } catch (e) { toast('Cursor connect failed: ' + (e.message || e), 'error'); }
+  };
+
+  window.pingOneLocalAgent = async function(id){
+    try {
+      const r = await api('/api/agents/local/ping', { id: id });
+      pingStatus[id] = { ok: r.ok, latencyMs: r.latencyMs, error: r.error };
+      render(lastDetected);
+      toast(r.ok ? (id + ' is live') : (id + ' failed: ' + (r.error || 'auth')), r.ok ? 'success' : 'error');
+    } catch (e) { toast('Ping failed: ' + (e.message || e), 'error'); }
+  };
+
+  window.disconnectLocalAgent = async function(id){
+    try {
+      const data = await api('/api/agents/local/disconnect', { id: id });
+      delete pingStatus[id];
+      const ids = Array.isArray(data.connected) ? data.connected : connectedIds.filter(function(x){ return x !== id; });
+      if (getActiveAgent() === id) setActiveAgentStored('');
+      persistConnected(ids);
+      render(lastDetected, ids);
+      toast(id + ' disconnected', 'info');
+    } catch (e) { toast('Disconnect failed: ' + (e.message || e), 'error'); }
+  };
+
+  window.setActiveLocalAgent = function(id){
+    setActiveAgentStored(id);
+    render(lastDetected);
+    paintAdmiralBackbone();
+    toast(id + ' pinned as the active backbone', 'success');
+  };
+  window.setClaudeModel = function(m){ setClaudeModelStored(m); };
+
+  async function autoReconnect(){
+    try {
+      var raw = localStorage.getItem('t3mp3st_connected_agents');
+      var want = raw ? JSON.parse(raw) : [];
+      if (!want.length) return;
+      const data = await api('/api/agents/local/connect', { ids: want, ping: false });
+      const ids = (data.connected || []).map(function(c){ return c.id; });
+      render(lastDetected, ids);
+      persistConnected(ids);
+    } catch (e) { /* silent — server may be down */ }
+  }
+
+  function hasBackend(){
+    var api = (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.baseUrl) || '';
+    return !!(api || window.__t3mpLiveAgents > 0);
+  }
+  window.t3mpHasBackend = hasBackend;
+  // Pick the best connected agent to serve as the mission LLM backend: prefer a live-pinged one, and
+  // Use a stable preference order when the operator has not pinned a connected agent. Returns id | null.
+  function preferredAgent(){
+    var order = ['codex','opencode','omp','hermes','claude'];
+    var connected = (connectedIds || []).slice();
+    var live = connected.filter(function(id){ return pingStatus[id] && pingStatus[id].ok; });
+    var pool = live;
+    // Fall back to the SERVER's reported agents (/api/agents/local/status, stashed by
+    // refreshSystemStatus). Without this, a War Room loaded without first visiting Settings has an
+    // empty client connectedIds and would route missions to a key-provider even though the server
+    // already has a live agent — the exact AI-backbone/mission-routing mismatch we want to avoid.
+    if (!pool.length && Array.isArray(window.__t3mpServerAgents)) {
+      var srv = window.__t3mpServerAgents.slice();
+      pool = srv.filter(function(a){ return a.lastPing && a.lastPing.ok; }).map(function(a){ return a.id; });
+    }
+    // Explicit operator pin wins over the default order only while it is live. A remembered
+    // connection is not sufficient: routing a stale pin ahead of a working keyed provider makes
+    // General/Admiral dispatch fail even though a healthy fallback is available.
+    var pinned = getActiveAgent();
+    if (pinned && pool.indexOf(pinned) >= 0) return pinned;
+    pool.sort(function(a,b){ return order.indexOf(a) - order.indexOf(b); });
+    return pool[0] || null;
+  }
+  window.t3mpPreferredAgent = preferredAgent;
+  // The EXPLICIT operator pin (empty string = none). Callers use this to let a pinned local agent
+  // outrank stored API keys, so "use my local Claude" beats a leftover OpenRouter key.
+  window.t3mpActiveAgentPin = getActiveAgent;
+  // CENTRALIZED backend agent resolution — the single source of truth every server-dispatch surface
+  // (missions, General, Admiral) uses, so pin precedence and model passthrough stay consistent:
+  //   • an EXPLICIT pin outranks a stored API key (the pin is a deliberate "use my local Claude");
+  //   • with no key and no pin, the auto-preferred connected agent is used;
+  //   • the returned `model` carries the picked underlying model as "agentId::model" (LocalAgentAdapter
+  //     parses it) so the selected Claude model is never dropped.
+  // Returns { id, model } or null when no local agent should drive this dispatch.
+  window.t3mpDispatchAgent = function(apiKey){
+    const key = (apiKey || '').trim();
+    const pin = getActiveAgent();
+    const pref = preferredAgent();
+    const agent = (pin && pref === pin) ? pin : (!key ? pref : null);
+    if (!agent) return null;
+    const am = agentModelFor(agent);
+    return { id: agent, model: am ? (agent + '::' + am) : agent };
+  };
+  window.openAgentSettings = function(){
+    if (typeof navigateTo === 'function') navigateTo('settings');
+  };
+
+  function bootLocalAgents(){
+    setTimeout(async function(){ try { await window.detectLocalAgents(); await autoReconnect(); } catch(e) {} }, 700);
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') bootLocalAgents();
+  else window.addEventListener('DOMContentLoaded', bootLocalAgents);
+})();
+</script>
+<script>
+// Overview boot: restore query state, wire controls, first paint.
+(function () {
+  loadState();
+  var q = Shell.params.get();
+  var qt = q.get('target');
+  if (qt) {
+    var input = document.getElementById('heroHuntTarget');
+    if (input) input.value = qt;
+  }
+  var qp = q.get('provider') || (state.settings && state.settings.activeProvider);
+  var sel = document.getElementById('quickProvider');
+  if (sel && qp) {
+    sel.value = qp;
+    if (state.settings) state.settings.activeProvider = sel.value;
+  }
+  var qs = q.get('sev');
+  var sevSel = document.getElementById('sevFilter');
+  if (sevSel && qs) sevSel.value = qs;
+
+  document.getElementById('huntBtn').addEventListener('click', launchMissionFromOverview);
+  var huntInput = document.getElementById('heroHuntTarget');
+  if (huntInput) huntInput.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); launchMissionFromOverview(); }
+  });
+  document.getElementById('missionStopBtn').addEventListener('click', async function () {
+    try { await BackendDispatch.stopMission(); missionRunning = false; toast('Mission stop requested', 'info'); }
+    catch (e) { toast('Stop failed: ' + (e.message || e), 'error'); }
+  });
+  if (sel) sel.addEventListener('change', function () {
+    if (state.settings) state.settings.activeProvider = sel.value;
+    saveState();
+    Shell.params.set({ provider: sel.value });
+    paintAdmiralBackbone();
+  });
+  if (sevSel) sevSel.addEventListener('change', function () { filterFindings(sevSel.value); });
+  document.getElementById('healthRetry').addEventListener('click', function () { T3MP3ST_API.checkHealth().then(refreshOAuthStatus); });
+  document.getElementById('findingsRetry').addEventListener('click', refreshFindings);
+  document.getElementById('generalAutoBtn').addEventListener('click', function () { generalFullAuto([]); });
+  document.getElementById('sitrepBtn').addEventListener('click', generalRequestSitrep);
+  document.querySelectorAll('#missionState [data-retry], #findingsState [data-retry], #statusState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { refreshMissionStatus(); refreshFindings(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    var t = document.getElementById('heroHuntTarget');
+    if (t) t.value = nq.get('target') || '';
+    refreshFindings();
+  });
+
+  T3MP3ST_API.checkHealth().then(function () {
+    refreshOAuthStatus();
+    paintAdmiralBackbone();
+    refreshMissionStatus();
+    refreshFindings();
+    refreshReceiptsBadge();
+    connectStream();
+    missionTimer = setInterval(function () { refreshMissionStatus(); }, 8000);
+  });
+})();
+</script>
+</body>
+</html>

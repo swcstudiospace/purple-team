@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Arsenal</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Sensor Deck Loadout</div>
+<h1 class="page-head__title" id="pageTitle">Arsenal</h1>
+<p class="page-head__sub">Arm tools for a mission. Advisory loadout; operators can still call any tool at runtime. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="statusTitle">
+<h2 class="card__title" id="statusTitle">Adapter status</h2>
+<div class="form-row">
+<div><label class="flabel" for="familySel">Family</label><select class="form-input" id="familySel"><option value="web_api">web_api</option><option value="ai_red_team">ai_red_team</option><option value="agent_warfare">agent_warfare</option><option value="code_supply_chain">code_supply_chain</option><option value="cloud_infra">cloud_infra</option><option value="crypto_secrets">crypto_secrets</option><option value="smart_contract">smart_contract</option></select></div>
+<div><label class="flabel" for="arsenalQuery">Filter</label><input class="form-input" id="arsenalQuery" type="search" placeholder="tool name…"></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm btn--primary" id="statusBtn" type="button">Check status</button>
+<button class="btn btn--sm" id="activationBtn" type="button">Activation summary</button>
+</div>
+<div data-state-root id="statusState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No adapter data for this family yet.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Check again</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Status unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Status current.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><p class="mono" id="readinessLine"></p><table class="table" id="statusTable"><thead><tr><th>Adapter</th><th>Ready</th><th>Note</th></tr></thead><tbody></tbody></table></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="planTitle">
+<h2 class="card__title" id="planTitle">Loadout plan</h2>
+<div class="form-row">
+<div><label class="flabel" for="planTarget">Target</label><input class="form-input mono" id="planTarget" type="text" placeholder="local-lab or host"></div>
+<div><label class="flabel" for="planObjective">Objective</label><input class="form-input" id="planObjective" type="text" placeholder="map the attack surface"></div>
+</div>
+<div class="card__row" style="margin-top:8px"><button class="btn btn--sm btn--primary" id="planBtn" type="button">Plan loadout</button></div>
+<div data-state-root id="planState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p>No plan yet. Pick a family and target, then plan.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Plan loadout</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Planning failed.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Plan ready.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><ul class="feed" id="planList"></ul></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="approvalsTitle">
+<h2 class="card__title" id="approvalsTitle">Tool approvals</h2>
+<div class="card__row"><button class="btn btn--sm" id="approvalsBtn" type="button">Refresh</button></div>
+<div data-state-root id="approvalsState">
+<div data-state="loading" class="st-loading"><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No tool approvals pending.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Refresh</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Approvals unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Approvals current.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><ul class="feed" id="approvalsList"></ul></div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Arsenal page: /api/arsenal/status, /api/arsenal/plan, /api/arsenal/activation, approvals.
+async function loadArsenalStatus() {
+  var root = document.getElementById('statusState');
+  var family = (document.getElementById('familySel') || {}).value || 'web_api';
+  var needle = ((document.getElementById('arsenalQuery') || {}).value || '').toLowerCase();
+  try {
+    var d = await Shell.apiGet('/api/arsenal/status?family=' + encodeURIComponent(family));
+    var readiness = (d.summary && d.summary.readiness) || 0;
+    var line = document.getElementById('readinessLine');
+    if (line) line.textContent = 'Family ' + family + ' · readiness ' + readiness + '%';
+    var adapters = d.adapters || d.tools || [];
+    var rows = adapters.filter(function (t) {
+      return !needle || String(t.id || t.name || '').toLowerCase().indexOf(needle) >= 0;
+    });
+    var tbody = document.getElementById('statusTable').querySelector('tbody');
+    if (tbody) {
+      tbody.innerHTML = rows.map(function (t) {
+        var ready = t.ready !== false && t.missing !== true;
+        return '<tr><td class="mono">' + Shell.escHtml(t.id || t.name || '') + '</td>'
+          + '<td><span class="badge ' + (ready ? 'badge--ok' : 'badge--warn') + '">' + (ready ? 'ready' : 'missing') + '</span></td>'
+          + '<td>' + Shell.escHtml(t.note || t.hint || '') + '</td></tr>';
+      }).join('');
+    }
+    if (!rows.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = rows.length + ' adapter(s) · ' + readiness + '% ready.';
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function loadActivation() {
+  try {
+    var d = await Shell.apiGet('/api/arsenal/activation');
+    var summary = d.summary || {};
+    Shell.toast('Activation: ' + JSON.stringify(summary).slice(0, 160), 'info');
+  } catch (e) {
+    Shell.toast('Activation summary failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function planLoadout() {
+  var root = document.getElementById('planState');
+  Shell.showState(root, 'loading');
+  var family = (document.getElementById('familySel') || {}).value || 'web_api';
+  var target = ((document.getElementById('planTarget') || {}).value || '').trim() || 'local-lab';
+  var objective = ((document.getElementById('planObjective') || {}).value || '').trim() || 'Map the attack surface.';
+  try {
+    var d = await Shell.apiPost('/api/arsenal/plan', { family: family, target: target, objective: objective });
+    var steps = d.steps || d.plan || [];
+    var list = document.getElementById('planList');
+    if (list) {
+      var items = Array.isArray(steps) ? steps : [steps];
+      list.innerHTML = items.map(function (s) {
+        return '<li>' + Shell.escHtml(typeof s === 'string' ? s : (s.tool || s.title || JSON.stringify(s))) + '</li>';
+      }).join('') || '<li>Plan returned with no steps.</li>';
+    }
+    Shell.showState(root, 'data');
+    Shell.toast('Loadout planned for ' + family, 'success');
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function loadToolApprovals() {
+  var root = document.getElementById('approvalsState');
+  try {
+    var d = await Shell.apiGet('/api/arsenal/approvals');
+    var arr = Array.isArray(d) ? d : (d.approvals || []);
+    var list = document.getElementById('approvalsList');
+    if (list) {
+      list.innerHTML = arr.map(function (a) {
+        return '<li>' + Shell.escHtml(a.id || '') + ' · ' + Shell.escHtml(a.command || a.action || '') + ' · ' + Shell.escHtml(a.risk || a.status || '') + '</li>';
+      }).join('');
+    }
+    if (!arr.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  var familySel = document.getElementById('familySel');
+  var arsenalQuery = document.getElementById('arsenalQuery');
+  if (familySel && q.get('family')) familySel.value = q.get('family');
+  if (arsenalQuery && q.get('q')) arsenalQuery.value = q.get('q');
+  loadArsenalStatus();
+  loadToolApprovals();
+  document.getElementById('statusBtn').addEventListener('click', function () {
+    Shell.params.set({ family: familySel.value, q: arsenalQuery.value });
+    loadArsenalStatus();
+  });
+  document.getElementById('activationBtn').addEventListener('click', loadActivation);
+  document.getElementById('planBtn').addEventListener('click', planLoadout);
+  document.getElementById('approvalsBtn').addEventListener('click', loadToolApprovals);
+  if (arsenalQuery) arsenalQuery.addEventListener('input', function () {
+    Shell.params.set({ q: arsenalQuery.value });
+    loadArsenalStatus();
+  });
+  document.querySelectorAll('#statusState [data-retry], #planState [data-retry], #approvalsState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { loadArsenalStatus(); planLoadout(); loadToolApprovals(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    if (familySel) familySel.value = nq.get('family') || 'web_api';
+    if (arsenalQuery) arsenalQuery.value = nq.get('q') || '';
+    loadArsenalStatus();
+  });
+})();
+</script>
+</body>
+</html>

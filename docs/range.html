@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Range</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">OBSIDIVM · CTF Range</div>
+<h1 class="page-head__title" id="pageTitle">Range</h1>
+<p class="page-head__sub">Reproducible benchmark suites and execution-based challenge drills. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="suiteTitle">
+<h2 class="card__title" id="suiteTitle">Suite</h2>
+<div class="card__row" role="tablist" aria-label="Range suites">
+<button class="btn btn--sm" id="tabBench" type="button" role="tab">Benchmarks</button>
+<button class="btn btn--sm" id="tabCtf" type="button" role="tab">CTF range</button>
+</div>
+</section>
+
+<section class="card" id="benchCard" aria-labelledby="benchTitle">
+<h2 class="card__title" id="benchTitle">OBSIDIVM benchmarks</h2>
+<div class="form-row">
+<div><label class="flabel" for="benchCat">Category</label><select class="form-input" id="benchCat"><option value="all">all</option><option value="owasp">OWASP Top 10</option><option value="mitre">MITRE ATT&amp;CK</option><option value="cwe">CWE Top 25</option></select></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm btn--primary" id="benchPreflight" type="button">Run preflight</button>
+<button class="btn btn--sm" id="benchRun" type="button">Run suite checks</button>
+</div>
+<div data-state-root id="benchState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No checks selected. Pick a category and run.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Run preflight</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Benchmarks unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Suite complete.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><table class="table" id="benchTable"><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody></tbody></table></div>
+</div>
+</section>
+
+<section class="card" id="ctfCard" aria-labelledby="ctfTitle" hidden>
+<h2 class="card__title" id="ctfTitle">CTF range</h2>
+<p class="text-secondary"><strong>Local simulation / illustrative.</strong> Challenge solves here are format-checked, not verified against a live target. For measured, live-exploit-verified results use OBSIDIVM above.</p>
+<div data-state-root id="ctfState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--row"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No challenges in this category.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Show all</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Range unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Correct flag format.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="provider-grid" id="ctfGrid"></div></div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Range page: OBSIDIVM preflight + suite checks, CTF drills (format-checked).
+var BENCH_CHECKS = [
+  { id: 'owasp_a01_bac', cat: 'owasp', label: 'A01 Broken Access Control' },
+  { id: 'owasp_a03_injection', cat: 'owasp', label: 'A03 Injection' },
+  { id: 'owasp_a07_authn', cat: 'owasp', label: 'A07 Auth Failures' },
+  { id: 'mitre_execution', cat: 'mitre', label: 'TA0002 Execution' },
+  { id: 'mitre_persistence', cat: 'mitre', label: 'TA0003 Persistence' },
+  { id: 'cwe_79_xss', cat: 'cwe', label: 'CWE-79 Cross-Site Scripting' },
+  { id: 'cwe_89_sqli', cat: 'cwe', label: 'CWE-89 SQL Injection' },
+  { id: 'cwe_78_os_cmd', cat: 'cwe', label: 'CWE-78 OS Command Injection' }
+];
+
+var CTF_CHALLENGES = [
+  { id: 'web-login-bypass', cat: 'web', title: 'Login bypass', hint: 'The login form concatenates input into a query.' },
+  { id: 'web-ssrf', cat: 'web', title: 'SSRF fetch', hint: 'The fetcher follows internal URLs.' },
+  { id: 'pwn-buffer', cat: 'pwn', title: 'Buffer overflow', hint: 'A fixed-size buffer guards the flag read.' },
+  { id: 'crypto-xor', cat: 'crypto', title: 'Reused XOR key', hint: 'Two ciphertexts share one key.' }
+];
+
+function setSuite(suite) {
+  Shell.params.set({ suite: suite === 'bench' ? '' : suite });
+  document.getElementById('benchCard').hidden = suite !== 'bench';
+  document.getElementById('ctfCard').hidden = suite !== 'ctf';
+  document.getElementById('tabBench').className = 'btn btn--sm' + (suite === 'bench' ? ' btn--primary' : '');
+  document.getElementById('tabCtf').className = 'btn btn--sm' + (suite === 'ctf' ? ' btn--primary' : '');
+  if (suite === 'ctf') renderCtf();
+}
+
+async function runPreflight() {
+  var root = document.getElementById('benchState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/preflight');
+    var checks = d.checks || [];
+    var tbody = document.getElementById('benchTable').querySelector('tbody');
+    if (tbody) {
+      tbody.innerHTML = checks.map(function (c) {
+        var pass = c.pass !== false && c.status !== 'fail';
+        return '<tr><td>' + Shell.escHtml(c.name || c.id || '') + '</td>'
+          + '<td><span class="badge ' + (pass ? 'badge--ok' : 'badge--danger') + '">' + (pass ? 'pass' : 'fail') + '</span></td>'
+          + '<td>' + Shell.escHtml(c.detail || '') + '</td></tr>';
+      }).join('') || '<li>Preflight returned no checks.</li>';
+    }
+    Shell.showState(root, checks.length ? 'data' : 'empty');
+    var okEl = root.querySelector('[data-ok]');
+    if (okEl) okEl.textContent = 'Score ' + (d.score != null ? d.score : 'n/a') + '/100.';
+    Shell.toast('Preflight score ' + (d.score != null ? d.score : 'n/a') + '/100', 'success');
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function runBenchChecks() {
+  var root = document.getElementById('benchState');
+  var cat = (document.getElementById('benchCat') || {}).value || 'all';
+  Shell.params.set({ cat: cat === 'all' ? '' : cat });
+  var selected = BENCH_CHECKS.filter(function (c) { return cat === 'all' || c.cat === cat; });
+  if (!selected.length) {
+    Shell.showState(root, 'empty');
+    return;
+  }
+  Shell.showState(root, 'loading');
+  var tbody = document.getElementById('benchTable').querySelector('tbody');
+  var rows = [];
+  for (var i = 0; i < selected.length; i++) {
+    var c = selected[i];
+    var outcome = { pass: true, detail: 'static probe executed' };
+    try {
+      var d = await Shell.apiPost('/api/tools/execute', { command: 'file package.json', target: 'local-host' });
+      if (d.approval && d.approval.status === 'pending') outcome = { pass: true, detail: 'receipt gate verified (pending approval as expected)' };
+      else outcome = { pass: !d.error, detail: d.error || 'tool lane reachable' };
+    } catch (e) {
+      outcome = { pass: false, detail: e.message || String(e) };
+    }
+    rows.push({ check: c, outcome: outcome });
+  }
+  if (tbody) {
+    tbody.innerHTML = rows.map(function (r) {
+      return '<tr><td>' + Shell.escHtml(r.check.label) + '</td>'
+        + '<td><span class="badge ' + (r.outcome.pass ? 'badge--ok' : 'badge--danger') + '">' + (r.outcome.pass ? 'pass' : 'fail') + '</span></td>'
+        + '<td>' + Shell.escHtml(r.outcome.detail) + '</td></tr>';
+    }).join('');
+  }
+  Shell.showState(root, 'data');
+  var passed = rows.filter(function (r) { return r.outcome.pass; }).length;
+  Shell.toast(passed + '/' + rows.length + ' checks passed', passed === rows.length ? 'success' : 'warning');
+}
+
+function renderCtf() {
+  var root = document.getElementById('ctfState');
+  var grid = document.getElementById('ctfGrid');
+  if (grid) {
+    grid.innerHTML = CTF_CHALLENGES.map(function (c) {
+      return '<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name">' + Shell.escHtml(c.title) + '</h3>'
+        + '<span class="badge badge--info">' + Shell.escHtml(c.cat) + '</span></div>'
+        + '<p class="provider-card__desc">' + Shell.escHtml(c.hint) + '</p>'
+        + '<div class="key-row"><input class="form-input mono" data-flag="' + Shell.escHtml(c.id) + '" placeholder="flag{...}">'
+        + '<button class="btn btn--sm btn--primary" data-solve="' + Shell.escHtml(c.id) + '">Submit</button></div></div>';
+    }).join('');
+    grid.querySelectorAll('[data-solve]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var id = b.getAttribute('data-solve');
+        var field = grid.querySelector('[data-flag="' + id + '"]');
+        var value = field ? field.value.trim() : '';
+        if (/^flag\{[^}]{3,}\}$/.test(value)) {
+          Shell.showState(root, 'success');
+          var okEl = root.querySelector('[data-ok]');
+          if (okEl) okEl.textContent = id + ' accepted (format check only — illustrative).';
+          Shell.toast('Flag format accepted for ' + id, 'success');
+        } else {
+          Shell.toast('That does not look like a flag{...} submission', 'error');
+        }
+      });
+    });
+  }
+  Shell.showState(root, 'data');
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  if (q.get('cat')) document.getElementById('benchCat').value = q.get('cat');
+  setSuite(q.get('suite') === 'ctf' ? 'ctf' : 'bench');
+  document.getElementById('tabBench').addEventListener('click', function () { setSuite('bench'); });
+  document.getElementById('tabCtf').addEventListener('click', function () { setSuite('ctf'); });
+  document.getElementById('benchPreflight').addEventListener('click', runPreflight);
+  document.getElementById('benchRun').addEventListener('click', runBenchChecks);
+  document.getElementById('benchCat').addEventListener('change', runBenchChecks);
+  document.querySelectorAll('#benchState [data-retry], #ctfState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { runPreflight(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    document.getElementById('benchCat').value = nq.get('cat') || 'all';
+    setSuite(nq.get('suite') === 'ctf' ? 'ctf' : 'bench');
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Mission</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Live Scan · Scope Receipts</div>
+<h1 class="page-head__title" id="pageTitle">Mission</h1>
+<p class="page-head__sub">Per-agent execution progress and explicit approvals for external or live execution. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="viewTitle">
+<h2 class="card__title" id="viewTitle">View</h2>
+<div class="card__row" role="tablist" aria-label="Mission views">
+<button class="btn btn--sm" id="tabScan" type="button" role="tab">Live scan</button>
+<button class="btn btn--sm" id="tabReceipts" type="button" role="tab">Scope receipts</button>
+</div>
+</section>
+
+<section class="card" id="scanCard" aria-labelledby="scanTitle">
+<h2 class="card__title" id="scanTitle">Live scan</h2>
+<div class="card__row">
+<button class="btn btn--sm" id="scanRefresh" type="button">Refresh</button>
+<button class="btn btn--sm" id="scanStop" type="button">Stop mission</button>
+<button class="btn btn--sm" id="scanPause" type="button">Pause</button>
+<button class="btn btn--sm" id="scanResume" type="button">Resume</button>
+</div>
+<div data-state-root id="scanState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No live mission. Start one from the Overview.</p><a class="btn btn--sm btn--primary" href="overview.html">Launch a hunt</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Live scan unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Scan updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden>
+<p class="mono" id="scanLine"></p>
+<ul class="feed" id="agentList"></ul>
+</div>
+</div>
+</section>
+
+<section class="card" id="receiptsCard" aria-labelledby="receiptsTitle" hidden>
+<h2 class="card__title" id="receiptsTitle">Scope receipts</h2>
+<div class="card__row">
+<label class="flabel" for="receiptFilter">Filter</label>
+<select class="form-input" id="receiptFilter" style="max-width:180px"><option value="all">all</option><option value="pending">pending</option><option value="approved">approved</option><option value="rejected">rejected</option></select>
+<button class="btn btn--sm" id="approveAll" type="button">Approve all pending</button>
+<button class="btn btn--sm" id="receiptsRefresh" type="button">Refresh</button>
+</div>
+<div id="resumeBanner" hidden></div>
+<div data-state-root id="receiptsState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No receipts match this filter. Approval requests appear here before live execution.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Refresh</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Receipts unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Receipts updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><table class="table" id="receiptsTable"><thead><tr><th>ID</th><th>Action</th><th>Target</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Mission page: live scan (GET /api/mission/status) + receipts (GET /api/approvals).
+var receiptsCache = [];
+
+function setView(view) {
+  Shell.params.set({ view: view === 'scan' ? '' : view });
+  document.getElementById('scanCard').hidden = view !== 'scan';
+  document.getElementById('receiptsCard').hidden = view !== 'receipts';
+  document.getElementById('tabScan').className = 'btn btn--sm' + (view === 'scan' ? ' btn--primary' : '');
+  document.getElementById('tabReceipts').className = 'btn btn--sm' + (view === 'receipts' ? ' btn--primary' : '');
+  if (view === 'scan') refreshLiveScanPage();
+  else refreshReceiptsPage();
+}
+
+async function refreshLiveScanPage() {
+  var root = document.getElementById('scanState');
+  try {
+    var status = await Shell.apiGet('/api/mission/status');
+    var line = document.getElementById('scanLine');
+    var list = document.getElementById('agentList');
+    if (!status || !status.active) {
+      Shell.showState(root, 'empty');
+      return;
+    }
+    var mission = status.mission || {};
+    if (line) line.textContent = 'ACTIVE · phase ' + (mission.currentPhase || 'running');
+    var agents = status.operators || status.agents || [];
+    if (list) {
+      list.innerHTML = agents.map(function (op) {
+        return '<li>' + Shell.escHtml(op.id || op.archetype || 'operator') + ' · ' + Shell.escHtml(op.status || op.phase || 'running') + '</li>';
+      }).join('') || '<li>No per-agent updates yet.</li>';
+    }
+    Shell.showState(root, 'data');
+    var okEl = root.querySelector('[data-ok]');
+    if (okEl) okEl.textContent = agents.length + ' operator(s) reporting.';
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function missionControl(action) {
+  try {
+    await Shell.apiPost('/api/mission/' + action, {});
+    Shell.toast('Mission ' + action + ' requested', 'success');
+    refreshLiveScanPage();
+  } catch (e) {
+    Shell.toast(action + ' failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function refreshReceiptsPage() {
+  var root = document.getElementById('receiptsState');
+  var filter = (document.getElementById('receiptFilter') || {}).value || Shell.params.get().get('filter') || 'all';
+  try {
+    var data = await Shell.apiGet('/api/approvals');
+    receiptsCache = Array.isArray(data.approvals) ? data.approvals : [];
+    renderReceiptsPage(filter);
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+function renderReceiptsPage(filter) {
+  var root = document.getElementById('receiptsState');
+  var rows = receiptsCache.filter(function (a) { return filter === 'all' || a.status === filter; });
+  var tbody = document.getElementById('receiptsTable').querySelector('tbody');
+  if (tbody) {
+    tbody.innerHTML = rows.map(function (a) {
+      return '<tr><td class="mono">' + Shell.escHtml(a.id) + '</td><td>' + Shell.escHtml(a.action || '') + '</td>'
+        + '<td class="mono">' + Shell.escHtml(a.target || '') + '</td>'
+        + '<td><span class="badge ' + (a.status === 'approved' ? 'badge--ok' : (a.status === 'rejected' ? 'badge--danger' : 'badge--warn')) + '">' + Shell.escHtml(a.status || 'pending') + '</span></td>'
+        + '<td>' + (a.status === 'pending'
+          ? '<button class="btn btn--sm btn--primary" data-approve="' + Shell.escHtml(a.id) + '">Approve</button> '
+            + '<button class="btn btn--sm" data-reject="' + Shell.escHtml(a.id) + '">Reject</button>'
+          : '') + '</td></tr>';
+    }).join('');
+    tbody.querySelectorAll('[data-approve]').forEach(function (b) {
+      b.addEventListener('click', function () { decideReceipt(b.getAttribute('data-approve'), true); });
+    });
+    tbody.querySelectorAll('[data-reject]').forEach(function (b) {
+      b.addEventListener('click', function () { decideReceipt(b.getAttribute('data-reject'), false); });
+    });
+  }
+  var banner = document.getElementById('resumeBanner');
+  if (banner) {
+    var pendingRetry = null;
+    try { pendingRetry = JSON.parse(window.localStorage.getItem('t3mp3st_pending_retry') || 'null'); } catch (e) { pendingRetry = null; }
+    if (pendingRetry && pendingRetry.approvalIds && pendingRetry.approvalIds.length) {
+      banner.hidden = false;
+      banner.innerHTML = '<div class="st-success"><p><strong>Resume available.</strong> A Full Auto run is waiting on receipt approval.</p>'
+        + '<button class="btn btn--sm btn--primary" id="resumeAuto">Resume Full Auto</button></div>';
+      var rb = document.getElementById('resumeAuto');
+      if (rb) rb.addEventListener('click', function () {
+        try { window.localStorage.removeItem('t3mp3st_pending_retry'); } catch (e) { /* storage unavailable */ }
+        window.location.href = 'overview.html';
+        Shell.toast('Receipt recorded — re-engage Full Auto from the Overview', 'info');
+      });
+    } else {
+      banner.hidden = true;
+      banner.innerHTML = '';
+    }
+  }
+  if (!rows.length) {
+    Shell.showState(root, 'empty');
+  } else {
+    Shell.showState(root, 'data');
+    var okEl = root.querySelector('[data-ok]');
+    if (okEl) okEl.textContent = rows.length + ' receipt(s) shown.';
+  }
+}
+
+async function decideReceipt(id, approve) {
+  try {
+    await Shell.apiPost('/api/approvals/' + id + (approve ? '/approve' : '/reject'), {});
+    Shell.toast('Receipt ' + (approve ? 'approved: ' : 'rejected: ') + id, approve ? 'success' : 'info');
+    refreshReceiptsPage();
+  } catch (e) {
+    Shell.toast('Decision failed: ' + (e.message || e), 'error');
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  var filterSel = document.getElementById('receiptFilter');
+  if (filterSel && q.get('filter')) filterSel.value = q.get('filter');
+  setView(q.get('view') === 'receipts' ? 'receipts' : 'scan');
+  document.getElementById('tabScan').addEventListener('click', function () { setView('scan'); });
+  document.getElementById('tabReceipts').addEventListener('click', function () { setView('receipts'); });
+  document.getElementById('scanRefresh').addEventListener('click', refreshLiveScanPage);
+  document.getElementById('scanStop').addEventListener('click', function () { missionControl('stop'); });
+  document.getElementById('scanPause').addEventListener('click', function () { missionControl('pause'); });
+  document.getElementById('scanResume').addEventListener('click', function () { missionControl('resume'); });
+  document.getElementById('receiptsRefresh').addEventListener('click', refreshReceiptsPage);
+  document.getElementById('approveAll').addEventListener('click', async function () {
+    var pending = receiptsCache.filter(function (a) { return a.status === 'pending'; });
+    for (var i = 0; i < pending.length; i++) {
+      try { await Shell.apiPost('/api/approvals/' + pending[i].id + '/approve', {}); } catch (e) { /* keep going */ }
+    }
+    Shell.toast('Approved ' + pending.length + ' pending receipt(s)', pending.length ? 'success' : 'info');
+    refreshReceiptsPage();
+  });
+  if (filterSel) filterSel.addEventListener('change', function () {
+    Shell.params.set({ filter: filterSel.value === 'all' ? '' : filterSel.value });
+    renderReceiptsPage(filterSel.value);
+  });
+  document.querySelectorAll('#scanState [data-retry], #receiptsState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { refreshLiveScanPage(); refreshReceiptsPage(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    if (filterSel) filterSel.value = nq.get('filter') || 'all';
+    setView(nq.get('view') === 'receipts' ? 'receipts' : 'scan');
+  });
+})();
+</script>
+</body>
+</html>

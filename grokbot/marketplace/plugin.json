@@ -1,0 +1,50 @@
+{
+  "name": "t3mp3st-grokbot",
+  "version": "1.0.0",
+  "publisher": "t3mp3st",
+  "displayName": "T3MP3ST — Red Team Bot Pack",
+  "description": "Grok Bot pack for the T3MP3ST loopback backend: five seat templates plus the seven tempest skills and seven hat skills.",
+  "connectors": [
+    {
+      "name": "tempest-commander",
+      "url": "http://127.0.0.1:3333",
+      "auth": "none"
+    },
+    {
+      "name": "tempest-red",
+      "url": "http://127.0.0.1:3333",
+      "auth": "none"
+    },
+    {
+      "name": "tempest-black",
+      "url": "http://127.0.0.1:3333",
+      "auth": "none"
+    },
+    {
+      "name": "tempest-blue",
+      "url": "http://127.0.0.1:3333",
+      "auth": "none"
+    },
+    {
+      "name": "tempest-white",
+      "url": "http://127.0.0.1:3333",
+      "auth": "none"
+    }
+  ],
+  "skills": [
+    "tempest-bootstrap",
+    "tempest-run",
+    "tempest-mission",
+    "tempest-operators",
+    "tempest-status",
+    "tempest-report",
+    "tempest-memory",
+    "black-specter",
+    "black-wraith",
+    "blue-sentinel",
+    "blue-warden",
+    "white-arbiter",
+    "white-auditor",
+    "dark-purple"
+  ]
+}

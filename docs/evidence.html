@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Evidence</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Evidence Vault</div>
+<h1 class="page-head__title" id="pageTitle">Evidence</h1>
+<p class="page-head__sub">Findings land here with provenance. Verified means a real tool produced it — not the model guessing. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="filterTitle">
+<h2 class="card__title" id="filterTitle">Filters</h2>
+<div class="form-row">
+<div><label class="flabel" for="kindSel">Kind</label><select class="form-input" id="kindSel"><option value="findings">findings</option><option value="evidence">evidence</option></select></div>
+<div><label class="flabel" for="sevSel">Severity</label><select class="form-input" id="sevSel"><option value="all">all</option><option value="critical">critical</option><option value="high">high</option><option value="medium">medium</option><option value="low">low</option></select></div>
+<div><label class="flabel" for="qInput">Search</label><input class="form-input" id="qInput" type="search" placeholder="title, id, family…"></div>
+<div><label class="flabel" for="missionInput">Mission</label><input class="form-input mono" id="missionInput" type="text" placeholder="mission id (optional)"></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm btn--primary" id="applyBtn" type="button">Apply</button>
+<button class="btn btn--sm" id="exportBtn" type="button">Export JSON</button>
+</div>
+</section>
+
+<section class="card" aria-labelledby="listTitle">
+<h2 class="card__title" id="listTitle">Ledger</h2>
+<div data-state-root id="ledgerState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No entries match. Run a mission to produce evidence.</p><a class="btn btn--sm btn--primary" href="overview.html">Launch a hunt</a></div>
+<div data-state="error" class="st-error" hidden><p><strong>Ledger unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Ledger updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><table class="table" id="ledgerTable"><thead><tr><th>ID</th><th>Title</th><th>Severity</th><th>Provenance</th></tr></thead><tbody></tbody></table></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="graphTitle">
+<h2 class="card__title" id="graphTitle">Evidence graph</h2>
+<div class="card__row"><button class="btn btn--sm" id="graphBtn" type="button">Load graph</button></div>
+<div data-state-root id="graphState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p>No graph loaded yet.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Load graph</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Graph unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Graph loaded.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><ul class="feed" id="graphList"></ul></div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Evidence page: /api/findings + /api/evidence + /api/evidence-graph.
+var ledgerCache = [];
+
+function scopeQuery() {
+  var m = (document.getElementById('missionInput') || {}).value || Shell.params.get().get('mission') || '';
+  return m ? '?missionId=' + encodeURIComponent(m) : '';
+}
+
+async function loadLedger() {
+  var root = document.getElementById('ledgerState');
+  var kind = (document.getElementById('kindSel') || {}).value || 'findings';
+  var sev = (document.getElementById('sevSel') || {}).value || 'all';
+  var needle = ((document.getElementById('qInput') || {}).value || '').toLowerCase();
+  try {
+    var d = await Shell.apiGet('/api/' + kind + scopeQuery());
+    var arr = Array.isArray(d) ? d : (d.findings || d.evidence || []);
+    ledgerCache = arr;
+    var rows = arr.filter(function (e) {
+      if (sev !== 'all' && (e.severity || '') !== sev) return false;
+      if (needle) {
+        var hay = String(e.id || '') + ' ' + String(e.title || '') + ' ' + String(e.family || '');
+        if (hay.toLowerCase().indexOf(needle) < 0) return false;
+      }
+      return true;
+    });
+    var tbody = document.getElementById('ledgerTable').querySelector('tbody');
+    if (tbody) {
+      tbody.innerHTML = rows.map(function (e) {
+        return '<tr><td class="mono">' + Shell.escHtml(e.id || '') + '</td><td>' + Shell.escHtml(e.title || '') + '</td>'
+          + '<td><span class="badge badge--neutral">' + Shell.escHtml(e.severity || 'n/a') + '</span></td>'
+          + '<td class="mono">' + Shell.escHtml(e.provenance || e.source || 'tool') + '</td></tr>';
+      }).join('');
+    }
+    if (!rows.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = rows.length + ' entr' + (rows.length === 1 ? 'y' : 'ies') + ' shown.';
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function loadGraph() {
+  var root = document.getElementById('graphState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/evidence-graph' + scopeQuery());
+    var nodes = d.nodes || [];
+    var edges = d.edges || [];
+    var list = document.getElementById('graphList');
+    if (list) {
+      list.innerHTML = nodes.map(function (n) {
+        return '<li>' + Shell.escHtml(n.id || n.label || 'node') + ' · ' + Shell.escHtml(n.type || '') + '</li>';
+      }).join('') + edges.map(function (e) {
+        return '<li>' + Shell.escHtml(e.from || '') + ' → ' + Shell.escHtml(e.to || '') + ' · ' + Shell.escHtml(e.rel || '') + '</li>';
+      }).join('');
+    }
+    if (!nodes.length && !edges.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = nodes.length + ' node(s) / ' + edges.length + ' edge(s).';
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  var kindSel = document.getElementById('kindSel');
+  var sevSel = document.getElementById('sevSel');
+  var qInput = document.getElementById('qInput');
+  var missionInput = document.getElementById('missionInput');
+  if (kindSel && q.get('kind')) kindSel.value = q.get('kind');
+  if (sevSel && q.get('sev')) sevSel.value = q.get('sev');
+  if (qInput && q.get('q')) qInput.value = q.get('q');
+  if (missionInput && q.get('mission')) missionInput.value = q.get('mission');
+  loadLedger();
+  document.getElementById('applyBtn').addEventListener('click', function () {
+    Shell.params.set({ kind: kindSel.value === 'findings' ? '' : kindSel.value, sev: sevSel.value === 'all' ? '' : sevSel.value, q: qInput.value, mission: missionInput.value });
+    loadLedger();
+  });
+  document.getElementById('exportBtn').addEventListener('click', function () {
+    var blob = new Blob([JSON.stringify(ledgerCache, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'evidence-export.json';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    Shell.toast('Exported ' + ledgerCache.length + ' entr' + (ledgerCache.length === 1 ? 'y' : 'ies'), 'success');
+  });
+  document.getElementById('graphBtn').addEventListener('click', loadGraph);
+  document.querySelectorAll('#ledgerState [data-retry], #graphState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { loadLedger(); loadGraph(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    if (kindSel) kindSel.value = nq.get('kind') || 'findings';
+    if (sevSel) sevSel.value = nq.get('sev') || 'all';
+    if (qInput) qInput.value = nq.get('q') || '';
+    if (missionInput) missionInput.value = nq.get('mission') || '';
+    loadLedger();
+  });
+})();
+</script>
+</body>
+</html>

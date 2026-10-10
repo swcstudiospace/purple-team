@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  // WHY core-only: T3MP3ST is a single-operator localhost tool. The bundled UI
+  // is static docs/ content that talks to the alongside loopback API server
+  // (`npm run server`), which already owns command execution behind its
+  // loopback origin guard + Host allow-list (see docs/TAURI.md). The webview
+  // itself needs NO shell, filesystem, dialog, notification, or opener access,
+  // so none is granted — a compromised renderer gains no new capability.
+  // Deliberately ABSENT (deny-list, pinned by tauri-scaffold-static.test.ts):
+  //   shell:*  (no child processes from the webview — execution stays server-side)
+  //   fs:*     (no file read/write scope — the UI persists via the API, not disk)
+  //   dialog:* (no native open/save dialogs)
+  //   http/request backends beyond the loopback CSP (see tauri.conf.json security.csp)
+  "windows": ["main"],
+  "permissions": [
+    // WHY: bare-minimum Tauri core (window/event/app primitives the shell needs
+    // to exist at all). No scope attached.
+    "core:default"
+  ]
+}

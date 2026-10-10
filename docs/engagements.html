@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Engagements</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Op Admiral · Configs · Self-Improvement</div>
+<h1 class="page-head__title" id="pageTitle">Engagements</h1>
+<p class="page-head__sub">Autonomous operation planning, the config library, and harness self-improvement loops. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="viewTitle">
+<h2 class="card__title" id="viewTitle">View</h2>
+<div class="card__row" role="tablist" aria-label="Engagement views">
+<button class="btn btn--sm" id="tabAdmiral" type="button" role="tab">Op Admiral</button>
+<button class="btn btn--sm" id="tabConfigs" type="button" role="tab">Configs</button>
+<button class="btn btn--sm" id="tabSelf" type="button" role="tab">Self-improvement</button>
+</div>
+</section>
+
+<section class="card" id="admiralCard" aria-labelledby="admiralTitle">
+<h2 class="card__title" id="admiralTitle">Op Admiral</h2>
+<div class="form-row">
+<div><label class="flabel" for="directiveInput">Directive</label><input class="form-input" id="directiveInput" type="text" placeholder="Assess the exposure of example.com"></div>
+<div><label class="flabel" for="familySel">Family</label><select class="form-input" id="familySel"><option value="web_api">web_api</option><option value="ai_red_team">ai_red_team</option><option value="agent_warfare">agent_warfare</option><option value="code_supply_chain">code_supply_chain</option><option value="cloud_infra">cloud_infra</option></select></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm btn--primary" id="planBtn" type="button">Plan operation</button>
+<button class="btn btn--sm" id="executeBtn" type="button">Execute plan</button>
+<button class="btn btn--sm" id="autoBtn" type="button">Full auto</button>
+<button class="btn btn--sm" id="sitrepBtn" type="button">Request sitrep</button>
+<button class="btn btn--sm" id="assessBtn" type="button">Generate assessment</button>
+</div>
+<div data-state-root id="admiralState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton skeleton--title"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p>No operation planned yet. Enter a directive and plan.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Plan operation</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Admiral unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Operation updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div id="planOut"></div><div id="sitrepOut"></div></div>
+</div>
+</section>
+
+<section class="card" id="configsCard" aria-labelledby="configsTitle" hidden>
+<h2 class="card__title" id="configsTitle">Config library</h2>
+<div class="card__row">
+<button class="btn btn--sm btn--primary" id="configsBtn" type="button">Load library</button>
+</div>
+<div data-state-root id="configsState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>The library is empty.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Reload</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Library unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Library loaded.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden>
+<h3 class="card__title">Workflow presets</h3><ul class="feed" id="presetsList"></ul>
+<h3 class="card__title">Operator runbooks</h3><ul class="feed" id="runbooksList"></ul>
+</div>
+</div>
+</section>
+
+<section class="card" id="selfCard" aria-labelledby="selfTitle" hidden>
+<h2 class="card__title" id="selfTitle">Self-improvement</h2>
+<p class="text-secondary">The harness proposes its own improvements — human-gated, with a change ledger.</p>
+<div class="card__row">
+<button class="btn btn--sm btn--primary" id="selfBtn" type="button">Check loops</button>
+<button class="btn btn--sm" id="reviewBtn" type="button">Run learning review</button>
+</div>
+<div data-state-root id="selfState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton skeleton--title"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p>No loops reported yet.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Check loops</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Loops unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Loops current.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden>
+<h3 class="card__title">Proposals</h3><ul class="feed" id="proposalsList"></ul>
+<h3 class="card__title">Memory capsule</h3><ul class="feed" id="capsuleList"></ul>
+</div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Engagements page: Op Admiral (general/*, admiral/*), configs library, self-improvement.
+var admiralPlan = null;
+
+function setView(view) {
+  Shell.params.set({ view: view === 'admiral' ? '' : view });
+  document.getElementById('admiralCard').hidden = view !== 'admiral';
+  document.getElementById('configsCard').hidden = view !== 'configs';
+  document.getElementById('selfCard').hidden = view !== 'self';
+  document.getElementById('tabAdmiral').className = 'btn btn--sm' + (view === 'admiral' ? ' btn--primary' : '');
+  document.getElementById('tabConfigs').className = 'btn btn--sm' + (view === 'configs' ? ' btn--primary' : '');
+  document.getElementById('tabSelf').className = 'btn btn--sm' + (view === 'self' ? ' btn--primary' : '');
+  if (view === 'configs') loadConfigs();
+  if (view === 'self') loadSelf();
+}
+
+function directive() {
+  return (document.getElementById('directiveInput').value || '').trim();
+}
+
+async function planOperation() {
+  var root = document.getElementById('admiralState');
+  if (!directive()) { Shell.toast('Enter a directive first', 'error'); return; }
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiPost('/api/general/plan', { objective: directive(), family: document.getElementById('familySel').value });
+    admiralPlan = d.plan || d;
+    var out = document.getElementById('planOut');
+    if (out) out.innerHTML = '<div class="card"><h3 class="card__title">' + Shell.escHtml(admiralPlan.codename || 'plan') + '</h3><p class="text-secondary">' + Shell.escHtml(admiralPlan.summary || '') + '</p></div>';
+    Shell.showState(root, 'data');
+    Shell.toast('Operation planned', 'success');
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function executePlan() {
+  if (!admiralPlan) { Shell.toast('Plan an operation first', 'error'); return; }
+  try {
+    var stored = {};
+    try { stored = JSON.parse(window.localStorage.getItem('t3mp3st_state_v1') || '{}'); } catch (e) { stored = {}; }
+    var keys = ((stored || {}).settings) || {};
+    var key = keys.openrouterKey || keys.anthropicKey || keys.openaiKey || '';
+    await Shell.apiPost('/api/general/execute', { apiKey: key, provider: key ? 'openrouter' : undefined, plan: admiralPlan });
+    Shell.toast('Execution started', 'success');
+  } catch (e) {
+    Shell.toast('Execute failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function fullAuto() {
+  if (!directive()) { Shell.toast('Enter a directive first', 'error'); return; }
+  try {
+    var d = await Shell.apiPost('/api/general/auto', { objective: directive(), approvalIds: [] });
+    if (!d.success) throw new Error(d.error || 'Full auto failed');
+    Shell.toast('Full auto engaged', 'success');
+    var out = document.getElementById('planOut');
+    if (out && d.plan) out.innerHTML = '<div class="card"><h3 class="card__title">' + Shell.escHtml(d.plan.codename || 'plan') + '</h3></div>';
+    Shell.showState(document.getElementById('admiralState'), 'data');
+  } catch (e) {
+    Shell.toast('Full auto failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function requestSitrep() {
+  try {
+    var d = await Shell.apiPost('/api/general/sitrep', {});
+    var out = document.getElementById('sitrepOut');
+    if (out) {
+      var div = document.createElement('div');
+      div.className = 'card';
+      div.innerHTML = '<h3 class="card__title">Situation report</h3><p class="text-secondary">' + Shell.escHtml((d.sitrep && d.sitrep.summary) || d.summary || 'received') + '</p>';
+      out.prepend(div);
+    }
+    Shell.showState(document.getElementById('admiralState'), 'data');
+    Shell.toast('Sitrep received', 'success');
+  } catch (e) {
+    Shell.toast('Sitrep failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function requestAssessment() {
+  try {
+    await Shell.apiPost('/api/general/assess', {});
+    Shell.toast('Assessment ready', 'success');
+  } catch (e) {
+    Shell.toast('Assessment failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function converseAdmiral(message) {
+  var d = await Shell.apiPost('/api/admiral/converse', { messages: [{ role: 'user', content: message }] });
+  return d;
+}
+
+async function loadConfigs() {
+  var root = document.getElementById('configsState');
+  Shell.showState(root, 'loading');
+  try {
+    var results = await Promise.all([
+      Shell.apiGet('/api/workflow-presets'),
+      Shell.apiGet('/api/operator-runbooks')
+    ]);
+    var presets = results[0].presets || results[0].workflows || [];
+    var runbooks = results[1].runbooks || [];
+    var pl = document.getElementById('presetsList');
+    if (pl) pl.innerHTML = presets.map(function (p) { return '<li>' + Shell.escHtml(p.id || p.name || p.title || 'preset') + '</li>'; }).join('') || '<li>None.</li>';
+    var rl = document.getElementById('runbooksList');
+    if (rl) rl.innerHTML = runbooks.map(function (r) { return '<li>' + Shell.escHtml(r.family || r.id || 'runbook') + '</li>'; }).join('') || '<li>None.</li>';
+    if (!presets.length && !runbooks.length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = presets.length + ' preset(s) · ' + runbooks.length + ' runbook(s).';
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function loadSelf() {
+  var root = document.getElementById('selfState');
+  Shell.showState(root, 'loading');
+  try {
+    var results = await Promise.all([
+      Shell.apiGet('/api/learning/status'),
+      Shell.apiGet('/api/memory/capsule'),
+      Shell.apiGet('/api/memory/proposals')
+    ]);
+    var proposals = results[2].proposals || [];
+    var entries = (results[1].capsule && results[1].capsule.entries) || results[1].entries || [];
+    var pl = document.getElementById('proposalsList');
+    if (pl) {
+      pl.innerHTML = proposals.map(function (p) {
+        return '<li>' + Shell.escHtml(p.id || '') + ' · ' + Shell.escHtml(p.title || p.summary || '')
+          + ' <button class="btn btn--sm btn--primary" data-accept="' + Shell.escHtml(p.id || '') + '">Accept</button>'
+          + ' <button class="btn btn--sm" data-reject="' + Shell.escHtml(p.id || '') + '">Reject</button></li>';
+      }).join('') || '<li>No proposals pending review.</li>';
+      pl.querySelectorAll('[data-accept]').forEach(function (b) {
+        b.addEventListener('click', function () { decideProposal(b.getAttribute('data-accept'), true); });
+      });
+      pl.querySelectorAll('[data-reject]').forEach(function (b) {
+        b.addEventListener('click', function () { decideProposal(b.getAttribute('data-reject'), false); });
+      });
+    }
+    var cl = document.getElementById('capsuleList');
+    if (cl) cl.innerHTML = entries.map(function (e) { return '<li>' + Shell.escHtml(e.id || '') + ' · ' + Shell.escHtml(e.title || e.summary || '') + '</li>'; }).join('') || '<li>Capsule is empty.</li>';
+    Shell.showState(root, 'data');
+    var okEl = root.querySelector('[data-ok]');
+    if (okEl) okEl.textContent = proposals.length + ' proposal(s) · ' + entries.length + ' memor' + (entries.length === 1 ? 'y' : 'ies') + '.';
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+async function decideProposal(id, accept) {
+  try {
+    await Shell.apiPost('/api/memory/proposals/' + id + (accept ? '/accept' : '/reject'), {});
+    Shell.toast(accept ? 'Memory accepted into capsule' : 'Memory proposal rejected', accept ? 'success' : 'info');
+    loadSelf();
+  } catch (e) {
+    Shell.toast('Decision failed: ' + (e.message || e), 'error');
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  if (q.get('family')) document.getElementById('familySel').value = q.get('family');
+  setView(q.get('view') === 'configs' ? 'configs' : (q.get('view') === 'self' ? 'self' : 'admiral'));
+  document.getElementById('tabAdmiral').addEventListener('click', function () { setView('admiral'); });
+  document.getElementById('tabConfigs').addEventListener('click', function () { setView('configs'); });
+  document.getElementById('tabSelf').addEventListener('click', function () { setView('self'); });
+  document.getElementById('planBtn').addEventListener('click', planOperation);
+  document.getElementById('executeBtn').addEventListener('click', executePlan);
+  document.getElementById('autoBtn').addEventListener('click', fullAuto);
+  document.getElementById('sitrepBtn').addEventListener('click', requestSitrep);
+  document.getElementById('assessBtn').addEventListener('click', requestAssessment);
+  document.getElementById('configsBtn').addEventListener('click', loadConfigs);
+  document.getElementById('selfBtn').addEventListener('click', loadSelf);
+  document.getElementById('reviewBtn').addEventListener('click', async function () {
+    try {
+      var d = await Shell.apiPost('/api/learning/run-review', {});
+      var count = Array.isArray(d.proposals) ? d.proposals.length : 0;
+      Shell.toast('Learning review proposed ' + count + ' memor' + (count === 1 ? 'y' : 'ies'), count ? 'success' : 'info');
+      loadSelf();
+    } catch (e) {
+      Shell.toast('Review failed: ' + (e.message || e), 'error');
+    }
+  });
+  document.getElementById('familySel').addEventListener('change', function (ev) {
+    Shell.params.set({ family: ev.target.value });
+  });
+  document.querySelectorAll('#admiralState [data-retry], #configsState [data-retry], #selfState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { planOperation(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    setView(nq.get('view') === 'configs' ? 'configs' : (nq.get('view') === 'self' ? 'self' : 'admiral'));
+  });
+})();
+</script>
+</body>
+</html>

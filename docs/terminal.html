@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Terminal</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Operator Console</div>
+<h1 class="page-head__title" id="pageTitle">Terminal</h1>
+<p class="page-head__sub">Run allow-listed tool commands through the server. Gated commands return an approval receipt first. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="runTitle">
+<h2 class="card__title" id="runTitle">Run command</h2>
+<div class="form-row">
+<div><label class="flabel" for="termTarget">Target</label><input class="form-input mono" id="termTarget" type="text" placeholder="local-host"></div>
+<div><label class="flabel" for="termInput">Command</label><input class="form-input mono" id="termInput" type="text" placeholder="file package.json"></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm btn--primary" id="termRun" type="button">Run</button>
+<button class="btn btn--sm" id="termClear" type="button">Clear output</button>
+</div>
+<div id="termApproval" hidden></div>
+<div data-state-root id="termState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p>No output yet. Run an allow-listed command to begin.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Focus input</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Command failed.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Command complete.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><ul class="feed" id="termFeed" aria-live="polite"></ul></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="histTitle">
+<h2 class="card__title" id="histTitle">History</h2>
+<div class="card__row"><button class="btn btn--sm" id="histClear" type="button">Clear history</button></div>
+<ul class="feed" id="histList"></ul>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Terminal page: POST /api/tools/execute with approval-receipt support.
+var termHistory = [];
+try { termHistory = JSON.parse(window.localStorage.getItem('t3mp3st_term_history') || '[]'); } catch (e) { termHistory = []; }
+
+function addTermLine(text, cls) {
+  var feed = document.getElementById('termFeed');
+  if (!feed) return;
+  Shell.showState(document.getElementById('termState'), 'data');
+  var li = document.createElement('li');
+  li.textContent = text;
+  feed.appendChild(li);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+function renderHistory() {
+  var list = document.getElementById('histList');
+  if (list) {
+    list.innerHTML = termHistory.map(function (h) { return '<li>' + Shell.escHtml(h) + '</li>'; }).join('') || '<li>No history yet.</li>';
+  }
+}
+
+function persistHistory() {
+  try { window.localStorage.setItem('t3mp3st_term_history', JSON.stringify(termHistory.slice(-50))); } catch (e) { /* storage unavailable */ }
+}
+
+async function runTermCommand(approvalId) {
+  var root = document.getElementById('termState');
+  var input = document.getElementById('termInput');
+  var targetEl = document.getElementById('termTarget');
+  var command = (input.value || '').trim();
+  var target = (targetEl.value || '').trim() || Shell.params.get().get('target') || 'local-host';
+  if (!command) { Shell.toast('Enter a command', 'error'); return; }
+  Shell.params.set({ target: target });
+  Shell.showState(root, 'loading');
+  addTermLine('$ ' + command, 'prompt');
+  try {
+    var body = { command: command, target: target };
+    if (approvalId) body.approvalId = approvalId;
+    var d = await Shell.apiPost('/api/tools/execute', body);
+    if (d.approval && d.approval.status === 'pending' && !approvalId) {
+      var host = document.getElementById('termApproval');
+      host.hidden = false;
+      host.innerHTML = '<div class="st-error"><p><strong>Receipt required.</strong> The server gated this command behind approval ' + Shell.escHtml(d.approval.id) + '.</p>'
+        + '<div class="card__row"><button class="btn btn--sm btn--primary" id="termApprove">Approve and re-run</button></div></div>';
+      document.getElementById('termApprove').addEventListener('click', async function () {
+        try {
+          await Shell.apiPost('/api/approvals/' + d.approval.id + '/approve', { approvedBy: 'terminal-operator' });
+          host.hidden = true;
+          host.innerHTML = '';
+          runTermCommand(d.approval.id);
+        } catch (e) {
+          Shell.toast('Approval failed: ' + (e.message || e), 'error');
+        }
+      });
+      Shell.showState(root, 'data');
+      return;
+    }
+    addTermLine('', 'output');
+    addTermLine(String(d.output || d.result || JSON.stringify(d)).slice(0, 4000), 'output');
+    termHistory.push(command);
+    persistHistory();
+    renderHistory();
+    Shell.showState(root, 'data');
+    var okEl = root.querySelector('[data-ok]');
+    if (okEl) okEl.textContent = 'Exit ' + (d.exitCode != null ? d.exitCode : 'ok') + '.';
+    Shell.showState(root, 'success');
+    setTimeout(function () { Shell.showState(root, 'data'); }, 2500);
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+    addTermLine('error: ' + (e.message || e), 'output');
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  if (q.get('target')) document.getElementById('termTarget').value = q.get('target');
+  renderHistory();
+  document.getElementById('termRun').addEventListener('click', function () { runTermCommand(); });
+  document.getElementById('termInput').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') { ev.preventDefault(); runTermCommand(); }
+  });
+  document.getElementById('termClear').addEventListener('click', function () {
+    document.getElementById('termFeed').innerHTML = '';
+    Shell.showState(document.getElementById('termState'), 'empty');
+  });
+  document.getElementById('histClear').addEventListener('click', function () {
+    termHistory = [];
+    persistHistory();
+    renderHistory();
+  });
+  document.querySelectorAll('#termState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var input = document.getElementById('termInput');
+      if (input) input.focus();
+    });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    document.getElementById('termTarget').value = nq.get('target') || 'local-host';
+  });
+})();
+</script>
+</body>
+</html>

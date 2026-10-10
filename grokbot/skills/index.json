@@ -1,0 +1,75 @@
+{
+  "note": "Canonical Grok Bot saved-skill copies live in this repo under skills/<id>/SKILL.md. COMMANDER re-saves from the indexed path into Grok Bot; those copies never write back.",
+  "skills": [
+    {
+      "id": "tempest-bootstrap",
+      "path": "skills/tempest-bootstrap/SKILL.md",
+      "description": "Use when the operator types /tempest-help or /tempest-config, or when a seat runs its first session: registers the seat id and checks gateway reachability."
+    },
+    {
+      "id": "tempest-run",
+      "path": "skills/tempest-run/SKILL.md",
+      "description": "Use when the operator types /tempest-run with an objective: acknowledges with a run id, streams progress, and closes with a completion summary."
+    },
+    {
+      "id": "tempest-mission",
+      "path": "skills/tempest-mission/SKILL.md",
+      "description": "Use when the operator starts, parks, resumes, pauses, or stops a mission: owns mission ids and the parked/resumable lifecycle."
+    },
+    {
+      "id": "tempest-operators",
+      "path": "skills/tempest-operators/SKILL.md",
+      "description": "Use when the operator types /tempest-agents or tasks a seat: lists operators and dispatches work to one operator id."
+    },
+    {
+      "id": "tempest-status",
+      "path": "skills/tempest-status/SKILL.md",
+      "description": "Use when the operator types /tempest-status or /tempest-providers: reads mission status plus provider and subscription-session state."
+    },
+    {
+      "id": "tempest-report",
+      "path": "skills/tempest-report/SKILL.md",
+      "description": "Use when the operator types /tempest-report: exports the engagement report for a mission id."
+    },
+    {
+      "id": "tempest-memory",
+      "path": "skills/tempest-memory/SKILL.md",
+      "description": "Use when the operator recalls past work or reviews learned entries: reads the memory capsule and accepts or rejects proposals."
+    },
+    {
+      "id": "black-specter",
+      "path": "skills/black-specter/SKILL.md",
+      "description": "Use when the operator types /black-specter with a red plan: critiques the plan's covert tradecraft, cover, and noise budget from the adversary's eyes."
+    },
+    {
+      "id": "black-wraith",
+      "path": "skills/black-wraith/SKILL.md",
+      "description": "Use when the operator types /black-wraith with exfil paths: simulates the paths as analysis and checks them against the noise budget."
+    },
+    {
+      "id": "blue-sentinel",
+      "path": "skills/blue-sentinel/SKILL.md",
+      "description": "Use when the operator types /blue-sentinel with findings: maps each finding to telemetry and writes one detector recommendation per gap."
+    },
+    {
+      "id": "blue-warden",
+      "path": "skills/blue-warden/SKILL.md",
+      "description": "Use when the operator types /blue-warden with findings: audits hardening and returns a verification checklist plus misconfiguration call-outs."
+    },
+    {
+      "id": "white-arbiter",
+      "path": "skills/white-arbiter/SKILL.md",
+      "description": "Use when the operator types /white-arbiter with an action: returns the ROE verdict on that action and resolves any red versus blue dispute about it."
+    },
+    {
+      "id": "white-auditor",
+      "path": "skills/white-auditor/SKILL.md",
+      "description": "Use when the operator types /white-auditor with evidence: scores each entry by provenance and aggregates the evidence-strength verdict."
+    },
+    {
+      "id": "dark-purple",
+      "path": "skills/dark-purple/SKILL.md",
+      "description": "Use when the operator types /dark-purple with a mission scope: runs the full loop of red findings to black pressure to blue detection to white verdict to report."
+    }
+  ]
+}

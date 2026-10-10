@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — Operatives</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Operatives · Teams</div>
+<h1 class="page-head__title" id="pageTitle">Operatives</h1>
+<p class="page-head__sub">Specialist roster with editable prompts, team tool grants, and the Dark Purple synthesis panel. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<section class="card" aria-labelledby="rosterTitle">
+<h2 class="card__title" id="rosterTitle">Operatives roster</h2>
+<div class="card__row">
+<input class="form-input" id="rosterQuery" type="search" placeholder="Filter archetypes…" style="max-width:240px">
+<select class="form-input" id="teamFilter" style="max-width:180px"><option value="all">all teams</option><option value="black">black</option><option value="blue">blue</option><option value="white">white</option><option value="core">core operators</option></select>
+<button class="btn btn--sm" id="rosterRefresh" type="button">Refresh</button>
+</div>
+<div data-state-root id="rosterState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No operatives match this filter.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Reload roster</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Roster unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Roster updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="provider-grid" id="rosterGrid"></div></div>
+</div>
+</section>
+
+<section class="card" id="editorCard" aria-labelledby="editorTitle" hidden>
+<h2 class="card__title" id="editorTitle">Edit operative</h2>
+<p class="text-secondary" id="editorSub"></p>
+<div><label class="flabel" for="editorPrompt">System prompt</label><textarea class="form-input" id="editorPrompt"></textarea></div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm btn--primary" id="editorSave" type="button">Save</button>
+<button class="btn btn--sm" id="editorReset" type="button">Reset to default</button>
+<button class="btn btn--sm btn--ghost" id="editorClose" type="button">Close</button>
+</div>
+</section>
+
+<section class="card" aria-labelledby="grantsTitle">
+<h2 class="card__title" id="grantsTitle">Team tool grants</h2>
+<p class="text-secondary">Read-only projection of the per-team arsenal grant table (black, blue, white).</p>
+<div data-state-root id="grantsState">
+<div data-state="loading" class="st-loading"><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No grant data returned.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Reload</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Grants unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Grants loaded.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><table class="table" id="grantsTable"><thead><tr><th>Team</th><th>Granted tools</th></tr></thead><tbody></tbody></table></div>
+</div>
+</section>
+
+<section class="card card--raised" aria-labelledby="hatsTitle">
+<h2 class="card__title" id="hatsTitle">Specialist hats</h2>
+<p class="text-secondary">Six spawnable specialist hats — specter and wraith (black), sentinel and warden (blue), arbiter and auditor (white). Grants are subset-disciplined slices of the parent team table; dispatch spawns the hat on the active mission. Follows the roster search and team filter.</p>
+<div data-state-root id="hatsState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No hats match this filter.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Reload hats</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Hats unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Hats ready.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="provider-grid" id="hatsGrid"></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="purpleTitle">
+<h2 class="card__title" id="purpleTitle">Dark Purple synthesis</h2>
+<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections, <span class="mono">verdict</span> for ROE verdicts.</p>
+<div class="grid grid--3">
+<div><label class="flabel" for="purpleFindings">Findings</label><textarea class="form-input" id="purpleFindings" placeholder="F-001 | Exposed admin panel | high"></textarea></div>
+<div><label class="flabel" for="purpleDetections">Detections</label><textarea class="form-input" id="purpleDetections" placeholder="F-001 | partial"></textarea></div>
+<div><label class="flabel" for="purpleVerdicts">Verdicts</label><textarea class="form-input" id="purpleVerdicts" placeholder="allow"></textarea></div>
+</div>
+<div class="card__row" style="margin-top:8px">
+<button class="btn btn--sm" id="purpleLoad" type="button">Load finding ids from ledger</button>
+<button class="btn btn--sm btn--primary" id="purpleRun" type="button">Synthesize</button>
+</div>
+<div data-state-root id="purpleState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton skeleton--title"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p>No synthesis yet. Enter findings, detections, and verdicts, then synthesize.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Load from ledger</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Synthesis failed.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Synthesis recorded.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden>
+<h3 class="card__title">Coverage matrix</h3>
+<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
+<h3 class="card__title">Unresolved</h3>
+<ul class="feed" id="unresolvedList"></ul>
+<h3 class="card__title">Next missions</h3>
+<ul class="feed" id="nextMissions"></ul>
+</div>
+</div>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// Operators page: roster (GET /api/operators/prompts), grants, Dark Purple synthesis.
+var TEAM_IDS = ['black', 'blue', 'white'];
+var rosterCache = [];
+var selectedArchetype = '';
+
+function teamOf(op) {
+  var a = op.archetype || op.id || '';
+  if (TEAM_IDS.indexOf(a) >= 0) return a;
+  return 'core';
+}
+
+async function loadRoster() {
+  var root = document.getElementById('rosterState');
+  var q = (document.getElementById('rosterQuery') || {}).value || Shell.params.get().get('q') || '';
+  var team = (document.getElementById('teamFilter') || {}).value || Shell.params.get().get('team') || 'all';
+  try {
+    var d = await Shell.apiGet('/api/operators/prompts');
+    rosterCache = d.operators || [];
+    renderRoster(q, team);
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+function renderRoster(q, team) {
+  var root = document.getElementById('rosterState');
+  var needle = String(q || '').toLowerCase();
+  var rows = rosterCache.filter(function (op) {
+    var t = teamOf(op);
+    if (team !== 'all' && t !== team) return false;
+    if (needle && String(op.archetype || op.id || '').toLowerCase().indexOf(needle) < 0) return false;
+    return true;
+  });
+  var grid = document.getElementById('rosterGrid');
+  if (grid) {
+    grid.innerHTML = rows.map(function (op) {
+      var arch = op.archetype || op.id || '';
+      var t = teamOf(op);
+      return '<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name mono">'
+        + Shell.escHtml(arch) + '</h3><span class="badge ' + (t === 'black' ? 'badge--neutral' : (t === 'blue' ? 'badge--info' : (t === 'white' ? 'badge--ok' : 'badge--accent'))) + '">'
+        + Shell.escHtml(t) + '</span></div>'
+        + '<p class="provider-card__desc">' + Shell.escHtml(String(op.systemPrompt || op.description || '').slice(0, 140)) + '</p>'
+        + '<div class="card__row"><button class="btn btn--sm" data-edit="' + Shell.escHtml(arch) + '">Edit</button></div></div>';
+    }).join('');
+    grid.querySelectorAll('[data-edit]').forEach(function (b) {
+      b.addEventListener('click', function () { openEditor(b.getAttribute('data-edit')); });
+    });
+  }
+  if (!rows.length) {
+    Shell.showState(root, 'empty');
+  } else {
+    Shell.showState(root, 'data');
+  }
+}
+
+function openEditor(archetype) {
+  selectedArchetype = archetype;
+  var op = rosterCache.find(function (o) { return (o.archetype || o.id) === archetype; }) || {};
+  document.getElementById('editorCard').hidden = false;
+  document.getElementById('editorSub').textContent = 'Archetype: ' + archetype + ' — edits apply to every spawned operator.';
+  document.getElementById('editorPrompt').value = op.systemPrompt || '';
+  document.getElementById('editorCard').scrollIntoView();
+}
+
+async function saveEditor() {
+  try {
+    var d = await Shell.apiPost('/api/operators/prompt', { archetype: selectedArchetype, systemPrompt: document.getElementById('editorPrompt').value });
+    if (d.error) throw new Error(d.error);
+    if (d.operator) {
+      var i = rosterCache.findIndex(function (x) { return (x.archetype || x.id) === selectedArchetype; });
+      if (i >= 0) rosterCache[i] = d.operator;
+    }
+    var q = (document.getElementById('rosterQuery') || {}).value || '';
+    var team = (document.getElementById('teamFilter') || {}).value || 'all';
+    renderRoster(q, team);
+    Shell.toast(selectedArchetype + ' updated', 'success');
+  } catch (e) {
+    Shell.toast('Save failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function resetEditor() {
+  try {
+    var d = await Shell.apiPost('/api/operators/prompt/reset', { archetype: selectedArchetype });
+    if (d.error) throw new Error(d.error);
+    if (d.operator) {
+      var i = rosterCache.findIndex(function (x) { return (x.archetype || x.id) === selectedArchetype; });
+      if (i >= 0) rosterCache[i] = d.operator;
+    }
+    document.getElementById('editorPrompt').value = (d.operator && d.operator.systemPrompt) || '';
+    Shell.toast(selectedArchetype + ' reset to default', 'info');
+  } catch (e) {
+    Shell.toast('Reset failed: ' + (e.message || e), 'error');
+  }
+}
+
+async function loadGrants() {
+  var root = document.getElementById('grantsState');
+  try {
+    var d = await Shell.apiGet('/api/teams/tool-grants');
+    var grants = d.grants || {};
+    var tbody = document.getElementById('grantsTable').querySelector('tbody');
+    if (tbody) {
+      tbody.innerHTML = Object.keys(grants).map(function (team) {
+        var tools = grants[team] || [];
+        return '<tr><td><span class="badge badge--accent">' + Shell.escHtml(team) + '</span></td><td class="mono">'
+          + Shell.escHtml(tools.join(', ')) + '</td></tr>';
+      }).join('');
+    }
+    if (!Object.keys(grants).length) {
+      Shell.showState(root, 'empty');
+    } else {
+      Shell.showState(root, 'data');
+      var okEl = root.querySelector('[data-ok]');
+      if (okEl) okEl.textContent = Object.keys(grants).length + ' team(s) with granted tools.';
+    }
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+function parseTriple(text) {
+  return String(text || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (ln) {
+    var parts = ln.split('|').map(function (p) { return p.trim(); });
+    return { id: parts[0] || '', title: parts[1] || '', severity: parts[2] || '' };
+  }).filter(function (e) { return e.id; });
+}
+
+async function runPurple() {
+  var root = document.getElementById('purpleState');
+  Shell.showState(root, 'loading');
+  try {
+    var findings = parseTriple(document.getElementById('purpleFindings').value).map(function (e) {
+      var out = { id: e.id };
+      if (e.title) out.title = e.title;
+      if (e.severity) out.severity = e.severity;
+      return out;
+    });
+    var detections = parseTriple(document.getElementById('purpleDetections').value).map(function (e) {
+      return { findingId: e.id, coverage: e.title || 'none' };
+    });
+    var verdicts = String(document.getElementById('purpleVerdicts').value || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (v) {
+      return { verdict: v };
+    });
+    var synthesis = await Shell.apiPost('/api/teams/purple/synthesize', { findings: findings, detections: detections, verdicts: verdicts });
+    var tbody = document.getElementById('coverageTable').querySelector('tbody');
+    if (tbody) {
+      tbody.innerHTML = (synthesis.coverageMatrix || []).map(function (row) {
+        return '<tr><td class="mono">' + Shell.escHtml(row.findingId) + '</td>'
+          + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.detection || 'none') + '</span></td>'
+          + '<td>' + Shell.escHtml(row.verdict || '—') + '</td>'
+          + '<td>' + Shell.escHtml(row.residualRisk || '') + '</td></tr>';
+      }).join('');
+    }
+    var ul = document.getElementById('unresolvedList');
+    if (ul) ul.innerHTML = (synthesis.unresolved || []).map(function (id) { return '<li>' + Shell.escHtml(id) + '</li>'; }).join('') || '<li>None — posture holds.</li>';
+    var nm = document.getElementById('nextMissions');
+    if (nm) nm.innerHTML = (synthesis.nextMissions || []).map(function (m) { return '<li>' + Shell.escHtml(m) + '</li>'; }).join('');
+    Shell.showState(root, 'data');
+    var okEl = root.querySelector('[data-ok]');
+    if (okEl) okEl.textContent = (synthesis.unresolved || []).length + ' unresolved · ' + (synthesis.nextMissions || []).length + ' follow-up mission(s).';
+    Shell.toast('Synthesis recorded', 'success');
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
+(function boot() {
+  var q = Shell.params.get();
+  var rq = document.getElementById('rosterQuery');
+  var tf = document.getElementById('teamFilter');
+  if (rq && q.get('q')) rq.value = q.get('q');
+  if (tf && q.get('team')) tf.value = q.get('team');
+  loadRoster();
+  loadGrants();
+  if (rq) rq.addEventListener('input', function () {
+    Shell.params.set({ q: rq.value });
+    renderRoster(rq.value, tf.value);
+  });
+  if (tf) tf.addEventListener('change', function () {
+    Shell.params.set({ team: tf.value === 'all' ? '' : tf.value });
+    renderRoster(rq.value, tf.value);
+  });
+  document.getElementById('rosterRefresh').addEventListener('click', loadRoster);
+  document.getElementById('editorSave').addEventListener('click', saveEditor);
+  document.getElementById('editorReset').addEventListener('click', resetEditor);
+  document.getElementById('editorClose').addEventListener('click', function () { document.getElementById('editorCard').hidden = true; });
+  document.getElementById('purpleRun').addEventListener('click', runPurple);
+  document.getElementById('purpleLoad').addEventListener('click', async function () {
+    try {
+      var d = await Shell.apiGet('/api/findings');
+      var arr = Array.isArray(d) ? d : (d.findings || []);
+      document.getElementById('purpleFindings').value = arr.map(function (f) { return (f.id || '') + ' | ' + (f.title || '') + ' | ' + (f.severity || ''); }).join('\n');
+      Shell.toast('Loaded ' + arr.length + ' finding(s) from the ledger', 'success');
+    } catch (e) {
+      Shell.toast('Ledger load failed: ' + (e.message || e), 'error');
+    }
+  });
+  document.querySelectorAll('#rosterState [data-retry], #grantsState [data-retry], #purpleState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () { loadRoster(); loadGrants(); });
+  });
+  Shell.params.onRestore(function () {
+    var nq = Shell.params.get();
+    if (rq) rq.value = nq.get('q') || '';
+    if (tf) tf.value = nq.get('team') || 'all';
+    renderRoster(rq.value, tf.value);
+  });
+})();
+</script>
+<script>
+// Specialist hats panel: the six spawnable hats from GET /api/operators/prompts,
+// grant slices from GET /api/teams/tool-grants, dispatch via POST /api/operators/spawn.
+// Prompt editing reuses the roster editor (openEditor) and the frozen prompt endpoints.
+(function () {
+  var HAT_ORDER = ['specter', 'wraith', 'sentinel', 'warden', 'arbiter', 'auditor'];
+  var HAT_PARENT = { specter: 'black', wraith: 'black', sentinel: 'blue', warden: 'blue', arbiter: 'white', auditor: 'white' };
+  var hatsRoster = [];
+  var hatsGrants = {};
+
+  function hatBadge(team) {
+    if (team === 'black') return 'badge--neutral';
+    if (team === 'blue') return 'badge--info';
+    return 'badge--ok';
+  }
+
+  function hatsFilter() {
+    var rq = document.getElementById('rosterQuery');
+    var tf = document.getElementById('teamFilter');
+    return {
+      q: String((rq && rq.value) || ''),
+      team: String((tf && tf.value) || 'all')
+    };
+  }
+
+  async function loadHats() {
+    var root = document.getElementById('hatsState');
+    if (!root) return;
+    try {
+      var d = await Shell.apiGet('/api/operators/prompts');
+      var g = await Shell.apiGet('/api/teams/tool-grants');
+      hatsGrants = (g && g.grants) || {};
+      var ops = (d && d.operators) || [];
+      hatsRoster = ops.filter(function (op) {
+        return HAT_ORDER.indexOf(op.archetype || op.id) >= 0;
+      });
+      hatsRoster.sort(function (a, b) {
+        return HAT_ORDER.indexOf(a.archetype || a.id) - HAT_ORDER.indexOf(b.archetype || b.id);
+      });
+      renderHats();
+    } catch (e) {
+      var errEl = root.querySelector('[data-err]');
+      if (errEl) errEl.textContent = e.message || String(e);
+      Shell.showState(root, 'error');
+    }
+  }
+
+  function renderHats() {
+    var root = document.getElementById('hatsState');
+    if (!root) return;
+    var f = hatsFilter();
+    var needle = f.q.toLowerCase();
+    var grid = document.getElementById('hatsGrid');
+    var rows = hatsRoster.filter(function (op) {
+      var arch = op.archetype || op.id || '';
+      var team = HAT_PARENT[arch] || '';
+      if (f.team !== 'all' && team !== f.team) return false;
+      if (needle && arch.toLowerCase().indexOf(needle) < 0) return false;
+      return true;
+    });
+    if (!rows.length) {
+      Shell.showState(root, 'empty');
+      return;
+    }
+    if (grid) {
+      grid.innerHTML = rows.map(function (op) {
+        var arch = op.archetype || op.id || '';
+        var team = HAT_PARENT[arch] || '';
+        var tools = hatsGrants[arch] || [];
+        return '<div class="card provider-card"><div class="provider-card__head"><h3 class="provider-card__name mono">'
+          + Shell.escHtml(arch) + '</h3><span class="badge ' + hatBadge(team) + '">'
+          + Shell.escHtml(team) + '</span></div>'
+          + '<p class="provider-card__desc">' + Shell.escHtml(String(op.description || op.systemPrompt || '').slice(0, 160)) + '</p>'
+          + '<p class="provider-card__grants mono">' + Shell.escHtml(tools.length ? tools.join(', ') : 'grants pending') + '</p>'
+          + '<div class="card__row"><button class="btn btn--sm btn--primary" data-dispatch="' + Shell.escHtml(arch) + '">Dispatch</button>'
+          + '<button class="btn btn--sm" data-hat-edit="' + Shell.escHtml(arch) + '">Edit</button></div></div>';
+      }).join('');
+      grid.querySelectorAll('[data-dispatch]').forEach(function (b) {
+        b.addEventListener('click', function () { dispatchHat(b.getAttribute('data-dispatch')); });
+      });
+      grid.querySelectorAll('[data-hat-edit]').forEach(function (b) {
+        b.addEventListener('click', function () { openEditor(b.getAttribute('data-hat-edit')); });
+      });
+    }
+    Shell.showState(root, 'data');
+  }
+
+  async function dispatchHat(arch) {
+    try {
+      var d = await Shell.apiPost('/api/operators/spawn', { archetype: arch });
+      if (d && d.error) throw new Error(d.error);
+      var summary = (d && d.operator) || {};
+      var label = summary.callsign || summary.id || arch;
+      Shell.toast('Dispatched ' + arch + ' as ' + label, 'success');
+    } catch (e) {
+      Shell.toast('Dispatch failed: ' + (e.message || e), 'error');
+    }
+  }
+
+  loadHats();
+  var rqEl = document.getElementById('rosterQuery');
+  if (rqEl) rqEl.addEventListener('input', renderHats);
+  var tfEl = document.getElementById('teamFilter');
+  if (tfEl) tfEl.addEventListener('change', renderHats);
+  var refreshBtn = document.getElementById('rosterRefresh');
+  if (refreshBtn) refreshBtn.addEventListener('click', loadHats);
+  document.querySelectorAll('#hatsState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', loadHats);
+  });
+  Shell.params.onRestore(renderHats);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>T3MP3ST — About</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Mission Brief</div>
+<h1 class="page-head__title" id="pageTitle">About</h1>
+<p class="page-head__sub">What T3MP3ST is, how it is operated, and where the sources of truth live.</p>
+</div>
+
+<section class="card" aria-labelledby="whatTitle">
+<h2 class="card__title" id="whatTitle">What this is</h2>
+<p class="text-secondary">T3MP3ST is an authorized red-team console: missions drive real operators against targets you own or are permitted to test, every live action passes through scope receipts, and every claim lands in the evidence vault with provenance. Later kill-chain phases are honestly labeled where they are scaffolded rather than fully autonomous.</p>
+</section>
+
+<section class="card" aria-labelledby="contractTitle">
+<h2 class="card__title" id="contractTitle">Operating contract</h2>
+<ul class="feed">
+<li>Same-origin API by default; the server contract is frozen — the UI never invents routes.</li>
+<li>Tokens stay on this machine: subscriptions sign in server-side, keys live in local storage, masked everywhere.</li>
+<li>Receipts gate live execution; Full Auto resumes with the exact approved receipt.</li>
+<li>An explicit agent pin outranks a stored key; a stale pin never displaces a working provider.</li>
+</ul>
+</section>
+
+<section class="card" aria-labelledby="liveTitle">
+<h2 class="card__title" id="liveTitle">Live server snapshot</h2>
+<div data-state-root id="aboutState">
+<div data-state="loading" class="st-loading"><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>The server did not report a status.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Check again</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Server unreachable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Server reachable.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><p class="mono" id="aboutHealth"></p></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="mapTitle">
+<h2 class="card__title" id="mapTitle">Console map</h2>
+<ul class="feed">
+<li>Overview — war-room launch, live status, findings, admiral quick operations.</li>
+<li>Mission — per-agent live scan and scope receipts.</li>
+<li>Operatives — roster, team grants, Dark Purple synthesis.</li>
+<li>Evidence — findings and evidence ledger with provenance.</li>
+<li>Arsenal — adapter status and loadout planning.</li>
+<li>Terminal — allow-listed tool execution with receipt gating.</li>
+<li>Range — OBSIDIVM benchmarks and CTF drills.</li>
+<li>Engagements — Op Admiral plans, config library, self-improvement.</li>
+<li>Settings — subscriptions, agents, keys, server.</li>
+</ul>
+</section>
+</main>
+<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+// About page: live server snapshot for the brief.
+async function loadAboutHealth() {
+  var root = document.getElementById('aboutState');
+  try {
+    var r = await fetch(Shell.apiBase() + '/api/health');
+    var d = await r.json();
+    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
+    var el = document.getElementById('aboutHealth');
+    if (el) el.textContent = 'status ' + (d.status || 'unknown') + ' · llm ' + (d.llm && d.llm.connected ? 'connected' : 'not connected');
+    Shell.showState(root, 'data');
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+(function boot() {
+  loadAboutHealth();
+  document.querySelectorAll('#aboutState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', loadAboutHealth);
+  });
+})();
+</script>
+</body>
+</html>
