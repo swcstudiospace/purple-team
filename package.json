@@ -132,10 +132,10 @@
     "llm"
   ],
   "author": "t3mp3st contributors",
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/elder-plinius/t3mp3st.git"
+    "url": "git+https://github.com/swcstudiospace/purple-team.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",

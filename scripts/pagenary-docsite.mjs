@@ -6,7 +6,7 @@ const ROOT = process.cwd();
 const TENANT_ID = 't3mp3st-docs';
 const TENANT_DIR = join(ROOT, 'docsite', TENANT_ID);
 const CONTENT_DIR = join(TENANT_DIR, 'content');
-const DEFAULT_SITE_URL = 'https://elder-plinius.github.io/T3MP3ST/t3mp3st-docs';
+const DEFAULT_SITE_URL = 'https://swcstudiospace.github.io/purple-team/t3mp3st-docs';
 
 const pages = [
   {

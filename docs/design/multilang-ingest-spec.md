@@ -1,6 +1,6 @@
 # Multi-language white-box ingest for T3MP3ST
 
-**Status:** Draft design (for an upstream PR to `elder-plinius/T3MP3ST`)
+**Status:** Draft design (for an upstream PR to `swcstudiospace/purple-team`)
 **Date:** 2026-07-10
 **Scope:** Replace the Python-only ingest parser with a portable multi-language parser, reusing T3MP3ST's existing security-ranking pipeline unchanged.
 

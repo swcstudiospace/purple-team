@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Safe upstream sync for T3MP3ST from elder-plinius/T3MP3ST.
+  Safe upstream sync for T3MP3ST from swcstudiospace/purple-team.
 
 .DESCRIPTION
   Backs up local secrets/config/artifacts, fetches upstream main, applies the update,
@@ -35,7 +35,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$UpstreamUrl = 'https://github.com/elder-plinius/T3MP3ST.git'
+$UpstreamUrl = 'https://github.com/swcstudiospace/purple-team.git'
 $UpstreamBranch = 'main'
 $UpstreamRemote = 'upstream'
 

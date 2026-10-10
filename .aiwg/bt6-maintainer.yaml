@@ -6,7 +6,7 @@ project:
 repository:
   canonicalRemote: "upstream"
   baseBranch: "main"
-  expectedSlug: "elder-plinius/T3MP3ST"
+  expectedSlug: "swcstudiospace/purple-team"
   ciRemote: "upstream"
 tracker:
   authorityRemote: "upstream"

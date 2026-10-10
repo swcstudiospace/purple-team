@@ -18,7 +18,7 @@
 
 **A multi-agent offensive-security framework, built to turn the AI coding agent you already run into a zero-day hunter.**
 
-![scores: re-derivable](https://img.shields.io/badge/scores-re--derivable-brightgreen) &nbsp; ![verify-claims 27/27](https://img.shields.io/badge/verify--claims-27%2F27-brightgreen) &nbsp; ![PRs welcome](https://img.shields.io/badge/PRs-welcome-purple) &nbsp; ![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue)
+![scores: re-derivable](https://img.shields.io/badge/scores-re--derivable-brightgreen) &nbsp; ![verify-claims 27/27](https://img.shields.io/badge/verify--claims-27%2F27-brightgreen) &nbsp; ![PRs welcome](https://img.shields.io/badge/PRs-welcome-purple) &nbsp; ![License: MIT](https://img.shields.io/badge/License-MIT-blue)
 
 </div>
 
@@ -40,7 +40,7 @@ Three things set it apart:
 
 T3MP3ST is an **offensive** security tool, built for **authorized** testing, research, and education. Point it **only** at systems you own or have **explicit, written permission** to test. Unauthorized access to computers, networks, or data is illegal in most jurisdictions — **you alone are responsible** for how you use this software and for staying inside the law and your rules of engagement. Bring the storm to *your* targets, not someone else's.
 
-T3MP3ST is provided **as-is under the AGPL-3.0 license, with no warranty and no liability** for any damage, loss, or misuse. The authors do not endorse, support, or condone unauthorized activity. Get permission. Stay in scope. Don't be a menace. 🫡
+T3MP3ST is provided **as-is under the MIT license, with no warranty and no liability** for any damage, loss, or misuse. The authors do not endorse, support, or condone unauthorized activity. Get permission. Stay in scope. Don't be a menace. 🫡
 
 ## Why it exists
 
@@ -145,7 +145,7 @@ Full deployment guide: [docs/DOCKER.md](docs/DOCKER.md).
 
 ## Updating from upstream
 
-If you installed from a release tarball or copied the tree instead of tracking `git pull`, use the built-in updater to sync with [github.com/elder-plinius/T3MP3ST](https://github.com/elder-plinius/T3MP3ST) without losing local secrets or bench output. It shows a numbered plan, asks **y/N** before changing anything, then runs `npm install`.
+If you installed from a release tarball or copied the tree instead of tracking `git pull`, use the built-in updater to sync with [github.com/swcstudiospace/purple-team](https://github.com/swcstudiospace/purple-team) without losing local secrets or bench output. It shows a numbered plan, asks **y/N** before changing anything, then runs `npm install`.
 
 ```bash
 npm run update          # interactive sync from upstream main
@@ -328,7 +328,7 @@ Release process and gates: [RELEASE_CHECKLIST](docs/RELEASE_CHECKLIST.md).
 
 ## License
 
-AGPL-3.0. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ---
 

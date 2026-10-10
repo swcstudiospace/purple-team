@@ -26,8 +26,8 @@ T3MP3ST is a local offensive-security command center for authorized testing. It 
 From a clone:
 
 ```bash
-git clone https://github.com/elder-plinius/T3MP3ST.git
-cd T3MP3ST
+git clone https://github.com/swcstudiospace/purple-team.git
+cd purple-team
 npm install
 ```
 

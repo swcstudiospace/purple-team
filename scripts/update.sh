@@ -2,7 +2,7 @@
 # Linux / macOS / WSL updater (Windows uses update.ps1 via scripts/update.mjs).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-UPSTREAM_URL='https://github.com/elder-plinius/T3MP3ST.git'
+UPSTREAM_URL='https://github.com/swcstudiospace/purple-team.git'
 UPSTREAM_BRANCH='main'
 UPSTREAM_REMOTE='upstream'
 DRY_RUN=0

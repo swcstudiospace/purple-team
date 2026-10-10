@@ -5,7 +5,7 @@ T3MP3ST needs contributions from prompt engineers, cyber operators, bug bounty h
 The best contributions make the system more capable while making its evidence and authority boundaries clearer.
 
 The canonical repository and tracker are
-[`elder-plinius/T3MP3ST`](https://github.com/elder-plinius/T3MP3ST). Open issues
+[`swcstudiospace/purple-team`](https://github.com/swcstudiospace/purple-team). Open issues
 and pull requests there against `main`. The project uses focused branches,
 squash merges, green exact-head CI, and does not permit force-pushing published
 review history.

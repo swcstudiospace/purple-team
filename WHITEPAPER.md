@@ -87,7 +87,7 @@ Key design principles:
 
 ### 1.3 Scope of This Document
 
-This whitepaper covers T3MP3ST v1.0, encompassing the core framework (~12,000 lines of TypeScript), the web UI (~14,000 lines), and the supporting infrastructure. All code is AGPL-3.0-licensed.
+This whitepaper covers T3MP3ST v1.0, encompassing the core framework (~12,000 lines of TypeScript), the web UI (~14,000 lines), and the supporting infrastructure. All code is MIT-licensed.
 
 ---
 
@@ -698,7 +698,7 @@ Usage should comply with:
 | MCP integration | Yes | No | No | No |
 | OPSEC management | Built-in | Limited | Strong | Minimal |
 | Web UI | Yes | Armitage | Yes | Varies |
-| Open source | AGPL-3.0 | BSD (Framework) | Commercial | Varies |
+| Open source | MIT | BSD (Framework) | Commercial | Varies |
 | Language | TypeScript | Ruby | Java | Python/Go |
 | Payload databases | 200+ | 2000+ | Focused | Limited |
 | Evidence management | Full pipeline | Database | Logs | Minimal |
@@ -741,7 +741,7 @@ T3MP3ST represents a new paradigm in security testing tooling: **LLM-native, mul
 
 The platform's triple integration surface (CLI, REST API, MCP) makes it embeddable in any workflow, from human-driven engagements to fully autonomous AI agent pipelines. Its comprehensive payload databases, real tooling implementations, and OPSEC-first design philosophy provide a solid foundation for authorized security testing at scale.
 
-T3MP3ST is open source under the AGPL-3.0 license, welcoming contributions from the security research community.
+T3MP3ST is open source under the MIT license, welcoming contributions from the security research community.
 
 ---
 

@@ -24,5 +24,5 @@ schema, and standalone plugin delivery metadata.
 
 ## License
 
-This derivative is distributed under AGPL-3.0. The repository root `LICENSE`
-contains the full license text.
+This derivative is distributed under AGPL-3.0; the full license text is
+available at https://www.gnu.org/licenses/agpl-3.0.txt.
