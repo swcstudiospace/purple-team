@@ -32,10 +32,11 @@ provenance is failure.
 - ✓ Tauri bundle completion: @tauri-apps/cli, committed icon rasters, Rust sources, strict-JSON configs, `cargo check` green; mobile-init blockers recorded — v1.2 Phase 11
 - ✓ Node server sidecar: `@yao-pkg/pkg` node22 binary from `dist/server.js`, `externalBin` + docs resources, Rust spawn/reap outside dev, same-origin `/ui/` navigation, tauri.localhost origin handling — v1.2 Phase 12
 - ✓ Remote-access hardening: non-loopback binds (incl. Docker) refuse to start without `T3MP3ST_BEARER_TOKEN[_FILE]`; `/api` bearer + per-IP 60/min burst-120 limit; loopback unchanged; MCP proxy sends the bearer — v1.2 Phase 13
+- ✓ Color suites at red parity: detection/emulation/governance catalog categories (+12 adapters, 120 total), D3FEND + ATT&CK v19.2 attributed vendors, blue/black/white engine suites, three deterministic corpus benches (CI-pinned), four playbooks, nine color routes, purple v2 id-keyed synthesis + riskTier + persistence, Defend UI, 12 MCP tools — v1.3 Phases 15–20
 
-### Active (v1.3)
+### Active
 
-- [ ] Color suites at red parity: blue detection core+bench, black emulation core+bench, white governance suite, purple v2 id-keyed synthesis, Defend UI — phases 15–20 (research: `.planning/v1.3-RESEARCH-color-suites.md`)
+- [ ] Next milestone: scope unchosen (candidates in `.planning/v1.3-MILESTONE-AUDIT.md` tech-debt list)
 
 ### Out of Scope
 
