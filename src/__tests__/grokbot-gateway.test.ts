@@ -21,6 +21,7 @@ const TEMPEST_TOOLS = [
   'tempest_providers',
   'tempest_purple_synthesize',
   'tempest_blue_gaps',
+  'tempest_black_cover',
   'tempest_hats_list',
   'tempest_hat_dispatch',
 ];
@@ -102,7 +103,7 @@ function mcpCall(
 }
 
 describe('tempest tool registry', () => {
-  it('exposes all twelve tempest_* tools with input schemas', () => {
+  it('exposes all thirteen tempest_* tools with input schemas', () => {
     const block = tempestToolsBlock();
     expect(block.match(/name: 'tempest_/g)).toHaveLength(TEMPEST_TOOLS.length);
     for (const name of TEMPEST_TOOLS) {
@@ -111,7 +112,7 @@ describe('tempest tool registry', () => {
     expect(block.match(/inputSchema/g)).toHaveLength(TEMPEST_TOOLS.length);
   });
 
-  it('implements all twelve tempest_* handlers', () => {
+  it('implements all thirteen tempest_* handlers', () => {
     const block = tempestHandlerBlock();
     expect(block.match(/case 'tempest_/g)).toHaveLength(TEMPEST_TOOLS.length);
     for (const name of TEMPEST_TOOLS) {
@@ -135,6 +136,7 @@ describe('tempest tool registry', () => {
       '/api/oauth/status',
       '/api/teams/purple/synthesize',
       '/api/teams/blue/gaps',
+      '/api/teams/black/cover',
     ]) {
       expect(src, `missing proxy path ${path}`).toContain(path);
     }

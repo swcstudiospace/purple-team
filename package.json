@@ -44,6 +44,7 @@
     "cve:bench:adversarial": "node scripts/cve-hunt-bench.mjs --adversarial",
     "cloud:bench": "node scripts/cloud-misconfig-bench.mjs",
     "cloud:bench:live": "node scripts/cloud-misconfig-bench.mjs --live",
+    "black:bench": "node scripts/opsec-review-bench.mjs",
     "blue:bench": "node scripts/detection-coverage-bench.mjs",
     "mobile:bench": "node scripts/mobile-static-bench.mjs",
     "binary:bench": "node scripts/binary-vuln-bench.mjs",

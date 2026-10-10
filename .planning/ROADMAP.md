@@ -20,7 +20,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 - [x] **Phase 15: Blue Suite Core** - `detection` catalog category + adapters, `src/teams/blue/` v2 pipeline (telemetry registry, D3FEND-keyed coverage, Sigma rule packs), blue routes + grants (2026-10-10)
 - [x] **Phase 16: Blue Playbook & Bench** - `ai-defense-playbook.ts`, `detection-coverage-bench` corpus harness, blue-sentinel/warden skill backends + MCP `tempest_blue_gaps` (2026-10-10)
 - [x] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants (2026-10-10)
-- [ ] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover`
+- [x] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover` (2026-10-10)
 - [ ] **Phase 19: White Suite** - `governance` data packs, white v2 modules (ROE parser, evidence-chain validator, report auditor), ROE bench, white routes/skills/MCP
 - [ ] **Phase 20: Purple v2 & Defend UI** - id-keyed synthesis + residual-risk model, persisted color artifacts, Defend UI page, full gates & close-out
 
@@ -79,6 +79,11 @@ Plans:
   2. Skills wired to real routes without breaking the shared grammar
   3. MCP tool registers through the loopback/bearer path
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 18-01: Black playbook + opsec bench + wiring (parallel units + corrective)
+
 ### Phase 19: White Suite
 **Goal**: White owns governance and evidence-chain tooling end to end.
 **Depends on**: Phase 15 (pattern), v1.2 receipt ledger
@@ -104,6 +109,6 @@ Plans:
 | 15. Blue Suite Core | 1/1 | Complete | 2026-10-10 |
 | 16. Blue Playbook & Bench | 1/1 | Complete | 2026-10-10 |
 | 17. Black Suite Core | 1/1 | Complete | 2026-10-10 |
-| 18. Black Playbook & Bench | 0/0 | Not Started | — |
+| 18. Black Playbook & Bench | 1/1 | Complete | 2026-10-10 |
 | 19. White Suite | 0/0 | Not Started | — |
 | 20. Purple v2 & Defend UI | 0/0 | Not Started | — |

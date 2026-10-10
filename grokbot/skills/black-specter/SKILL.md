@@ -31,28 +31,40 @@ The operator must see the ack before any backend call resolves.
 
 ## 2. Dispatch the review
 
-Drive the `tempest_hat_dispatch` MCP tool with hat `specter` and the plan
-as the task — or directly, composing the canonical calls:
+Read the cover review the backend computes over the active red plan —
+its actions matched through the disclosed noise vocabulary and grouped
+into doctrine phases:
 
-```bash
-SPAWN=$(curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"specter"}')
-OP=$(echo "$SPAWN" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-curl -s -X POST http://127.0.0.1:3333/api/operators/$OP/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"tradecraft critique","taskDescription":"<red plan>"}'
-```
+- Cover review — the `tempest_black_cover` MCP tool, or
+  `curl -s http://127.0.0.1:3333/api/teams/black/cover` (each tripped
+  phase with its matched technique ids and opsec checklist items:
+  `id`, `check`, `why`).
+- Noise budget —
+  `curl -s http://127.0.0.1:3333/api/teams/black/noise` (per-action
+  ledger entries — action, matched techniques, cost, rationale — plus
+  `total`, `within`, `tier`).
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+Relay the `phases` array as the backend returned it — the matched
+technique ids per phase and the checklist items behind each flag — and
+the ledger entries with their rationales. Never rewrite a technique id,
+never soften a checklist `why`, and never score an action the backend
+did not match. An empty `phases` array means the backend holds no
+active red plan — say so; that is not a clean bill.
 
 Relay short progress updates quoting the mission id.
 
 ## 3. Completion summary
 
-Close with: scope, mission id, tradecraft verdict (which parts read as
-real and which do not, with reasons), cover assessment, noise-budget
-ledger (action, noise cost, evidence yield, assumptions), and the report
-pointer (`/tempest-report <mission id>`). If the backend is unreachable,
-say so in one line —
+Close with: scope, mission id, the doctrine phases the plan trips with
+their matched technique ids, the checklist flags per phase (`id`,
+`check`, `why`), the noise-budget ledger (action, cost, rationale) with
+the `within`/`tier` standing, and the report pointer
+(`/tempest-report <mission id>`). If the backend is
+unreachable, say so in one line —
 
 > t3mp3st backend unreachable — start it with npm run server; this review
 > is parked under its mission id and resumes when the backend answers.

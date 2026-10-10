@@ -1,0 +1,93 @@
+{
+  "schema": "t3mp3st.bench/opsec-review/v1",
+  "engines": "dist/teams/black {noise.structuredNoiseBudget, checklist.opsecReview, exfil.exfilCostModel}",
+  "cases": 10,
+  "score": {
+    "verdicts": {
+      "hits": 25,
+      "total": 25,
+      "rate": 1
+    },
+    "discrimination": {
+      "decoyPlans": 2,
+      "decoyFlagged": 0
+    },
+    "penalty": {
+      "perDecoy": 5,
+      "applied": 0,
+      "penalizedHits": 25
+    },
+    "perCase": [
+      {
+        "id": "plan-recon-passive-first",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-discovery-no-egress",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-anti-forensics-refusal",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-c2-bulk-egress",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-exfil-dns-tunnel",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-quiet-collection",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-repeated-probes",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "plan-full-kill-chain",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "DECOY-benign-runbook",
+        "decoy": true,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "DECOY-near-miss-channel",
+        "decoy": true,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      }
+    ]
+  }
+}

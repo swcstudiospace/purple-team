@@ -31,25 +31,31 @@ The operator must see the ack before any backend call resolves.
 
 ## 2. Dispatch the simulation
 
-Drive the `tempest_hat_dispatch` MCP tool with hat `wraith` and the paths
-as the task — or directly, composing the canonical calls:
+Read the egress cost report the backend computes for the run — every
+planned path costed per channel against the noise budget:
 
-```bash
-SPAWN=$(curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"wraith"}')
-OP=$(echo "$SPAWN" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-curl -s -X POST http://127.0.0.1:3333/api/operators/$OP/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"exfil simulation","taskDescription":"<exfil paths>"}'
-```
+- Exfil cost report —
+  `curl -s http://127.0.0.1:3333/api/teams/black/exfil` (per-path
+  `pathId`, `channel`, `tier`, `totalCost`, `feasible`, and pressure
+  `notes`; envelope `totalVolumeMb`, `totalCost`, `budget`, `within`).
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+Relay the `paths` array as the backend returned it — channel, tier, and
+cost per path with the pressure notes — and read `within` as the
+noise-budget standing. Never re-tier a path the backend already placed,
+never call an infeasible path feasible, and never simulate a channel
+the backend did not cost.
 
 Relay short progress updates quoting the mission id.
 
 ## 3. Completion summary
 
-Close with: scope, mission id, per-path verdict (simulated channel,
-detection surface spent, noise-budget standing), and the report pointer
+Close with: scope, mission id, the per-path verdict (`pathId`, channel,
+tier, cost, feasibility notes), total volume and cost against the
+budget with the `within` standing, and the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 

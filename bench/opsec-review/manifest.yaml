@@ -1,0 +1,50 @@
+schema: t3mp3st.bench/opsec-review/v1
+name: T3MP3ST Opsec Review Bench — v0
+description: |
+  Black-pipeline benchmark. Each case is a red operations plan (actions +
+  declared egress, optional exfil paths) with ground-truth verdicts from all
+  three real engines: the structured noise budget (exact total/tier/within and
+  the exact violation strings), the phase-keyed opsec review (matched
+  techniques per phase, item count, egress notes), and the egress path cost
+  model (per-path channel resolution, cost decomposition, tier, feasibility).
+  Decoy plans are BENIGN operations text — near-miss wording a naive keyword
+  matcher would flag, or an unknown exfil channel key — that the engines must
+  refuse to flag: zero noise cost, zero violations, zero phases, and unknown
+  channels resolved to 'unspecified', never silently adopted.
+
+engines: dist/teams/black — noise.js (structuredNoiseBudget), checklist.js
+  (opsecReview, OPSEC_PHASES), exfil.js (exfilCostModel, EXFIL_CHANNELS);
+  technique ids validated against attack-data.js (ATTACK_BY_ID). The real
+  pipeline via the built dist/ output, never a vendored copy of the logic.
+
+scoring:
+  axes:
+    adherence:       { rule: 'noise total/tier/within + violation set, review phases/item-count/egress-notes, and per-path cost arithmetic all equal ground truth' }
+    discrimination:  { rule: 'benign decoy plans score totally quiet (zero cost, zero violations, zero phases); unknown channel keys resolve to unspecified, never adopted' }
+  decoy_penalty: 5         # subtracted per benign decoy plan scored flagged
+  report: bench/opsec-review/report.json   # deterministic JSON (no timestamps)
+  self_test_default: true  # --self-test is the default; offline and deterministic
+
+cases:
+  - id: plan-recon-passive-first
+    difficulty: easy
+  - id: plan-discovery-no-egress
+    difficulty: medium
+  - id: plan-anti-forensics-refusal
+    difficulty: medium
+  - id: plan-c2-bulk-egress
+    difficulty: hard
+  - id: plan-exfil-dns-tunnel
+    difficulty: hard
+  - id: plan-quiet-collection
+    difficulty: easy
+  - id: plan-repeated-probes
+    difficulty: easy
+  - id: plan-full-kill-chain
+    difficulty: hard
+  - id: DECOY-benign-runbook
+    path: decoy-benign-runbook
+    difficulty: decoy
+  - id: DECOY-near-miss-channel
+    path: decoy-near-miss-channel
+    difficulty: decoy

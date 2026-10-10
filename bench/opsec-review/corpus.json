@@ -1,0 +1,317 @@
+{
+  "note": "Opsec-review corpus for the Black loadout. Each case is a RED OPERATIONS PLAN (actions + declared egress, optional exfil paths) with KNOWN ground-truth verdicts from the three real black engines: the structured noise budget (exact total/tier/within plus the exact violation strings), the phase-keyed opsec review (exact matched techniques per phase, item count, egress notes), and the egress path cost model (exact per-path channel/technique/cost arithmetic, tier, feasibility). Decoy plans are BENIGN operations text — runbook excerpts, near-miss wording a naive keyword matcher would flag, an unknown exfil channel key — that the engines must refuse to flag: zero noise cost, zero violations, zero phases, unknown channels resolved to 'unspecified' (never silently adopted). All technique ids are vendored ATT&CK v19.2 ids; non-decoy exfil channels are real EXFIL_CHANNELS keys. Expectations track the shipped engines (dist/teams/black), not a vendored copy.",
+  "decoy_penalty": 5,
+  "cases": [
+    {
+      "id": "plan-recon-passive-first",
+      "desc": "Quiet recon plan: passive DNS, WHOIS, and web fingerprinting with egress declared — low-tier spend, no violations",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "subfinder passive dns sweep of target zones",
+          "whois the corporate domain block",
+          "whatweb fingerprint of the public app"
+        ],
+        "egress": ["approved-vpn-relay"]
+      },
+      "expect": {
+        "noise": { "total": 6, "tier": "low", "within": true, "violations": [] },
+        "review": {
+          "phases": [
+            { "phase": "reconnaissance", "matchedTechniques": ["T1592", "T1596.001", "T1596.002"] }
+          ],
+          "itemCount": 4,
+          "egressDeclared": true,
+          "egressNotes": []
+        }
+      }
+    },
+    {
+      "id": "plan-discovery-no-egress",
+      "desc": "Discovery sweep with NO egress declared: every action pays the undeclared-egress surcharge, plan goes loud, C2C-01 fails by default",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "uname -a on the jump host",
+          "netstat -tunlp on the foothold",
+          "arp -a inventory of the segment",
+          "ps aux in the incident window"
+        ],
+        "egress": []
+      },
+      "expect": {
+        "noise": {
+          "total": 33,
+          "tier": "loud",
+          "within": false,
+          "violations": ["no egress routing declared: every action pays the undeclared-egress surcharge"]
+        },
+        "review": {
+          "phases": [
+            { "phase": "discovery", "matchedTechniques": ["T1018", "T1049", "T1057", "T1082"] },
+            { "phase": "reconnaissance", "matchedTechniques": ["T1596.001"] }
+          ],
+          "itemCount": 7,
+          "egressDeclared": false,
+          "egressNotes": ["no egress routing declared: C2C-01 fails by default and every exfil path is infeasible"]
+        }
+      }
+    },
+    {
+      "id": "plan-anti-forensics-refusal",
+      "desc": "Plan with timestomping and shredding: anti-forensics accrues the fixed doctrine penalty per match and surfaces as violations — awareness only, never stealth",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "timestomp the dropped dll",
+          "shred the toolchain logs",
+          "base64 -d the loader"
+        ],
+        "egress": ["approved-vpn-relay"]
+      },
+      "expect": {
+        "noise": {
+          "total": 25,
+          "tier": "loud",
+          "within": false,
+          "violations": [
+            "anti-forensics refused (awareness only, never wipe/tamper): \"shred the toolchain logs\" matched T1070.004 File Deletion",
+            "anti-forensics refused (awareness only, never wipe/tamper): \"timestomp the dropped dll\" matched T1070.006 Timestomp"
+          ]
+        },
+        "review": {
+          "phases": [
+            { "phase": "stealth", "matchedTechniques": ["T1027", "T1070.004", "T1070.006"] }
+          ],
+          "itemCount": 4,
+          "egressDeclared": true,
+          "egressNotes": []
+        }
+      }
+    },
+    {
+      "id": "plan-c2-bulk-egress",
+      "desc": "C2-heavy plan: proxychains double-matches T1090/T1090.003, staging wording pulls the collection checklist; one feasible relay path and one bulk cleartext cloud path that must cost high and go infeasible",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "proxychains curl the staging endpoint",
+          "certutil -urlcache the second stage",
+          "ssh -L tunnel through the relay"
+        ],
+        "egress": ["socks5 proxy over vpn"]
+      },
+      "exfil": {
+        "paths": [
+          { "id": "pull-relay-tooling", "channel": "c2-channel", "volumeMb": 150 },
+          { "id": "archive-drop", "channel": "cloud-storage-put", "volumeMb": 480, "encrypted": false }
+        ]
+      },
+      "expect": {
+        "noise": { "total": 16, "tier": "moderate", "within": true, "violations": [] },
+        "review": {
+          "phases": [
+            { "phase": "collection", "matchedTechniques": ["T1074"] },
+            { "phase": "command-and-control", "matchedTechniques": ["T1071.001", "T1090", "T1090.003", "T1105", "T1572"] }
+          ],
+          "itemCount": 8,
+          "egressDeclared": true,
+          "egressNotes": []
+        },
+        "exfil": {
+          "paths": [
+            { "pathId": "pull-relay-tooling", "channel": "c2-channel", "techniqueId": "T1041", "baseCost": 2, "volumeCost": 2, "penalty": 0, "totalCost": 4, "tier": "medium", "feasible": true },
+            { "pathId": "archive-drop", "channel": "cloud-storage-put", "techniqueId": "T1567.002", "baseCost": 3, "volumeCost": 5, "penalty": 2, "totalCost": 10, "tier": "high", "feasible": false }
+          ],
+          "totalCost": 14,
+          "within": false
+        }
+      }
+    },
+    {
+      "id": "plan-exfil-dns-tunnel",
+      "desc": "DNS-tunnel exfil run: chunk wording pulls T1030, the tunnel channel costs high with the cleartext penalty, and the path is infeasible against the default run budget",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "dnscat2 tunnel for command traffic",
+          "exfil over c2 in 900MB chunk batches"
+        ],
+        "egress": ["dns egress via resolver relay"]
+      },
+      "exfil": {
+        "paths": [{ "id": "dns-tunnel-main", "channel": "dns-tunnel", "volumeMb": 450 }]
+      },
+      "expect": {
+        "noise": { "total": 11, "tier": "moderate", "within": true, "violations": [] },
+        "review": {
+          "phases": [
+            { "phase": "command-and-control", "matchedTechniques": ["T1572"] },
+            { "phase": "exfiltration", "matchedTechniques": ["T1030", "T1041"] }
+          ],
+          "itemCount": 9,
+          "egressDeclared": true,
+          "egressNotes": []
+        },
+        "exfil": {
+          "paths": [
+            { "pathId": "dns-tunnel-main", "channel": "dns-tunnel", "techniqueId": "T1048.003", "baseCost": 6, "volumeCost": 5, "penalty": 2, "totalCost": 13, "tier": "high", "feasible": false }
+          ],
+          "totalCost": 13,
+          "within": false
+        }
+      }
+    },
+    {
+      "id": "plan-quiet-collection",
+      "desc": "Minimal staging run: collection reads stay low-tier, a 200MB web-service upload costs medium and stays feasible with egress declared",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "collect the engagement evidence bundle",
+          "tar czf the evidence staging directory"
+        ],
+        "egress": ["approved-vpn-relay"]
+      },
+      "exfil": {
+        "paths": [{ "id": "evidence-upload", "channel": "web-service-upload", "volumeMb": 200 }]
+      },
+      "expect": {
+        "noise": { "total": 7, "tier": "low", "within": true, "violations": [] },
+        "review": {
+          "phases": [
+            { "phase": "collection", "matchedTechniques": ["T1005", "T1074", "T1560.001"] }
+          ],
+          "itemCount": 3,
+          "egressDeclared": true,
+          "egressNotes": []
+        },
+        "exfil": {
+          "paths": [
+            { "pathId": "evidence-upload", "channel": "web-service-upload", "techniqueId": "T1567", "baseCost": 2, "volumeCost": 2, "penalty": 0, "totalCost": 4, "tier": "medium", "feasible": true }
+          ],
+          "totalCost": 4,
+          "within": true
+        }
+      }
+    },
+    {
+      "id": "plan-repeated-probes",
+      "desc": "The same nmap action fired three times: identical probes trip the repeated-probe violation even though the raw spend stays low-tier",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "nmap port scan of the dmz",
+          "nmap port scan of the dmz",
+          "nmap port scan of the dmz"
+        ],
+        "egress": ["approved-vpn-relay"]
+      },
+      "expect": {
+        "noise": {
+          "total": 6,
+          "tier": "low",
+          "within": true,
+          "violations": ["repeated probe (3x): \"nmap port scan of the dmz\""]
+        },
+        "review": {
+          "phases": [
+            { "phase": "reconnaissance", "matchedTechniques": ["T1595.001"] }
+          ],
+          "itemCount": 4,
+          "egressDeclared": true,
+          "egressNotes": []
+        }
+      }
+    },
+    {
+      "id": "plan-full-kill-chain",
+      "desc": "Full-dose plan touching all six doctrine phases at once: recon through exfil, loud total over budget, every phase checklist present in doctrine order",
+      "decoy": false,
+      "plan": {
+        "actions": [
+          "subfinder passive dns on the target",
+          "ps aux on the foothold",
+          "base64 -d the payload obfuscation step",
+          "proxychains curl the relay",
+          "collect and harvest operator output",
+          "exfil over c2 at run end"
+        ],
+        "egress": ["approved-vpn-relay"]
+      },
+      "expect": {
+        "noise": { "total": 25, "tier": "loud", "within": false, "violations": [] },
+        "review": {
+          "phases": [
+            { "phase": "collection", "matchedTechniques": ["T1005"] },
+            { "phase": "command-and-control", "matchedTechniques": ["T1071.001", "T1090", "T1090.003"] },
+            { "phase": "discovery", "matchedTechniques": ["T1057"] },
+            { "phase": "exfiltration", "matchedTechniques": ["T1041"] },
+            { "phase": "reconnaissance", "matchedTechniques": ["T1596.001"] },
+            { "phase": "stealth", "matchedTechniques": ["T1027"] }
+          ],
+          "itemCount": 23,
+          "egressDeclared": true,
+          "egressNotes": []
+        }
+      }
+    },
+    {
+      "id": "DECOY-benign-runbook",
+      "desc": "DECOY benign plan: runbook-housekeeping wording with near-miss terms (hyphenated 'port-scan', 'collected', 'web-service-upload') that a naive keyword matcher would flag — the engines must score it totally quiet",
+      "decoy": true,
+      "plan": {
+        "actions": [
+          "Read the port-scan findings appendix and file the report",
+          "Paging through collected engagement notes for the summary",
+          "Update the on-call rota and hand over the duty phone",
+          "Review the web-service-upload allowlist for the mail relay"
+        ],
+        "egress": ["corporate vpn"]
+      },
+      "exfil": { "paths": [] },
+      "expect": {
+        "noise": { "total": 0, "tier": "quiet", "within": true, "violations": [] },
+        "review": {
+          "phases": [],
+          "itemCount": 0,
+          "egressDeclared": true,
+          "egressNotes": []
+        },
+        "exfil": { "paths": [], "totalCost": 0, "within": true }
+      }
+    },
+    {
+      "id": "DECOY-near-miss-channel",
+      "desc": "DECOY near-miss plan: 'curling'/'ps auxww'/'git push' wording must not match the vocabulary, and an unknown 'carrier-pigeon' exfil channel must resolve to 'unspecified' (C2-channel fallback T1041) — never silently adopted as a real channel",
+      "decoy": true,
+      "plan": {
+        "actions": [
+          "curling results into the notes",
+          "ps auxww during the load test",
+          "git push of the engagement report"
+        ],
+        "egress": ["lab breakout gateway"]
+      },
+      "exfil": {
+        "paths": [{ "id": "pigeon-relay", "channel": "carrier-pigeon", "volumeMb": 50, "encrypted": true }]
+      },
+      "expect": {
+        "noise": { "total": 0, "tier": "quiet", "within": true, "violations": [] },
+        "review": {
+          "phases": [],
+          "itemCount": 0,
+          "egressDeclared": true,
+          "egressNotes": []
+        },
+        "exfil": {
+          "paths": [
+            { "pathId": "pigeon-relay", "channel": "unspecified", "techniqueId": "T1041", "baseCost": 2, "volumeCost": 1, "penalty": 0, "totalCost": 3, "tier": "low", "feasible": true }
+          ],
+          "totalCost": 3,
+          "within": true
+        }
+      }
+    }
+  ]
+}
