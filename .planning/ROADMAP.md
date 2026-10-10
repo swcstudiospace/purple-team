@@ -21,7 +21,7 @@ Grok Bot integration recorded as a follow-up. Closes with full gates and docs.
 - [x] **Phase 11: Tauri Bundle Completion** - install @tauri-apps/cli, generate icon rasters from the committed SVG, init mobile targets where the host toolchain permits, verify bundle config (2026-10-10)
 - [x] **Phase 12: Node Server Sidecar** - bundle the loopback server as a Tauri sidecar so `tauri build` yields a self-contained desktop app (2026-10-10)
 - [x] **Phase 13: Remote-Access Hardening** - bearer-token auth for non-loopback bot hosting + bot rate limits, with tests (2026-10-10)
-- [ ] **Phase 14: v1.2 Hardening & Close-out** - full gates, docs, planning final
+- [x] **Phase 14: v1.2 Hardening & Close-out** - full gates, docs, planning final (2026-10-10)
 
 ## Phase Details
 
@@ -78,6 +78,11 @@ Plans:
   2. Docs cover bundle completion, sidecar, and remote hardening
   3. ROADMAP/STATE reflect completion
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 14-01: Gate run and close-out record
+
 ## Progress
 
 | Phase | Plans Complete | Status | Completed |
@@ -85,4 +90,4 @@ Plans:
 | 11. Tauri Bundle Completion | 1/1 | Complete | 2026-10-10 |
 | 12. Node Server Sidecar | 1/1 | Complete | 2026-10-10 |
 | 13. Remote-Access Hardening | 1/1 | Complete | 2026-10-10 |
-| 14. v1.2 Hardening & Close-out | 0/0 | Not Started | — |
+| 14. v1.2 Hardening & Close-out | 1/1 | Complete | 2026-10-10 |

@@ -1,10 +1,10 @@
 ---
 gsd_state_version: '1.0'
-status: in_progress
+status: phases_complete
 progress:
   total_phases: 4
-  completed_phases: 3
-  percent: 75
+  completed_phases: 4
+  percent: 100
 ---
 
 # Project State — v1.2
@@ -18,12 +18,12 @@ See: .planning/PROJECT.md (updated 2026-10-09) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 14 of 14 (v1.2 Hardening & Close-out)
-Plan: 0 of 0
-Status: In progress — Phases 11–13 complete
-Last activity: 2026-10-10 — Phase 13: bearer + rate limit off loopback; loopback unchanged
+Phase: 14 of 14 (v1.2 Hardening & Close-out) — complete
+Plan: 1 of 1
+Status: All v1.2 phases complete. Milestone audit is tech_debt; archive is waiting on that decision.
+Last activity: 2026-10-10 — Phase 14 gates green (989 tests, lint, typecheck, doctor, prompt audit)
 
-Progress: [███████▌░░] 75%
+Progress: [██████████] 100%
 
 ## Completed Context
 
@@ -41,13 +41,17 @@ CLI, icons, Rust sources, strict JSON, `cargo check` green. Android needs a JDK/
 
 `@yao-pkg/pkg` node22 sidecar. Rust spawns and reaps it outside dev. Host smoke green. Installer matrix is CI.
 
-### Phase 13: Remote-Access Hardening (2026-10-10)
+### Phase 13: Remote-Access Hardening (`5ec3be5`)
 
 Non-loopback binds refuse to start without `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE`. `/api` requires the bearer and is rate-limited (60/min, burst 120). Loopback is unchanged.
 
+### Phase 14: Gates (2026-10-10)
+
+lint (0 errors), typecheck, 989 tests, doctor, prompt audit. Recorded in `14-01-SUMMARY.md`.
+
 ## Pending Todos
 
-- Phase 14: lint, typecheck, full tests, doctor, prompt audit, planning final.
+- Archive v1.2 only if the tech-debt audit is accepted (see `.planning/v1.2-MILESTONE-AUDIT.md`).
 
 ## Blockers/Concerns
 
@@ -57,5 +61,5 @@ Non-loopback binds refuse to start without `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BE
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Phase 14 next
+Stopped at: v1.2 phases complete; milestone archive not started
 Resume file: None
