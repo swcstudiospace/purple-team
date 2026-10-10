@@ -1,7 +1,7 @@
 {
   "team": "redteam",
   "gateway_url": "http://127.0.0.1:3333",
-  "gateway_url_note": "Loopback default. Override with T3MP3ST_URL only for another loopback address (localhost, ::1, 127.0.0.0/8). Non-loopback bot hosting needs T3MP3ST_HOST plus a future bearer scheme — recorded follow-up, not this unit.",
+  "gateway_url_note": "Loopback default. A non-loopback T3MP3ST_URL requires T3MP3ST_BEARER_TOKEN (or T3MP3ST_BEARER_TOKEN_FILE) on both the proxy and the server. Never commit the token.",
   "roster_version": 1,
   "seats": {
     "commander": {

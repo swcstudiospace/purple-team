@@ -15,7 +15,7 @@ services:
     ports:
       - "127.0.0.1:3333:3333"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3333/api/health"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider --header=\"Authorization: Bearer $$T3MP3ST_BEARER_TOKEN\" http://127.0.0.1:3333/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3

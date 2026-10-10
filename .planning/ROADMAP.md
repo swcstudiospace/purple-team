@@ -20,7 +20,7 @@ Grok Bot integration recorded as a follow-up. Closes with full gates and docs.
 
 - [x] **Phase 11: Tauri Bundle Completion** - install @tauri-apps/cli, generate icon rasters from the committed SVG, init mobile targets where the host toolchain permits, verify bundle config (2026-10-10)
 - [x] **Phase 12: Node Server Sidecar** - bundle the loopback server as a Tauri sidecar so `tauri build` yields a self-contained desktop app (2026-10-10)
-- [ ] **Phase 13: Remote-Access Hardening** - bearer-token auth for non-loopback bot hosting + bot rate limits, with tests
+- [x] **Phase 13: Remote-Access Hardening** - bearer-token auth for non-loopback bot hosting + bot rate limits, with tests (2026-10-10)
 - [ ] **Phase 14: v1.2 Hardening & Close-out** - full gates, docs, planning final
 
 ## Phase Details
@@ -64,6 +64,11 @@ Plans:
   3. Rate limiting triggers deterministically under burst — pinned by test
   4. No token material in committed files; grokbot/README.md documents the new auth model
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 13-01: Bearer auth and rate limits off loopback
+
 ### Phase 14: v1.2 Hardening & Close-out
 **Goal**: v1.2 verifiably green and documented.
 **Depends on**: Phases 11-13
@@ -79,5 +84,5 @@ Plans:
 |-------|----------------|--------|-----------|
 | 11. Tauri Bundle Completion | 1/1 | Complete | 2026-10-10 |
 | 12. Node Server Sidecar | 1/1 | Complete | 2026-10-10 |
-| 13. Remote-Access Hardening | 0/0 | Not Started | — |
+| 13. Remote-Access Hardening | 1/1 | Complete | 2026-10-10 |
 | 14. v1.2 Hardening & Close-out | 0/0 | Not Started | — |

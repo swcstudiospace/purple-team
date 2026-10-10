@@ -24,11 +24,16 @@ The API is a local operator surface, not a multi-user internet service.
 - Default port: `3333`
 - Override port with `T3MP3ST_PORT`
 - Override bind host with `T3MP3ST_HOST`
+- Non-loopback binds (including Docker's `0.0.0.0`) refuse to start unless
+  `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE` is set. `/api/*` then
+  requires `Authorization: Bearer <token>` and is rate-limited (60/minute,
+  burst 120, `429` + `Retry-After`). `/`, `/ui`, and `/health` stay open.
+- Loopback binds do not ask for a token and do not rate-limit.
 - State-changing requests are guarded against foreign browser origins
 - Loopback binds reject non-loopback Host headers to reduce DNS-rebinding risk
 - Active or networked tool use should have a scope/authorization receipt
 
-Do not expose the server on a public interface without adding your own authentication and network controls.
+Do not publish a non-loopback bind beyond the operators who hold the token.
 
 ## Health And Runtime
 

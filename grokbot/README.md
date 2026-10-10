@@ -41,17 +41,19 @@ when the prompts are assembled outside the gateway (CI, a local check).
 Per-user sessions are mission and engagement ids carried in skill text —
 there is no new session store. The operator quotes the mission id back on
 every follow-up (`/tempest-report <mission id>`, status polls, tasking), and
-the backend resolves it. Per-user rate limiting is a recorded follow-up.
+the backend resolves it. Off-loopback `/api` is rate-limited per caller IP
+(not per seat).
 
-## Bot auth: loopback trust
+## Bot auth: loopback trust, bearer off loopback
 
-The bot proxy (the `tempest_*` MCP tools and the curl examples in every
-skill) only talks to the loopback backend at `T3MP3ST_URL`
-(default `http://127.0.0.1:3333`). Non-loopback bot hosting needs
-`T3MP3ST_HOST` plus the future bearer scheme the server already names as
-its upgrade path — recorded follow-up, not this unit. Until that scheme
-lands, refuse any non-loopback base URL with an honest error instead of
-sending traffic to it.
+The bot proxy (the `tempest_*` MCP tools) talks to `T3MP3ST_URL`
+(default `http://127.0.0.1:3333`). Loopback needs no token. A non-loopback
+URL is refused unless `T3MP3ST_BEARER_TOKEN` (or `T3MP3ST_BEARER_TOKEN_FILE`)
+is set; the proxy then sends `Authorization: Bearer <token>`. The server
+binds non-loopback only when that same token is set, and it rate-limits
+`/api` per caller (60/minute, burst 120). Never commit the token. The
+browser UI reads it from `localStorage` key `t3mp3st_bearer_token` and does
+not prompt on loopback.
 
 ## Integrity rule
 

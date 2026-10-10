@@ -1,5 +1,13 @@
 # T3MP3ST Changelog
 
+## 2026-10-10 — v1.2 Phase 13: bearer auth off loopback
+
+Non-loopback binds, including Docker's `0.0.0.0`, refuse to start without
+`T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE`. `/api` then requires
+that bearer and is rate-limited (60/minute, burst 120). Loopback is unchanged:
+no token, no limit. The Grok Bot proxy sends the bearer and still refuses a
+non-loopback URL when the token is unset.
+
 ## 2026-10-09 — t3mp3st v1.1: Specialized Hats, Grok Abstractions, UI Redesign, Tauri
 
 Four shipped phases:

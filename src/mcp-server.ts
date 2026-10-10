@@ -15,7 +15,9 @@ import {
   Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import { execFile } from 'child_process';
+import { readFileSync } from 'fs';
 import { promisify } from 'util';
+import { resolveBearerToken } from './net/remote-access.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -40,6 +42,18 @@ function tempestIsLoopbackHostname(host: string): boolean {
   return h === 'localhost' || h === '::1' || /^127(?:\.\d{1,3}){3}$/.test(h);
 }
 
+function tempestBearer(): string {
+  const loaded = resolveBearerToken(process.env, (path) => readFileSync(path, 'utf8'));
+  return loaded.ok ? loaded.token : '';
+}
+
+function tempestHeaders(extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { ...(extra ?? {}) };
+  const token = tempestBearer();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
 function tempestBaseOrError(): { base?: string; error?: string } {
   const base = (process.env.T3MP3ST_URL || 'http://127.0.0.1:3333').trim().replace(/\/+$/, '');
   let host: string;
@@ -48,9 +62,9 @@ function tempestBaseOrError(): { base?: string; error?: string } {
   } catch {
     return { error: `Invalid T3MP3ST_URL ${JSON.stringify(base)}: not a parseable URL.` };
   }
-  if (!tempestIsLoopbackHostname(host)) {
+  if (!tempestIsLoopbackHostname(host) && !tempestBearer()) {
     return {
-      error: `Refusing non-loopback T3MP3ST_URL ${JSON.stringify(base)}: the tempest proxy only talks to the loopback backend (localhost, ::1, 127.0.0.0/8).`,
+      error: `Refusing non-loopback T3MP3ST_URL ${JSON.stringify(base)}: set T3MP3ST_BEARER_TOKEN (the server requires it off loopback).`,
     };
   }
   return { base };
@@ -70,7 +84,7 @@ async function tempestGet(path: string): Promise<string> {
   const checked = tempestBaseOrError();
   if (!checked.base) return JSON.stringify({ ok: false, error: checked.error });
   try {
-    const res = await fetch(checked.base + path);
+    const res = await fetch(checked.base + path, { headers: tempestHeaders() });
     return JSON.stringify({ ok: res.ok, status: res.status, data: await tempestReadBody(res) });
   } catch {
     return JSON.stringify({ ok: false, error: `t3mp3st backend unreachable at ${checked.base} — start it with npm run server` });
@@ -83,7 +97,7 @@ async function tempestPost(path: string, body: unknown): Promise<string> {
   try {
     const res = await fetch(checked.base + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: tempestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body ?? {}),
     });
     return JSON.stringify({ ok: res.ok, status: res.status, data: await tempestReadBody(res) });

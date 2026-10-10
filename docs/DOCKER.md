@@ -180,17 +180,17 @@ docker system prune -a --volumes
 
 **⚠️ CRITICAL: External Exposure Risk**
 
-The Docker setup binds the server to `0.0.0.0` inside the container to allow port forwarding. This disables the Host-header/DNS-rebinding guard in `server.ts`.
+The Docker setup binds the server to `0.0.0.0` inside the container so port forwarding works. That is a non-loopback bind: the process **refuses to start** until `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE` is set (put it in `.env`, which compose already loads). `/api` then requires the bearer. The Host-header allow-list is off on this bind, same as any explicit non-loopback host.
 
-**SAFE:** The default `docker-compose.yml` publishes the port as `127.0.0.1:3333:3333`, which restricts access to localhost only.
+**SAFE:** The default `docker-compose.yml` publishes the port as `127.0.0.1:3333:3333`, and the bearer is still required because the process itself is not on loopback.
 
-**UNSAFE:** Running `docker run -p 3333:3333` (without the `127.0.0.1:` prefix) or `network_mode: host` exposes the **unauthenticated command-executing API** on all network interfaces (0.0.0.0), allowing anyone on your network (or the internet if port-forwarded) to execute arbitrary system commands.
+**UNSAFE:** Running `docker run -p 3333:3333` (without the `127.0.0.1:` prefix) or `network_mode: host` exposes the command-executing API on every interface. The bearer stops anonymous callers; it does not make a public bind a good idea.
 
 **Deployment Rules:**
 - ✅ Always bind to `127.0.0.1` on the host: `-p 127.0.0.1:3333:3333`
-- ✅ Use a reverse proxy (nginx, Caddy, Coolify) with authentication for external access
+- ✅ Set `T3MP3ST_BEARER_TOKEN` in `.env` before `docker compose up`
 - ❌ Never use `network_mode: host` in untrusted networks
-- ❌ Never publish to `0.0.0.0` without authentication middleware
+- ❌ Never publish to `0.0.0.0` beyond the operators who hold the token
 
 **Additional Security:**
 - Container runs as root by default. For production, add a non-root user in the Dockerfile.

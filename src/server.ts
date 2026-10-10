@@ -12,6 +12,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { execFile, spawn } from 'child_process';
+import { readFileSync } from 'fs';
 import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -31,6 +32,13 @@ import {
   startXaiDeviceFlow,
 } from './llm/oauth.js';
 import { initProxyFromConfig, configureProxy, fetchBypassingProxy, getProxyStatus, checkIp, invalidateIpCache } from './net/proxy.js';
+import {
+  REMOTE_RATE_BURST,
+  REMOTE_RATE_PER_MINUTE,
+  createRemoteGuard,
+  createTokenBucket,
+  resolveBearerToken,
+} from './net/remote-access.js';
 import { redactString, redactLedgerText, redactSecrets } from './redact.js';
 import { LLMBackbone } from './llm/index.js';
 import { TempestCommand } from './index.js';
@@ -174,6 +182,9 @@ const HOST = process.env.T3MP3ST_HOST || (process.env.DOCKER === 'true' ? '0.0.0
 // non-loopback address) they've opted into network access behind their own front,
 // so we don't second-guess the Host there.
 const HOST_IS_LOOPBACK = /^(127\.|localhost$|::1$|\[::1\]$)/i.test(HOST.trim());
+// Resolved once. Empty on the default loopback bind; required before listen
+// when the bind is not loopback (including Docker's 0.0.0.0).
+const bearerLoad = resolveBearerToken(process.env, (path) => readFileSync(path, 'utf8'));
 
 const app = express();
 
@@ -319,6 +330,15 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
+
+// Off-loopback only. Loopback (the default, and the Tauri sidecar) does not
+// mount this, so interactive localhost use stays unauthenticated and unlimited.
+if (!HOST_IS_LOOPBACK && bearerLoad.ok) {
+  app.use(createRemoteGuard({
+    token: bearerLoad.token,
+    bucket: createTokenBucket({ perMinute: REMOTE_RATE_PER_MINUTE, burst: REMOTE_RATE_BURST }),
+  }));
+}
 
 // =============================================================================
 // LLM BACKBONE INITIALIZATION
@@ -8219,6 +8239,14 @@ process.on('uncaughtException', (err) => {
 });
 
 async function startServer() {
+  if (!HOST_IS_LOOPBACK && !bearerLoad.ok) {
+    const where = bearerLoad.reason === 'unreadable' && bearerLoad.file ? ` (unreadable file ${bearerLoad.file})` : '';
+    console.error(
+      `[T3MP3ST] Refusing to bind non-loopback host "${HOST}" without a bearer token${where}. ` +
+      'Set T3MP3ST_BEARER_TOKEN or T3MP3ST_BEARER_TOKEN_FILE and restart.',
+    );
+    process.exit(1);
+  }
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════════╗');
   console.log('║                     T3MP3ST API Server v2.0                    ║');
@@ -8267,9 +8295,10 @@ async function startServer() {
     if (!HOST_IS_LOOPBACK) {
       console.warn('');
       console.warn(`  ⚠️  EXPOSURE WARNING: bound to NON-LOOPBACK host "${HOST}". This API executes`);
-      console.warn('     commands and has NO built-in authentication — the Origin/Host guards only');
-      console.warn('     cover the localhost threat model. Do NOT put this on a LAN or the internet');
-      console.warn('     without real auth (a Bearer-token reverse proxy) in front of it.');
+      console.warn('     commands. Bearer auth and a per-IP rate limit are ON for /api.');
+      console.warn('     /ui stays open. A browser on this host must send the token');
+      console.warn('     (localStorage key t3mp3st_bearer_token). Do not publish this bind');
+      console.warn('     beyond the operators who hold T3MP3ST_BEARER_TOKEN.');
       console.warn('');
     }
     console.log('');

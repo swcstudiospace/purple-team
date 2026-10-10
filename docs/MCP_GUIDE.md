@@ -84,12 +84,12 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_providers` | `GET /api/llm/status` + `GET /api/oauth/status` |
 | `tempest_purple_synthesize` | `POST /api/teams/purple/synthesize` (`findings`, `detections`) |
 
-Loopback-only guard: the proxy refuses any `T3MP3ST_URL` whose host is not
-exactly `localhost`, `::1`, or a full dotted quad in `127.0.0.0/8`. Loopback
-trust is the auth model — provider keys and subscription sessions stay on the
-server and are never exposed through these tools. Non-loopback bot hosting
-needs a future bearer scheme plus `T3MP3ST_HOST`; per-user rate limiting is
-likewise a recorded follow-up, not a current feature.
+Loopback guard: with no bearer set, the proxy refuses any `T3MP3ST_URL`
+whose host is not exactly `localhost`, `::1`, or a full dotted quad in
+`127.0.0.0/8`. Set `T3MP3ST_BEARER_TOKEN` (or `T3MP3ST_BEARER_TOKEN_FILE`) to
+call a non-loopback server; the proxy sends `Authorization: Bearer`. The
+server refuses to bind off loopback without that token and rate-limits
+`/api` (60/minute, burst 120). Provider keys stay on the server.
 
 ## Driving Missions Headlessly
 

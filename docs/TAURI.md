@@ -93,7 +93,7 @@ process. Phase 12 bundles that server as a sidecar the shell spawns itself
   machine's loopback, so the server binds LAN-reachable while the app is used:
 
   ```sh
-  T3MP3ST_HOST=0.0.0.0 npm run server   # explicit opt-in bind (server warns)
+  T3MP3ST_HOST=0.0.0.0 T3MP3ST_BEARER_TOKEN=… npm run server   # refuses to start without the token
   npm run tauri:ios      # or: npm run tauri:android
   ```
 
@@ -103,12 +103,11 @@ process. Phase 12 bundles that server as a sidecar the shell spawns itself
 
 ## 3. Follow-ups (NOT this unit — each with its unblock condition)
 
-1. **Bearer-auth upgrade (with mobile):** `src/server.ts` states the upgrade
-   path explicitly — if the API is ever exposed beyond localhost (the mobile
-   LAN mode above), add real Bearer-token auth. Until then the origin/Host
-   guards are the defense; do not ship mobile beyond a trusted LAN without it.
-   Unblock: server-side auth design + implementation; no Tauri change unblocks
-   this — the Tauri side only documents the pairing (section 2).
+1. **Bearer-auth upgrade (CLOSED 2026-10-10, Phase 13):** a non-loopback bind
+   refuses to start without `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE`.
+   `/api` requires the bearer and is rate-limited. Loopback, including the
+   desktop sidecar, is unchanged. Mobile LAN pairing still needs the token
+   (section 2). The Tauri shell does not collect it.
 2. **Node sidecar bundling (CLOSED 2026-10-10, Phase 12):** shipped — the
    bundled app now self-starts the API sidecar (section 2 run sequence), so
    desktop prod needs no alongside `npm run server` step. Decision: reuse the

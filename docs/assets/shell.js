@@ -82,6 +82,27 @@
     window.location.href = file;
   }
 
+  // Non-loopback binds require a bearer on /api. Loopback ignores it.
+  // Set localStorage t3mp3st_bearer_token in the operator browser; nothing
+  // is prompted and nothing is sent when the key is absent.
+  (function patchApiFetch() {
+    if (window.__t3mp3stFetchPatched || typeof window.fetch !== 'function') return;
+    var orig = window.fetch;
+    window.__t3mp3stFetchPatched = true;
+    window.fetch = function (input, init) {
+      var url = typeof input === 'string' ? input : (input && input.url) || '';
+      var token = '';
+      try { token = window.localStorage.getItem('t3mp3st_bearer_token') || ''; } catch (e) { /* storage unavailable */ }
+      if (token && String(url).indexOf('/api/') !== -1) {
+        init = init ? Object.assign({}, init) : {};
+        var headers = new Headers(init.headers || {});
+        if (!headers.has('Authorization')) headers.set('Authorization', 'Bearer ' + token);
+        init.headers = headers;
+      }
+      return orig.call(this, input, init);
+    };
+  })();
+
   function apiBase() {
     try {
       var custom = window.localStorage.getItem('t3mp3st_api_url');
