@@ -1,55 +1,48 @@
 ---
 gsd_state_version: '1.0'
-status: complete
+status: in_progress
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 4
+  completed_phases: 0
+  percent: 0
 ---
 
-# Project State
+# Project State — v1.2
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-09)
+See: .planning/PROJECT.md (updated 2026-10-09) and .planning/milestones/ for the archived v1.0/v1.1 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** Milestone complete — all 5 phases green
+**Current focus:** v1.2 — Tauri bundle completion, node server sidecar, remote-access hardening
 
 ## Current Position
 
-Phase: 5 of 5 (Hardening & Close-out)
-Plan: 1 of 1 in current phase
-Status: Complete (typecheck, lint 0 errors, npm test 896/896 + scripts, doctor, prompt:audit + live smoke)
-Last activity: 2026-10-09 — Milestone v1.0 complete: providers, dark purple core, white/red UI, grokbot, docs
+Phase: 11 of 14 (Tauri Bundle Completion)
+Plan: 0 of 0 in current phase (not yet planned)
+Status: In progress — repo re-homed, v1.2 phases set up per ROADMAP.md
+Last activity: 2026-10-10 — re-home + license + docs sweep + v1.2 bootstrap
 
-Progress: [██████████] 100%
+Progress: [░░░░░░░░░░] 0%
 
-## Accumulated Context
+## Completed Context (pre-phase, 2026-10-10)
 
-### Decisions
+- **Repo re-home:** old `.git` discarded after pre-flight (backup bundle at `../purple-team-pre-reset.bundle`, old HEAD `42c56de` with the in-flight user work WIP-committed into the bundle). Fresh root commit `53b95ed` pushed to `github.com/swcstudiospace/purple-team` — remote probed empty first (S1 clean push, no divergence). Pre-push secret scan green (placeholders/test vectors only).
+- **License:** AGPL-3.0 → MIT, commit `838206d` (© 2026 SWC Studio Space). Manifest/doc refs swept in commit `042aca9`.
+- **Docs identity sweep:** clone URLs, updater links, docsite siteUrl, expectedSlug, README badge — commit `042aca9`. Flagged exception: `.aiwg/plugins/bt6-maintainer/payload/provenance/SOURCE.md` retains `elder-plinius` references as historical provenance (intentional, not stale).
+- **Planning:** v1.0/v1.1 archived to `.planning/milestones/`; active ROADMAP.md now tracks v1.2 (Phases 11-14) built from the follow-ups recorded at v1.1 close-out.
 
-See PROJECT.md Key Decisions (full log). Wave highlights:
-- Build on HEAD; origin/main reconciliation user-gated, out of scope.
-- ChatGPT Plan = native openai OAuth + Codex-backend adapter; Cursor = cursor-agent CLI + alias.
-- Purple = orchestrator-level synthesis, not an operator.
-- Restored uncommitted src/target/index.ts deletion (load-bearing, reversible).
-- PATH-hermetic local-agent tests; manifest extractor tolerates annotations; white kit stays 9 (gate tiered).
-- UI replace-and-rebuild with dispatch centralization restored; grokbot = templates + skills + MCP proxies, loopback trust.
+## Pending Todos
 
-### Pending Todos
+- Phase 11 planning (first gsd-discuss → plan → execute cycle of v1.2).
 
-None.
+## Blockers/Concerns
 
-### Blockers/Concerns
-
-- User's remaining uncommitted work (prompt-audit.mjs, oauth tests, orchestration/prompts, PROMPT_AUDIT.md, provider-models.test.ts, .env.example) still sits in the tree — untouched by this milestone; reconcile before any origin pull.
-- Recorded follow-ups (not features): non-loopback bot hosting bearer auth, bot rate limits, live provider credentials for end-to-end verification (manual live checklist in grokbot/README.md).
+- `tauri ios init` requires macOS/Xcode; this host is Linux. Phase 11 must record the exact toolchain blocker if iOS init cannot run here (graceful degradation per docs/TAURI.md precedent).
+- Relicensing note: pre-existing contributions were made under AGPL-3.0-or-later; the MIT relicense is the repository owner's explicit decision this session. The `.aiwg` bt6-maintainer plugin payload remains AGPL-3.0 (derivative of AGPL source).
 
 ## Session Continuity
 
-Last session: 2026-10-09
-Stopped at: Milestone v1.0 complete, all gates green, phases committed (a866cf7, bfa8031, 8f991e1, b86a397, 78012c5 + phase-5 commit)
+Last session: 2026-10-10
+Stopped at: v1.2 bootstrap complete; Phase 11 next
 Resume file: None
