@@ -14,9 +14,12 @@
  * - black  → routing/noise-grade: passive mapping + resolver-pinned DNS tools, plus
  *            curl/httpx ONLY as egress/proxy verification probes (justified: verifying
  *            the approved route is the black team's core job; noisy active scanners
- *            like nmap/nuclei/ffuf are deliberately NOT granted). Black's grants stay
- *            strictly disjoint from blue's and white's — the passive DNS lookups
- *            (dig/whois) belong to the inspector teams only.
+ *            like nmap/nuclei/ffuf are deliberately NOT granted). Black additionally
+ *            holds emulation-data ids of its own — ATT&CK Navigator layer data and
+ *            Caldera adversary-emulation plan parsing — tradecraft-mapping surface
+ *            only; still nothing noisy, and still strictly disjoint from blue's and
+ *            white's grant sets (the passive DNS lookups dig/whois belong to the
+ *            inspector teams only).
  * - blue   → read/inspect-grade only: local_read + passive ids. No active, intrusive,
  *            credential, or dangerous tools — the blue team never touches the target.
  *            Blue additionally holds detection-grade catalog ids of its own (rule
@@ -42,7 +45,7 @@ export const TEAM_ARCHETYPES: readonly ['black', 'blue', 'white'] = ['black', 'b
 // Grant sets — every id must exist in src/arsenal/catalog.ts TOOL_ADAPTERS.
 // dig/whois are granted ONLY to the inspector teams (blue/white); black does its
 // resolver-pinned DNS work through host/dnsx so black stays disjoint from both.
-const BLACK_TOOLS = ['host', 'subfinder', 'amass', 'dnsx', 'waybackurls', 'wafw00f', 'curl', 'httpx'] as const;
+const BLACK_TOOLS = ['host', 'subfinder', 'amass', 'dnsx', 'waybackurls', 'wafw00f', 'curl', 'httpx', 'attack-navigator', 'caldera'] as const;
 const BLUE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'checksec', 'openssl', 'gitleaks', 'trufflehog', 'trivy', 'syft', 'grype', 'osv-scanner', 'checkov', 'semgrep', 'dig', 'whois', 'sigma', 'atomic-red-team', 'osquery', 'suricata', 'd3fend'] as const;
 const WHITE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'gitleaks', 'dig', 'whois'] as const;
 

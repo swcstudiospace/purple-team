@@ -19,7 +19,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 
 - [x] **Phase 15: Blue Suite Core** - `detection` catalog category + adapters, `src/teams/blue/` v2 pipeline (telemetry registry, D3FEND-keyed coverage, Sigma rule packs), blue routes + grants (2026-10-10)
 - [x] **Phase 16: Blue Playbook & Bench** - `ai-defense-playbook.ts`, `detection-coverage-bench` corpus harness, blue-sentinel/warden skill backends + MCP `tempest_blue_gaps` (2026-10-10)
-- [ ] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants
+- [x] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants (2026-10-10)
 - [ ] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover`
 - [ ] **Phase 19: White Suite** - `governance` data packs, white v2 modules (ROE parser, evidence-chain validator, report auditor), ROE bench, white routes/skills/MCP
 - [ ] **Phase 20: Purple v2 & Defend UI** - id-keyed synthesis + residual-risk model, persisted color artifacts, Defend UI page, full gates & close-out
@@ -65,6 +65,11 @@ Plans:
   2. Black grants remain disjoint from blue/white (existing invariant test stays green)
   3. Routes live behind the existing guards; vitest + typecheck green
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 17-01: Black suite core (catalog, ATT&CK vendor, engines, routes)
+
 ### Phase 18: Black Playbook & Bench
 **Goal**: Black gains playbook + verification parity.
 **Depends on**: Phase 17
@@ -98,7 +103,7 @@ Plans:
 |-------|----------------|--------|-----------|
 | 15. Blue Suite Core | 1/1 | Complete | 2026-10-10 |
 | 16. Blue Playbook & Bench | 1/1 | Complete | 2026-10-10 |
-| 17. Black Suite Core | 0/0 | Not Started | — |
+| 17. Black Suite Core | 1/1 | Complete | 2026-10-10 |
 | 18. Black Playbook & Bench | 0/0 | Not Started | — |
 | 19. White Suite | 0/0 | Not Started | — |
 | 20. Purple v2 & Defend UI | 0/0 | Not Started | — |

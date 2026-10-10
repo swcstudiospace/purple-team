@@ -62,6 +62,9 @@ import { hardeningPlan, type DetectionGap } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
 import { sigmaRulepack } from './teams/blue/rulepacks.js';
 import { registryTelemetry } from './teams/blue/telemetry.js';
+import { opsecReview } from './teams/black/checklist.js';
+import { exfilCostModel } from './teams/black/exfil.js';
+import { structuredNoiseBudget } from './teams/black/noise.js';
 import type { RoeVerdict } from './teams/white.js';
 
 const execFileAsync = promisify(execFile);
@@ -6448,6 +6451,40 @@ app.get('/api/teams/blue/rules', (_req: Request, res: Response): void => {
   const findings = [...findingsLedger.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const pack = sigmaRulepack(findings, coverageGaps(findings, registryTelemetry()));
   res.json(redactSecrets({ rules: pack.rules, yaml: pack.yaml }));
+});
+
+// GET /api/teams/black/cover — phase-grouped OPSEC review of the active RED
+// plan (teams/black/checklist.ts opsecReview): actions matched through the
+// disclosed noise vocabulary, matched techniques grouped into doctrine phases,
+// each present phase contributing its checklist. The plan is the most recently
+// updated mission draft. missionDrafts carry no per-action script and no
+// egress field, so the draft's objective and scope lines are the plan's
+// declared actions and egress reports as undeclared (the honest reading).
+// No draft → 200 with an empty phase list.
+app.get('/api/teams/black/cover', (_req: Request, res: Response): void => {
+  const draft = [...missionDrafts.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const actions = draft ? [draft.objective, ...draft.scope].filter(line => line.trim().length > 0) : [];
+  res.json(redactSecrets(opsecReview({ actions, egress: [] })));
+});
+
+// GET /api/teams/black/exfil — ATT&CK-keyed egress cost report over the plan's
+// exfil paths (teams/black/exfil.ts exfilCostModel). No ExfilPath-shaped data
+// exists in server state today — missionDrafts carry no channel/volume fields,
+// and pressure paths are computed on demand from repro packs, never stored —
+// so the report costs zero paths. The envelope stays the engine's report shape
+// (`{ paths, totalVolumeMb, totalCost, budget, within }`), never a 500.
+app.get('/api/teams/black/exfil', (_req: Request, res: Response): void => {
+  res.json(redactSecrets(exfilCostModel({ paths: [], egress: [] })));
+});
+
+// GET /api/teams/black/noise — tactic-tier structured noise budget over the
+// active RED plan's actions (teams/black/noise.ts structuredNoiseBudget), same
+// plan accessor and derivation as /cover. No draft → 200 with an empty ledger,
+// total 0, tier 'quiet'.
+app.get('/api/teams/black/noise', (_req: Request, res: Response): void => {
+  const draft = [...missionDrafts.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
+  const actions = draft ? [draft.objective, ...draft.scope].filter(line => line.trim().length > 0) : [];
+  res.json(redactSecrets(structuredNoiseBudget({ actions, egress: [] })));
 });
 
 // POST /api/models — live model list for the Universal API Config panel (#90).

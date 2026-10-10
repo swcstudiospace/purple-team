@@ -22,7 +22,8 @@ export type ToolCategory =
   | 'credentials'
   | 'post_exploitation'
   | 'reporting'
-  | 'detection';
+  | 'detection'
+  | 'emulation';
 
 export type ToolRisk = 'local_read' | 'passive' | 'active' | 'intrusive' | 'credential' | 'dangerous';
 export type ToolExecutionMode = 'safe_command' | 'receipt_required' | 'import_only' | 'catalog_only';
@@ -1318,6 +1319,38 @@ export const TOOL_ADAPTERS: ToolAdapter[] = [
     commandHint: 'Import the ontology CSV; recommendations are technique-keyed lookups, never live queries.',
     parserStatus: 'planned',
     notes: 'MITRE D3FEND ontology CSV vendored for technique-keyed defensive-control recommendations.',
+  },
+  {
+    id: 'attack-navigator',
+    binary: 'attack-navigator',
+    name: 'MITRE ATT&CK Navigator layers',
+    category: 'emulation',
+    families: ['web_api', 'cloud_infra', 'ai_red_team', 'agent_warfare'],
+    risk: 'local_read',
+    execution: 'import_only',
+    networked: false,
+    evidenceKinds: ['layer_data'],
+    outputFormats: ['json'],
+    installHint: 'Vendor ATT&CK Navigator layer JSON as a data pack.',
+    commandHint: 'Import ATT&CK layer/STIX JSON for tradecraft mapping; layers are annotated, never executed here.',
+    parserStatus: 'planned',
+    notes: 'ATT&CK layer/STIX data pack for tradecraft mapping (MITRE ATT&CK Terms of Use).',
+  },
+  {
+    id: 'caldera',
+    binary: 'caldera',
+    name: 'MITRE Caldera (emulation plan parsing)',
+    category: 'emulation',
+    families: ['web_api', 'cloud_infra', 'agent_warfare'],
+    risk: 'passive',
+    execution: 'catalog_only',
+    networked: false,
+    evidenceKinds: ['emulation_plan'],
+    outputFormats: ['json'],
+    installHint: 'Install MITRE Caldera separately for plan-schema reference only; this adapter never operates the platform.',
+    commandHint: 'Catalog-only until adversary-emulation plan parsing is bound to an authorized engagement.',
+    parserStatus: 'planned',
+    notes: 'Parses adversary emulation PLANS for analysis; never operates the platform (analysis-first doctrine).',
   },
 ];
 

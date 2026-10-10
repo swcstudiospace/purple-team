@@ -263,6 +263,9 @@ loopback trust as every other route (see Security Model above).
 | `GET` | `/api/teams/blue/gaps` | Read-only v2 D3FEND coverage report over the findings ledger (`{ gaps }`, per-gap `unresolvedCountermeasures` surfaced) |
 | `GET` | `/api/teams/blue/hardening` | Read-only severity-tiered hardening plan over the findings ledger (`{ items }`) |
 | `GET` | `/api/teams/blue/rules` | Read-only Sigma rule pack from ledger coverage gaps (`{ rules, yaml }`, experimental rules) |
+| `GET` | `/api/teams/black/cover` | Read-only phase-grouped OPSEC review of the active RED plan, the most recently updated mission draft (`{ phases, egressDeclared, egressNotes, itemCount }`; no draft → empty phases) |
+| `GET` | `/api/teams/black/exfil` | Read-only ATT&CK-keyed egress cost report over planned exfil paths (`{ paths, totalVolumeMb, totalCost, budget, within }`; zeroed until a path store exists — drafts carry no channel/volume fields) |
+| `GET` | `/api/teams/black/noise` | Read-only tactic-tier noise budget over the active plan's actions (`{ entries, total, budget, within, tier, violations }`; no draft → total 0, tier `quiet`) |
 
 `POST /api/teams/purple/synthesize` body:
 

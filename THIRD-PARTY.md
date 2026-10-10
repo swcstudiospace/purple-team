@@ -27,6 +27,20 @@ license for research, development, and commercial purposes that requires reprodu
 MITRE's copyright designation and license in copies; both are reproduced in the header
 of the vendored file.
 
+`src/teams/black/attack-data.ts` vendors a disclosed trimmed subset of the MITRE
+ATT&CK® Enterprise knowledge base (STIX 2.1 bundle, Enterprise ATT&CK v19.2, fetched
+2026-10-10 from
+[mitre-attack/attack-stix-data](https://raw.githubusercontent.com/mitre-attack/attack-stix-data/master/enterprise-attack/enterprise-attack.json))
+so the black suite's attack-data engines ship with no runtime downloads. The subset
+covers the six tactics black's doctrine maps to (reconnaissance, discovery, stealth,
+collection, command-and-control, exfiltration); the technique-id selection rule and
+every verbatim/trim boundary are disclosed in the vendored file's header — no
+technique ids are invented. ATT&CK is © The MITRE Corporation, used under the
+[ATT&CK Terms of Use](https://attack.mitre.org/resources/terms-of-use/) — a
+non-exclusive, royalty-free license for research, development and commercial purposes
+that requires reproducing MITRE's copyright designation and license in copies; both
+are reproduced in the header of the vendored file.
+
 No third-party code is bundled into the published MIT-licensed core (the CVE-Zero fixtures ship
 only our own `ground-truth.json` annotations; upstream repo source is stripped at export and
 fetched on demand). If you believe an attribution is missing or incorrect, please open an issue.
