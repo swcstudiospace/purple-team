@@ -17,6 +17,16 @@ pwntools, pycryptodome, sympy, z3-solver, fpylll, numpy/scipy, UPX, etc. — is 
 from upstream package repositories at image-build time under each package's own license;
 none of it is vendored into this repository.
 
+**Bundled third-party data:** `src/teams/blue/d3fend-ontology.ts` vendors the MITRE
+D3FEND™ ontology CSV verbatim (fetched 2026-10-10 from
+[d3fend.mitre.org/ontologies/d3fend.csv](https://d3fend.mitre.org/ontologies/d3fend.csv),
+ontology v1.6.0) so the blue coverage pipeline ships with no runtime downloads.
+D3FEND is © The MITRE Corporation, used under the
+[D3FEND Terms of Use](https://d3fend.mitre.org/tou) — a non-exclusive, royalty-free
+license for research, development, and commercial purposes that requires reproducing
+MITRE's copyright designation and license in copies; both are reproduced in the header
+of the vendored file.
+
 No third-party code is bundled into the published MIT-licensed core (the CVE-Zero fixtures ship
 only our own `ground-truth.json` annotations; upstream repo source is stripped at export and
 fetched on demand). If you believe an attribution is missing or incorrect, please open an issue.

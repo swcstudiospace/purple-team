@@ -58,7 +58,10 @@ import { redactCredential } from './evidence/index.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
 import { synthesize } from './teams/purple.js';
-import type { DetectionGap } from './teams/blue.js';
+import { hardeningPlan, type DetectionGap } from './teams/blue.js';
+import { coverageGaps } from './teams/blue/coverage.js';
+import { sigmaRulepack } from './teams/blue/rulepacks.js';
+import { registryTelemetry } from './teams/blue/telemetry.js';
 import type { RoeVerdict } from './teams/white.js';
 
 const execFileAsync = promisify(execFile);
@@ -6407,6 +6410,44 @@ app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => 
     nextMissions: synthesis.nextMissions.length,
   });
   res.status(201).json(synthesis);
+});
+
+// =============================================================================
+// BLUE DETECTION PIPELINE (Phase 15) — read-only projections of the v2 blue
+// modules over the findings ledger. Dependency direction stays server → teams;
+// ledger findings are handed to the pure modules as plain RedFindingShape-like
+// objects (id/title/severity; the ledger carries no countermeasure keys, so
+// keyless fallback semantics apply). Responses reuse the ledger read-time
+// serialization (redactSecrets) because finding titles flow into Sigma YAML.
+// =============================================================================
+
+// GET /api/teams/blue/gaps — v2 D3FEND-keyed detection-coverage report for the
+// whole findings ledger, scored against the curated telemetry registry
+// (teams/blue/coverage.ts + telemetry.ts). Per-gap unresolvedCountermeasures
+// are surfaced honestly: ids absent from the vendored ontology are reported,
+// never dropped. Empty ledger → 200 with an empty gaps array.
+app.get('/api/teams/blue/gaps', (_req: Request, res: Response): void => {
+  const findings = [...findingsLedger.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  res.json(redactSecrets({ gaps: coverageGaps(findings, registryTelemetry()) }));
+});
+
+// GET /api/teams/blue/hardening — v1 severity-tiered hardening work items over
+// the findings ledger (teams/blue.ts hardeningPlan). Read-only projection;
+// empty ledger → 200 with an empty items array.
+app.get('/api/teams/blue/hardening', (_req: Request, res: Response): void => {
+  const findings = [...findingsLedger.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  res.json(redactSecrets({ items: hardeningPlan(findings) }));
+});
+
+// GET /api/teams/blue/rules — Sigma rule pack derived from the coverage gaps:
+// one experimental rule per uncovered gap keyed on its unresolved D3FEND
+// countermeasures (teams/blue/rulepacks.ts). Covered gaps and keyless gaps
+// produce no rule; the default logsource is the module's disclosed generic
+// template. Empty ledger → 200 with `{ rules: [], yaml: '' }`.
+app.get('/api/teams/blue/rules', (_req: Request, res: Response): void => {
+  const findings = [...findingsLedger.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const pack = sigmaRulepack(findings, coverageGaps(findings, registryTelemetry()));
+  res.json(redactSecrets({ rules: pack.rules, yaml: pack.yaml }));
 });
 
 // POST /api/models — live model list for the Universal API Config panel (#90).

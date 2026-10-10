@@ -17,7 +17,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 
 ## Phases
 
-- [ ] **Phase 15: Blue Suite Core** - `detection` catalog category + adapters, `src/teams/blue/` v2 pipeline (telemetry registry, D3FEND-keyed coverage, Sigma rule packs), blue routes + grants
+- [x] **Phase 15: Blue Suite Core** - `detection` catalog category + adapters, `src/teams/blue/` v2 pipeline (telemetry registry, D3FEND-keyed coverage, Sigma rule packs), blue routes + grants (2026-10-10)
 - [ ] **Phase 16: Blue Playbook & Bench** - `ai-defense-playbook.ts`, `detection-coverage-bench` corpus harness, blue-sentinel/warden skill backends + MCP `tempest_blue_gaps`
 - [ ] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants
 - [ ] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover`
@@ -35,6 +35,11 @@ tradecraft, white adjudicates; nothing operates live estates.
   2. `GET /api/teams/blue/rules` returns valid Sigma YAML per uncovered gap, keyed to D3FEND ids — not prose recommendations
   3. Loopback behavior of existing routes unchanged; new routes honor origin/bearer guards
   4. vitest + typecheck green; static pins updated where they reference teams/blue
+
+**Plans**: 1 plan
+
+Plans:
+- [x] 15-01: Blue suite core (catalog, blue v2 pipeline, routes)
 
 ### Phase 16: Blue Playbook & Bench
 **Goal**: Blue gains red-parity knowledge and verification surfaces.
@@ -86,7 +91,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 15. Blue Suite Core | 0/0 | Not Started | — |
+| 15. Blue Suite Core | 1/1 | Complete | 2026-10-10 |
 | 16. Blue Playbook & Bench | 0/0 | Not Started | — |
 | 17. Black Suite Core | 0/0 | Not Started | — |
 | 18. Black Playbook & Bench | 0/0 | Not Started | — |

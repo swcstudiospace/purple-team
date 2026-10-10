@@ -3,8 +3,8 @@ gsd_state_version: '1.0'
 status: in_progress
 progress:
   total_phases: 6
-  completed_phases: 0
-  percent: 0
+  completed_phases: 1
+  percent: 17
 ---
 
 # Project State — v1.3
@@ -18,31 +18,31 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 15 of 20 (Blue Suite Core)
+Phase: 16 of 20 (Blue Playbook & Bench)
 Plan: not yet planned
-Status: Milestone bootstrapped 2026-10-10 from the accepted research doc
-Last activity: 2026-10-10 — v1.3 bootstrap
+Status: Phase 15 complete
+Last activity: 2026-10-10 — Phase 15: detection category (6 adapters), D3FEND-keyed coverage + Sigma rule packs, blue routes
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█▋░░░░░░░░] 17%
 
 ## Completed Context
 
-- **v1.0** 2026-10-09: plan-based inference, Dark Purple core, white/red UI, Grok Bot package.
-- **v1.1** 2026-10-09: six specialist hats, Grok slash grammar, UI polish, locked-down Tauri scaffold.
-- **v1.2** 2026-10-10 (`d6deec3`→`831a6b0`, tag `v1.2`): re-home (MIT), Tauri bundle completion, node22 sidecar, remote-access hardening (fail-closed bearer + rate limit off loopback). Gates green; audit tech_debt accepted.
-- **v1.3 research** 2026-10-10 (`daad918`+`d14bc85`): gap analysis + verified tool candidates (Sigma/pySigma, Atomic Red Team, Caldera, Velociraptor, Suricata, D3FEND).
+- **v1.0–v1.2:** archived (see `.planning/milestones/`); v1.2 tagged `v1.2` 2026-10-10.
+- **v1.3 research** (`daad918`+`d14bc85`): gap analysis + verified tool candidates.
+- **v1.3 bootstrap** (`64313fa`): roadmap phases 15–20.
+- **Phase 15 (2026-10-10):** `detection` category + 6 adapters; `BLUE_TOOLS` += 5 (disjointness intact); full D3FEND ontology v1.6.0 vendored (271 terms, TOU-attributed); `src/teams/blue/{telemetry,d3fend,coverage,rulepacks}.ts`; `GET /api/teams/blue/{gaps,hardening,rules}` (read-only, ledger-sourced, redacted); count pins 109→115; blue.ts surface stable; 14 new tests.
 
 ## Pending Todos
 
-- Phase 15: blue core (CONTEXT → PLAN → execute → SUMMARY).
+- Phase 16: blue playbook + detection-coverage bench + skill/MCP wiring.
 
 ## Blockers/Concerns
 
-- Catalog/grant invariant: grants reference existing `TOOL_ADAPTERS` ids — each color phase lands catalog entries and grant rows together.
-- Grant disjointness (black vs blue/white) is pinned by tests — do not break it when extending `BLACK_TOOLS`.
+- sigma ARG_TEMPLATE deferred — classified OPERATOR_DRIVEN in the invocation-honesty guard (kept green).
+- Bench corpora (Phases 16/18/19) are the heavy lift — author ground truth + decoys, reuse cve-hunt judge discipline.
 
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Phase 15 next
+Stopped at: Phase 16 next
 Resume file: None

@@ -335,37 +335,39 @@ describe('invocation-honesty guard — every mintable adapter is classified, non
   // decides whether it needs a template — it can never silently ship a broken positional invocation.
 
   // `<binary> <target>` is genuinely a correct, useful invocation for these.
-  const POSITIONAL_TARGET_OK = new Set([
-    'file', 'strings', 'binwalk', 'radamsa', 'jadx', 'class-dump', 'solhint', 'echidna', 'john',
-  ]);
+  const POSITIONAL_TARGET_OK: Record<string, true> = {
+    file: true, strings: true, binwalk: true, radamsa: true, jadx: true, 'class-dump': true, solhint: true, echidna: true, john: true,
+  };
   // No single safe default exists: the operator supplies the full command (cloud CLIs, model-config
-  // red-team harnesses, device-runtime tools, project-scaffolded RE, or a target-executing debugger).
-  const OPERATOR_DRIVEN = new Set([
-    'prowler', 'scoutsuite', 'cloudfox', 'pmapper', 'aws-cli', 'az-cli', 'gcloud-cli',
-    'promptfoo', 'foundry-forge', 'foundry-cast', 'openssl', 'afl-fuzz', 'ghidra',
-    'gdb', 'objection', 'drozer',
-  ]);
+  // red-team harnesses, device-runtime tools, project-scaffolded RE, a target-executing debugger,
+  // or a multi-subcommand tool like sigma-cli where check/convert and the pySigma pipeline are the
+  // operator's choice).
+  const OPERATOR_DRIVEN: Record<string, true> = {
+    prowler: true, scoutsuite: true, cloudfox: true, pmapper: true, 'aws-cli': true, 'az-cli': true, 'gcloud-cli': true,
+    promptfoo: true, 'foundry-forge': true, 'foundry-cast': true, openssl: true, 'afl-fuzz': true, ghidra: true,
+    gdb: true, objection: true, drozer: true, sigma: true,
+  };
   // KNOWN DEBT: the positional default is broken/degraded and these SHOULD get a template later.
   // Tracked honestly here rather than hidden — a good follow-up PR shrinks this set.
-  const KNOWN_DEBT = new Set([
-    'feroxbuster', 'osv-scanner', 'hashcat', 'apktool', 'yara',
-  ]);
+  const KNOWN_DEBT: Record<string, true> = {
+    feroxbuster: true, 'osv-scanner': true, hashcat: true, apktool: true, yara: true,
+  };
 
   const mintable = TOOL_ADAPTERS.filter(isMintable);
-  const classified = [POSITIONAL_TARGET_OK, OPERATOR_DRIVEN, KNOWN_DEBT];
+  const classified: Record<string, true>[] = [POSITIONAL_TARGET_OK, OPERATOR_DRIVEN, KNOWN_DEBT];
 
   it('every mintable adapter is either templated or explicitly filed under one fall-through reason', () => {
     const unaccounted = mintable
       .filter(a => !hasArgTemplate(a))
       .map(a => a.id)
-      .filter(id => !classified.some(s => s.has(id)));
+      .filter(id => !classified.some(s => id in s));
     expect(unaccounted, 'these mintable adapters silently fall through to `<binary> <target>`').toEqual([]);
   });
 
   it('the fall-through allow-lists are disjoint and never overlap a templated adapter', () => {
     const seen = new Set<string>();
     for (const set of classified) {
-      for (const id of set) {
+      for (const id of Object.keys(set)) {
         expect(seen.has(id), `${id} is listed in more than one fall-through set`).toBe(false);
         seen.add(id);
         const a = TOOL_ADAPTERS.find(x => x.id === id);

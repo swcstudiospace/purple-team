@@ -19,6 +19,10 @@
  *            (dig/whois) belong to the inspector teams only.
  * - blue   → read/inspect-grade only: local_read + passive ids. No active, intrusive,
  *            credential, or dangerous tools — the blue team never touches the target.
+ *            Blue additionally holds detection-grade catalog ids of its own (rule
+ *            validation/authoring via sigma-cli, plus vendored detection data packs:
+ *            atomic-red-team atomics, osquery, suricata, D3FEND) — validation and
+ *            authoring surface only, still nothing that touches the target.
  * - white  → read/inspect-grade only (same risk tiers as blue; overlap with blue is
  *            justified: both teams are read-only inspectors of evidence artifacts,
  *            with different purposes — control verification vs adjudication).
@@ -39,7 +43,7 @@ export const TEAM_ARCHETYPES: readonly ['black', 'blue', 'white'] = ['black', 'b
 // dig/whois are granted ONLY to the inspector teams (blue/white); black does its
 // resolver-pinned DNS work through host/dnsx so black stays disjoint from both.
 const BLACK_TOOLS = ['host', 'subfinder', 'amass', 'dnsx', 'waybackurls', 'wafw00f', 'curl', 'httpx'] as const;
-const BLUE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'checksec', 'openssl', 'gitleaks', 'trufflehog', 'trivy', 'syft', 'grype', 'osv-scanner', 'checkov', 'semgrep', 'dig', 'whois'] as const;
+const BLUE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'checksec', 'openssl', 'gitleaks', 'trufflehog', 'trivy', 'syft', 'grype', 'osv-scanner', 'checkov', 'semgrep', 'dig', 'whois', 'sigma', 'atomic-red-team', 'osquery', 'suricata', 'd3fend'] as const;
 const WHITE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'gitleaks', 'dig', 'whois'] as const;
 
 /**
