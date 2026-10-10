@@ -23,34 +23,38 @@ provenance is failure.
 - ✓ ChatGPT Plan + Cursor Plan first-class providers (native openai OAuth vendor, ChatGPTAdapter, cursor-agent CLI spec, server routes) — v1.0 Phase 1
 - ✓ Dark Purple core (black/blue/white archetypes + teams modules + purple synthesis + server integration) — v1.0 Phase 2
 - ✓ White/red compartmentalized UI (11 pages + shared shell/tokens, all-5-provider settings, team pages) — v1.0 Phase 3
-- ✓ Grok Bot package (rosters, 5 templates, 7 slash skills, marketplace) + 9 MCP proxy tools — v1.0 Phase 4
+- ✓ Grok Bot package (rosters, 5 templates, 7 slash skills, marketplace) + MCP proxy tools — v1.0 Phase 4
+- ✓ Specialized team Hats: specter/wraith (black), sentinel/warden (blue), arbiter/auditor (white) — prompts, grants, lanes, manifest — v1.1 Phase 6
+- ✓ Grok chat slash-command abstractions: hat-scoped skills + MCP tools + command grammar — v1.1 Phase 7
+- ✓ UI complete redesign + polish: tokens, motion with reduced-motion kill-switch, mobile viewports — v1.1 Phase 8
+- ✓ Tauri 2.0 wrapper: locked-down scaffold, capabilities, bundle wiring — v1.1 Phase 9
+- ✓ Repo re-home: fresh `main` on `swcstudiospace/purple-team`, AGPL-3.0 → MIT, identity sweep — v1.2 pre-phase
+- ✓ Tauri bundle completion: @tauri-apps/cli, committed icon rasters, Rust sources, strict-JSON configs, `cargo check` green; mobile-init blockers recorded — v1.2 Phase 11
+- ✓ Node server sidecar: `@yao-pkg/pkg` node22 binary from `dist/server.js`, `externalBin` + docs resources, Rust spawn/reap outside dev, same-origin `/ui/` navigation, tauri.localhost origin handling — v1.2 Phase 12
+- ✓ Remote-access hardening: non-loopback binds (incl. Docker) refuse to start without `T3MP3ST_BEARER_TOKEN[_FILE]`; `/api` bearer + per-IP 60/min burst-120 limit; loopback unchanged; MCP proxy sends the bearer — v1.2 Phase 13
 
-### Active (v1.1)
+### Active
 
-- [ ] Specialized team Hats: specter/wraith (black), sentinel/warden (blue), arbiter/auditor (white) — prompts, grants, lanes, manifest
-- [ ] Grok chat slash-command abstractions: hat-scoped skills + MCP tools + command grammar
-- [ ] UI complete redesign + polish: refined visual system, buttery motion, mobile viewports
-- [ ] Tauri 2.0 desktop + mobile wrapper: src-tauri scaffold, capabilities, bundle wiring, mobile init
+- [ ] v1.3 (proposed): black/blue/white suites at red parity — see `.planning/v1.3-RESEARCH-color-suites.md`
 
 ### Out of Scope
 
-- Merging the 30 unpulled upstream commits mid-mission — 7 dirty files overlap; reconciliation is user-gated, separate work
 - Any jailbreak/guardrail-bypass prompting — repo doctrine: honest authorization restatement only
-- Remote/multi-tenant server exposure — threat model is single-operator localhost (server.ts security comments)
-- Deploying/hosting anything — no infra changes in this milestone
-- Node sidecar bundling inside Tauri (recorded follow-up); non-loopback bot hosting bearer auth (recorded follow-up)
+- Remote/multi-tenant server exposure — threat model is single-operator loopback; non-loopback binds are opt-in and now bearer-gated
+- Deploying/hosting anything — no infra changes
+- Live defensive-tool execution from the desktop app — analysis-first posture; blue tooling validates detections, it does not operate EDR/SIEM estates
 
 ## Context
 
-- TypeScript ESM, Node >= 22.19, vitest, express; UI is static pages under `docs/` served at `/ui`.
-- Working tree carries coherent uncommitted work (OAuth vendors, prompt manifest/audit, UI additions) — treated as base state, never discarded or swept into phase commits.
-- `main` is 30 commits behind `origin/main`; overlapping files make a pull conflict-prone right now.
-- GSD planning (this directory): v1.0 shipped 2026-10-09 (ROADMAP.md/STATE.md); v1.1 tracked in ROADMAP.v1.1.md/STATE.v1.1.md.
-- programming-desk ships no light theme/framework and no Tauri implementation — the transferable patterns are mechanisms (single `:root` custom-property block; `tauri/**` ownership paths); palettes and the Tauri scaffold are designed, not copied.
+- TypeScript ESM, Node >= 22.19, vitest, express; UI is static pages under `docs/` served at `/ui` (bundled into Tauri via `frontendDist`, also served by the sidecar).
+- Repo: `github.com/swcstudiospace/purple-team`, MIT, fresh history from 2026-10-10 (pre-reset bundle at `../purple-team-pre-reset.bundle`).
+- Desktop: Tauri 2.12 shell spawns the packaged API server as a sidecar on 127.0.0.1:3333; capabilities stay `core:default`.
+- GSD planning (this directory): v1.0–v1.2 archived under `.planning/milestones/`.
+- Known debt (accepted at v1.2 close): no phase VERIFICATION files; installer matrix CI-only; docker healthcheck edited but unrun; mobile `gen/` needs JDK/Android-SDK or macOS/Xcode.
 
 ## Constraints
 
-- **Security posture**: loopback bind, origin/CSRF guards, no secrets in UI or logs — preserve in all phases. Tauri capabilities stay locked down (no blanket shell/fs).
+- **Security posture**: loopback bind by default, origin/CSRF/Host guards, bearer + rate limit off loopback, no secrets in UI or logs — preserve in all phases. Tauri capabilities stay locked down (no blanket shell/fs).
 - **Doctrine**: all prompts extend the PLINIAN authority model; no refusal-evasion, no destructive anti-forensics.
 - **Stack**: no new runtime dependencies unless unavoidable; TS strict, ESLint, vitest conventions.
 - **API stability**: existing `/api/*` routes keep their contracts; UI redesign is presentation-only.
@@ -60,18 +64,17 @@ provenance is failure.
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Build on current HEAD; do not pull origin/main mid-mission | 7 dirty files overlap upstream diff; pull would entangle a merge with the mission | — Pending |
 | ChatGPT Plan = native OAuth vendor (`openai`) + Codex-backend adapter; Cursor Plan = cursor-agent CLI spec + provider alias | Matches existing oauth.ts/local-agents patterns; no fabricated endpoints — env-overridable URLs | ✓ Good |
 | Purple is an orchestrator-level synthesis loop, not a spawnable operator | Red/blue/white are execution roles; purple correlates their outputs | ✓ Good |
-| Phases 3 (UI) and 4 (Grok Bot) dispatch in parallel | Disjoint surfaces; Grok Bot explicitly UI-less | ✓ Good |
-| Grok Bot host settled from evidence (q1) | User mandated the programming-desk pattern; grokbot/README.md documents platform + format | ✓ Good |
-| Restored uncommitted src/target/index.ts deletion from HEAD | Load-bearing, no replacement, reversible | ✓ Good |
+| Grok Bot host settled from evidence; grokbot/README.md documents platform + format | User mandated the programming-desk pattern | ✓ Good |
 | Local-agent tests must be PATH-hermetic (hermeticPath pattern) | Real host CLIs broke 10 pre-existing tests | ✓ Good |
-| Manifest extractor objRe tolerates TS annotations | Pre-existing gap; all 11 operator prompts in manifest | ✓ Good |
 | White referee kit stays 9 tools; toolkits gate tiered | Padding with active probes would violate doctrine | ✓ Good |
-| v1.1 hat ids: specter/wraith (black), sentinel/warden (blue), arbiter/auditor (white) | Two specialized Hats per discipline, same integration pattern as v1.0 teams | — Pending |
-| v1.1 order: hats → (grok abstractions + UI redesign parallel) → tauri bundle → close-out | Grok + UI consume hat surface; Tauri wraps final docs/ assets | — Pending |
-| Tauri backend = external loopback server; sidecar bundling is a follow-up | Avoids shipping a node runtime inside the bundle; matches localhost threat model | — Pending |
+| v1.1 hat ids: specter/wraith (black), sentinel/warden (blue), arbiter/auditor (white) | Two specialized Hats per discipline, same integration pattern as v1.0 teams | ✓ Good |
+| Re-home before v1.2 phases: fresh root, MIT, identity sweep | Owner-directed; pre-reset work preserved in a bundle | ✓ Good |
+| v1.2 sidecar = `@yao-pkg/pkg` node22 from tsc output | pkg-fetch 3.6 dropped node20 bases; Node SEA rejected (postject, no cross-build story) | ✓ Good |
+| v1.2 Rust spawns sidecar via `std::process::Command`, not tauri-plugin-shell | Keeps capabilities at `core:default`; renderer gains no execution surface | ✓ Good |
+| v1.2 non-loopback binds fail closed without a bearer | Intentionally breaks unauthenticated Docker `0.0.0.0` exposure — the vulnerability being closed | ✓ Good |
+| v1.2 Windows webview origin (`tauri.localhost`) trusted as page origin, never as Host | Host allow-list stays literal loopback to keep the anti-rebinding gate intact | ✓ Good |
 
 ---
-*Last updated: 2026-10-09 after v1.1 bootstrap*
+*Last updated: 2026-10-10 after v1.2 archive*
