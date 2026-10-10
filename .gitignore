@@ -4,6 +4,8 @@ dist/
 *.tsbuildinfo
 # Rust build output (cargo check/build in src-tauri/)
 src-tauri/target/
+# Tauri sidecar build output (npm run sidecar:build)
+src-tauri/binaries/
 
 # --- excluded from the published repo ---
 # raw upstream Cybench corpus (181M third-party content incl. writeups/flags/solutions — do not redistribute)

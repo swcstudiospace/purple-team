@@ -89,6 +89,9 @@
     } catch (e) { /* storage unavailable */ }
     var host = window.location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return 'http://' + host + ':3333';
+    // Windows Tauri serves the bundled UI from http://tauri.localhost, which is
+    // not the API. The shell's sidecar listens on the loopback port.
+    if (host === 'tauri.localhost') return 'http://127.0.0.1:3333';
     return '';
   }
 

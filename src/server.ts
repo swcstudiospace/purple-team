@@ -208,6 +208,21 @@ function isLoopbackOrigin(originHeader: string | undefined): boolean {
   }
 }
 
+// Packaged Tauri on Windows loads the bundled UI from http://tauri.localhost
+// (wry's asset host) and the shell calls the loopback API from that page.
+// `.localhost` is a special-use name, not a public host. This is NOT folded
+// into isLoopbackHostname: the Host allow-list stays literal loopback, so a
+// request that arrives with Host: tauri.localhost is still rejected.
+// macOS/Linux use tauri://localhost, which isLoopbackOrigin already accepts.
+function isDesktopShellOrigin(originHeader: string | undefined): boolean {
+  if (!originHeader) return false;
+  try {
+    return new URL(originHeader).hostname.toLowerCase() === 'tauri.localhost';
+  } catch {
+    return false;
+  }
+}
+
 // #84: a SAME-ORIGIN request — the caller's Origin (or Referer) host:port equals THIS server's
 // own Host header — is by definition not a foreign-website drive-by. It is trusted ONLY when the
 // operator has bound to a non-loopback address (see HOST_IS_LOOPBACK), i.e. they have explicitly
@@ -234,7 +249,7 @@ app.use(cors({
   origin(origin, callback) {
     // No Origin header (curl, CLI, server-to-server) → allow.
     if (!origin) return callback(null, true);
-    if (isLoopbackOrigin(origin)) return callback(null, true);
+    if (isLoopbackOrigin(origin) || isDesktopShellOrigin(origin)) return callback(null, true);
     return callback(null, false);
   },
   credentials: true,
@@ -260,7 +275,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const source = origin ?? referer;
   // No Origin AND no Referer → trusted local caller (curl/CLI/MCP). Allow.
   if (!source) return next();
-  if (isLoopbackOrigin(source)) return next();
+  if (isLoopbackOrigin(source) || isDesktopShellOrigin(source)) return next();
   // #84: on a non-loopback (opted-in network) bind, also trust the operator's own same-origin UI.
   if (!HOST_IS_LOOPBACK && isSameOriginAsHost(source, req.headers.host)) return next();
   res.status(403).json({
@@ -4861,7 +4876,7 @@ app.get('/api/events', (_req: Request, res: Response) => {
   // #84: allow the operator's own same-origin UI on a non-loopback (opted-in) bind; foreign
   // origins still fail the loopback check AND the Host match, so they remain rejected.
   const sameOriginNetworkBind = !HOST_IS_LOOPBACK && isSameOriginAsHost(origin, _req.headers.host);
-  if (origin && !isLoopbackOrigin(origin) && !sameOriginNetworkBind) {
+  if (origin && !isLoopbackOrigin(origin) && !isDesktopShellOrigin(origin) && !sameOriginNetworkBind) {
     res.status(403).json({
       error: 'Cross-origin event stream rejected',
       detail: 'The SSE feed may contain live mission/task/finding metadata and is only available to the localhost UI.',

@@ -1,0 +1,9 @@
+{
+  "scripts": [
+    "node_modules/web-tree-sitter/tree-sitter.cjs"
+  ],
+  "assets": [
+    "node_modules/web-tree-sitter/tree-sitter.wasm",
+    "node_modules/tree-sitter-wasms/out/**/*.wasm"
+  ]
+}

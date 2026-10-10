@@ -3,8 +3,9 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 // Tauri 2.0 scaffold pins (v1.1 Wave 1, unit B; updated v1.2 Phase 11): the
-// desktop shell wraps the static docs/ UI plus the alongside loopback server —
-// no bundled backend, no webview privileges beyond the bare core. These tests
+// desktop shell wraps the static docs/ UI. Prod (Phase 12) bundles the loopback
+// server as a sidecar; dev still runs it alongside. No webview privileges
+// beyond the bare core. These tests
 // pin the SHAPE (config markers, capability deny-list, script wiring,
 // decision-record coverage), not Tauri behavior itself (see docs/TAURI.md
 // toolchain probe + 2026-10-10 re-probe).
@@ -22,7 +23,7 @@ interface TauriConf {
   version: string;
   build: { frontendDist: string; devUrl: string; beforeDevCommand: string };
   app: { windows: TauriWindow[]; security: { csp: string } };
-  bundle: { targets: string[]; icon: string[] };
+  bundle: { targets: string[]; icon: string[]; externalBin?: string[]; resources?: Record<string, string> };
 }
 
 // Both Tauri JSON files are strict JSON since v1.2 Phase 11 (the Rust
@@ -62,6 +63,8 @@ describe('tauri.conf.json shape', () => {
     for (const target of ['deb', 'appimage', 'msi', 'app', 'dmg']) {
       expect(conf.bundle.targets).toContain(target);
     }
+    expect(conf.bundle.externalBin).toContain('binaries/t3mp3st-server');
+    expect(conf.bundle.resources?.['../docs/']).toBe('docs/');
     const main = conf.app.windows.find((w: TauriWindow) => w.label === 'main');
     expect(main).toBeDefined();
     expect(main?.minWidth).toBeLessThanOrEqual(360);
@@ -115,7 +118,7 @@ describe('docs/TAURI.md decision record', () => {
     expect(tauriDoc).toContain('T3MP3ST_HOST');
     // Bearer-auth upgrade named as a follow-up, not done here.
     expect(tauriDoc).toMatch(/[Bb]earer/);
-    // Node sidecar recorded as a follow-up, explicitly not this unit.
+    // Node sidecar closed in Phase 12 (still named in the decision record).
     expect(tauriDoc).toMatch(/[Ss]idecar/);
   });
 });

@@ -5,10 +5,10 @@ name: Tauri shell build
 on:
   push:
     branches: [main]
-    paths: ['src-tauri/**', 'docs/**', '.github/workflows/tauri-build.yml']
+    paths: ['src-tauri/**', 'src/server.ts', 'docs/**', 'scripts/build-sidecar.mjs', 'scripts/sidecar.pkg.json', 'package.json', 'package-lock.json', '.github/workflows/tauri-build.yml']
   pull_request:
     branches: [main]
-    paths: ['src-tauri/**', 'docs/**', '.github/workflows/tauri-build.yml']
+    paths: ['src-tauri/**', 'src/server.ts', 'docs/**', 'scripts/build-sidecar.mjs', 'scripts/sidecar.pkg.json', 'package.json', 'package-lock.json', '.github/workflows/tauri-build.yml']
   workflow_dispatch:
     inputs:
       mobile:
@@ -57,6 +57,8 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm ci
       - run: npm run build
+      - name: Build server sidecar
+        run: npm run sidecar:build
       - name: Build Tauri bundle
         uses: tauri-apps/tauri-action@v0
         env:

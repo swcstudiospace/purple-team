@@ -47,8 +47,9 @@ at line 4 column 3`); mobile init attempted with recorded blockers (section 5);
 
 ## 2. Backend strategy (decision record)
 
-Node is NOT bundled as a sidecar in this unit. The Tauri webview is a pure UI
-shell; all execution stays in the existing server process:
+The Tauri webview is a pure UI shell; all execution stays in the server
+process. Phase 12 bundles that server as a sidecar the shell spawns itself
+(see the prod sequence below). Dev still runs the server alongside:
 
 - **Desktop dev:** run the loopback server alongside, then open the shell
   against it.
@@ -60,12 +61,25 @@ shell; all execution stays in the existing server process:
 
   (`beforeDevCommand` in `tauri.conf.json` records the `npm run server` pairing.)
 
-- **Desktop prod:** build, then run the server alongside the bundled app.
+- **Desktop prod (Phase 12):** the bundled app self-starts the API sidecar —
+  run the installed app; there is no alongside-server step anymore.
 
   ```sh
-  npm run tauri:build     # bundles ../docs as the frontend
-  npm run server:prod     # loopback API the bundled UI calls
+  npm run sidecar:build   # dist/server.js -> src-tauri/binaries/t3mp3st-server-<triple> (@yao-pkg/pkg, node22)
+  npm run tauri:build     # also builds the sidecar, then bundles it (externalBin)
   ```
+
+  The Rust shell (`src-tauri/src/lib.rs`) spawns the installed
+  `t3mp3st-server` (bundler strips the triple suffix; found next to the main
+  executable) with `T3MP3ST_PORT=3333` via `std::process::Command` when
+  `!tauri::is_dev()`, waits for the loopback listener, and kills+reaps it on
+  exit. `bundle.resources` maps `docs/` into the resource directory and the
+  sidecar's cwd is that directory, so `express.static('docs')` serves `/ui`.
+  Once the listener answers, the shell navigates the webview to
+  `http://127.0.0.1:3333/ui/` (same origin as the API). On Windows the asset
+  host is `http://tauri.localhost`; `docs/assets/shell.js` points that host at
+  the loopback API, and the server treats that origin as the desktop shell
+  (not as a loopback Host).
 
   The bundled UI calls the same loopback origin, so the server's existing
   posture applies unchanged: CORS locked to localhost origins, state-changing
@@ -95,11 +109,18 @@ shell; all execution stays in the existing server process:
    guards are the defense; do not ship mobile beyond a trusted LAN without it.
    Unblock: server-side auth design + implementation; no Tauri change unblocks
    this — the Tauri side only documents the pairing (section 2).
-2. **Node sidecar bundling:** shipping node inside the Tauri bundle so desktop
-   prod needs no alongside `npm run server` step. Recorded, not started.
-   Unblock: a bundling decision (which runtime, sidecar wiring in
-   `tauri.conf.json` + capabilities) made on a CLI-equipped machine that can
-   actually build and smoke-test the bundle.
+2. **Node sidecar bundling (CLOSED 2026-10-10, Phase 12):** shipped — the
+   bundled app now self-starts the API sidecar (section 2 run sequence), so
+   desktop prod needs no alongside `npm run server` step. Decision: reuse the
+   `npm run build` tsc output (`dist/server.js`) and compile it with
+   `@yao-pkg/pkg` (maintained pkg fork) targeting `node22` —
+   `npm run sidecar:build` emits `src-tauri/binaries/t3mp3st-server-<triple>`
+   (gitignored build artifact), wired via `bundle.externalBin`; the Rust shell
+   spawns it with `std::process::Command` (no `tauri-plugin-shell`;
+   capabilities stay `core:default` only). Node SEA was rejected:
+   postject/binary-patching complexity with no cross-build story. Dev flow
+   unchanged (`beforeDevCommand` still runs `npm run server`; the sidecar
+   spawns only when `!tauri::is_dev()`).
 3. **CLI-dependent generation (closed 2026-10-10, Phase 11):** icons generated
    and committed (section 9); `tauri android init` / `tauri ios init` attempted
    with exact blockers recorded (section 5 — Java/SDK missing; iOS is

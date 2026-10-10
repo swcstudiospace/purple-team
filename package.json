@@ -114,8 +114,9 @@
     "test:update": "node scripts/test-update.mjs",
     "maintainer:check": "node scripts/sync-bt6-maintainer.mjs --check",
     "maintainer:sync": "node scripts/sync-bt6-maintainer.mjs",
+    "sidecar:build": "node scripts/build-sidecar.mjs",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "tauri:build": "npm run build && npm run sidecar:build && tauri build",
     "tauri:ios": "tauri ios dev",
     "tauri:android": "tauri android dev"
   },
@@ -162,6 +163,7 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@pagenary/publisher": "^2026.7.24",
+    "@yao-pkg/pkg": "^6.23.0",
     "@tauri-apps/cli": "^2.12.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",

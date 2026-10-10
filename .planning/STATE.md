@@ -3,8 +3,8 @@ gsd_state_version: '1.0'
 status: in_progress
 progress:
   total_phases: 4
-  completed_phases: 1
-  percent: 25
+  completed_phases: 2
+  percent: 50
 ---
 
 # Project State — v1.2
@@ -18,12 +18,12 @@ See: .planning/PROJECT.md (updated 2026-10-09) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 12 of 14 (Node Server Sidecar)
-Plan: 0 of 0 in current phase (not yet planned)
-Status: In progress — Phase 11 complete
-Last activity: 2026-10-10 — Phase 11: CLI installed, icons generated+committed, Rust sources added, strict-JSON fix, cargo check green
+Phase: 13 of 14 (Remote-Access Hardening)
+Plan: 0 of 0 in current phase (context written, not yet planned into an executed plan)
+Status: In progress — Phases 11 and 12 complete
+Last activity: 2026-10-10 — Phase 12: node22 sidecar via @yao-pkg/pkg, Rust spawn/reap, host smoke green
 
-Progress: [██▌░░░░░░░] 25%
+Progress: [█████░░░░░] 50%
 
 ## Completed Context
 
@@ -39,10 +39,18 @@ Progress: [██▌░░░░░░░] 25%
 - **Defect found+fixed:** v1.1 scaffold shipped no Rust sources and used `//` comments in `tauri.conf.json`/`capabilities` — the wrapper was unbuildable (`cargo check` rejected the JSON). Added `Cargo.toml` + `src/main.rs` + `src/lib.rs` (mobile-template shape); both JSON files now strict; rationale moved to `docs/TAURI.md` §4.
 - `cargo check` green (exit 0, tauri 2.12.2). Scaffold static test 25/25; typecheck clean.
 - **Recorded blockers** (exact errors in `docs/TAURI.md` §5): `tauri android init` needs Java+SDK/NDK; `tauri ios` subcommand is macOS-gated.
+- Commit `d6deec3`.
+
+### Phase 12: Node Server Sidecar (2026-10-10)
+
+- Sidecar is `npm run build` output packaged by `@yao-pkg/pkg` **node22** (node20 prebuilds are gone from pkg-fetch 3.6). `web-tree-sitter` needed a temporary `main` field or the binary crashed on startup.
+- Rust shell spawns/reaps it only outside dev. Capabilities stay `core:default`. Host smoke: status JSON, `/ui/` 200, tauri.localhost origin allowed, foreign origin and non-loopback Host rejected.
+- Full installer matrix is CI's job; not built on this host.
 
 ## Pending Todos
 
-- Phase 12: Node server sidecar (CONTEXT → PLAN → execute → SUMMARY).
+- Phase 13: bearer auth + rate limits for non-loopback binds (loopback unchanged).
+- Phase 14: full gates and milestone close-out.
 
 ## Blockers/Concerns
 
@@ -52,5 +60,5 @@ Progress: [██▌░░░░░░░] 25%
 ## Session Continuity
 
 Last session: 2026-10-10
-Stopped at: Phase 12 next
+Stopped at: Phase 13 next
 Resume file: None
