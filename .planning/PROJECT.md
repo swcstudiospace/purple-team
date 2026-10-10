@@ -33,9 +33,9 @@ provenance is failure.
 - ✓ Node server sidecar: `@yao-pkg/pkg` node22 binary from `dist/server.js`, `externalBin` + docs resources, Rust spawn/reap outside dev, same-origin `/ui/` navigation, tauri.localhost origin handling — v1.2 Phase 12
 - ✓ Remote-access hardening: non-loopback binds (incl. Docker) refuse to start without `T3MP3ST_BEARER_TOKEN[_FILE]`; `/api` bearer + per-IP 60/min burst-120 limit; loopback unchanged; MCP proxy sends the bearer — v1.2 Phase 13
 
-### Active
+### Active (v1.3)
 
-- [ ] v1.3 (proposed): black/blue/white suites at red parity — see `.planning/v1.3-RESEARCH-color-suites.md`
+- [ ] Color suites at red parity: blue detection core+bench, black emulation core+bench, white governance suite, purple v2 id-keyed synthesis, Defend UI — phases 15–20 (research: `.planning/v1.3-RESEARCH-color-suites.md`)
 
 ### Out of Scope
 
