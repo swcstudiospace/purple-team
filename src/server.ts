@@ -65,6 +65,9 @@ import { registryTelemetry } from './teams/blue/telemetry.js';
 import { opsecReview } from './teams/black/checklist.js';
 import { exfilCostModel } from './teams/black/exfil.js';
 import { structuredNoiseBudget } from './teams/black/noise.js';
+import { parseRoe } from './teams/white/roe-parser.js';
+import { auditEvidenceChain } from './teams/white/evidence-chain.js';
+import { auditReport } from './teams/white/report-auditor.js';
 import type { RoeVerdict } from './teams/white.js';
 
 const execFileAsync = promisify(execFile);
@@ -6485,6 +6488,54 @@ app.get('/api/teams/black/noise', (_req: Request, res: Response): void => {
   const draft = [...missionDrafts.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   const actions = draft ? [draft.objective, ...draft.scope].filter(line => line.trim().length > 0) : [];
   res.json(redactSecrets(structuredNoiseBudget({ actions, egress: [] })));
+});
+
+// =============================================================================
+// WHITE ADJUDICATION ROUTES (Phase 19) — read-only projections of the v2 white
+// modules over the receipt/finding ledgers. Dependency direction stays
+// server → teams; ledger rows are handed to the pure modules as plain
+// LedgerEvidenceShape/FindingShape-like objects (the live EvidenceEntry already
+// carries provenanceStrength, so no strength is re-inferred at the route).
+// Responses reuse the ledger read-time serialization (redactSecrets).
+// =============================================================================
+
+// GET /api/teams/white/roe — structured parse of the on-record ROE text
+// (teams/white/roe-parser.ts parseRoe). ROE text source: no field of
+// MissionDraft carries it (objective/scope/constraints are the only free-text
+// lines) and no other server state holds operator ROE text — purple synthesize
+// takes RoeVerdicts from the request body — so no second store is invented
+// here. The route parses the empty on-record text: the engine's zeroed parse
+// (ok:false, zero lines accounted) with the summary naming the route-level
+// fact. When a real ROE text source lands, an ok parse feeds v1 roeAudit for
+// verdicts; until then none are derived from a spec the text never stated.
+app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
+  const parse = { ...parseRoe(''), summary: 'no ROE text on record' };
+  res.json(redactSecrets(parse));
+});
+
+// GET /api/teams/white/evidence — replay-chain audit over the receipt ledger
+// (teams/white/evidence-chain.ts auditEvidenceChain): every entry must carry
+// its finding at tool-grade provenance or better (the ledger's persisted
+// provenanceStrength decides), replayable entries must name the exact
+// command/uri that re-runs them, and duplicate ledger ids break the chain.
+// Entries pass in ledger order. Empty ledger → 200 with zeroed counts.
+app.get('/api/teams/white/evidence', (_req: Request, res: Response): void => {
+  const entries = [...evidenceLedger.values()];
+  res.json(redactSecrets(auditEvidenceChain(entries)));
+});
+
+// GET /api/teams/white/report-audit — findings ↔ evidence coverage audit over
+// the live ledgers (teams/white/report-auditor.ts auditReport): a finding
+// ships only when every referenced evidence id resolves, at least one
+// tool-grade-or-better link carries it, and the report contract (recommended
+// fix + retest acceptance criteria) is met; ledger entries no finding claims
+// are reported in the other direction. Findings sort latest-first like the
+// blue ledger reports; evidence passes in ledger order. Empty ledgers → 200
+// with a zeroed audit.
+app.get('/api/teams/white/report-audit', (_req: Request, res: Response): void => {
+  const findings = [...findingsLedger.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const entries = [...evidenceLedger.values()];
+  res.json(redactSecrets(auditReport(findings, entries)));
 });
 
 // POST /api/models — live model list for the Universal API Config panel (#90).

@@ -23,7 +23,8 @@ export type ToolCategory =
   | 'post_exploitation'
   | 'reporting'
   | 'detection'
-  | 'emulation';
+  | 'emulation'
+  | 'governance';
 
 export type ToolRisk = 'local_read' | 'passive' | 'active' | 'intrusive' | 'credential' | 'dangerous';
 export type ToolExecutionMode = 'safe_command' | 'receipt_required' | 'import_only' | 'catalog_only';
@@ -1351,6 +1352,54 @@ export const TOOL_ADAPTERS: ToolAdapter[] = [
     commandHint: 'Catalog-only until adversary-emulation plan parsing is bound to an authorized engagement.',
     parserStatus: 'planned',
     notes: 'Parses adversary emulation PLANS for analysis; never operates the platform (analysis-first doctrine).',
+  },
+  {
+    id: 'nist-800-115',
+    binary: 'nist-800-115',
+    name: 'NIST SP 800-115 (Technical Guide to Information Security Testing and Assessment)',
+    category: 'governance',
+    families: ['reporting_remediation', 'web_api', 'cloud_infra', 'code_supply_chain', 'crypto_secrets'],
+    risk: 'local_read',
+    execution: 'import_only',
+    networked: false,
+    evidenceKinds: ['framework_control'],
+    outputFormats: ['json'],
+    installHint: 'Vendor the NIST SP 800-115 section catalog as a data pack.',
+    commandHint: 'Import the section catalog for adjudication-rule mapping; guidance text is referenced, never executed here.',
+    parserStatus: 'planned',
+    notes: 'Section catalog vendored for adjudication rules; NIST public-domain text.',
+  },
+  {
+    id: 'ptes',
+    binary: 'ptes',
+    name: 'PTES (Penetration Testing Execution Standard)',
+    category: 'governance',
+    families: ['web_api', 'cloud_infra', 'agent_warfare', 'reporting_remediation'],
+    risk: 'local_read',
+    execution: 'import_only',
+    networked: false,
+    evidenceKinds: ['framework_control'],
+    outputFormats: ['json'],
+    installHint: 'Vendor the PTES phase catalog as a data pack.',
+    commandHint: 'Import the phase catalog for engagement adjudication; phases are checklists, never executed here.',
+    parserStatus: 'planned',
+    notes: 'Phase catalog for engagement adjudication.',
+  },
+  {
+    id: 'osstmm',
+    binary: 'osstmm',
+    name: 'OSSTMM 3.0 (Open Source Security Testing Methodology Manual)',
+    category: 'governance',
+    families: ['web_api', 'cloud_infra', 'reporting_remediation'],
+    risk: 'local_read',
+    execution: 'import_only',
+    networked: false,
+    evidenceKinds: ['framework_control'],
+    outputFormats: ['json'],
+    installHint: 'Vendor the OSSTMM 3.0 module catalog as a data pack.',
+    commandHint: 'Import the module catalog for coverage adjudication; modules are scored on paper, never executed here.',
+    parserStatus: 'planned',
+    notes: 'Module catalog for coverage adjudication (ISECOM license attribution).',
   },
 ];
 

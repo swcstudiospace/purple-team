@@ -1,0 +1,381 @@
+{
+  "note": "Roe-adjudication corpus for the White loadout. Each case is a MISSION: operator ROE text (parsed by the real white ROE parser), optional audited actions (adjudicated by the v1 roeAudit over the PARSED spec — declared only when the text parses ok), optional receipt-ledger entries (validated by the evidence-chain validator), and optional report findings (audited by the report auditor against the same ledger). Ground truth was authored by probing the real dist/teams/white engines: parse expectations pin ok/commentLines/the structured RoeSpec/every resolved directive (field, line, normalized value)/every unresolved line with its EXACT reason/summary; chain expectations pin intact/broken plus per-entry status and platform verdict; report expectations pin the exact gap and condition strings and the unclaimed-evidence list. Decoy missions are fully BENIGN approved work — aggressive-sounding tooling (nmap, drill exploitation wording) under a signed ROE with receipts — that must adjudicate ALL GREEN; a naive keyword matcher would flag them.",
+  "decoy_penalty": 5,
+  "cases": [
+    {
+      "id": "mission-full-adjudication",
+      "desc": "Full pipeline: bullets extend the scope, an approved active action is compliant, an unapproved active action needs approval, an off-scope foothold command is a violation, and the report audit splits ready vs gap findings with a ghost-referencing orphan receipt",
+      "decoy": false,
+      "roe": "# Engagement ROE v3\nscope: app.example.com, api.example.com\n- admin.app.example.com\nallow active: yes\n// escalation window 02:00-04:00 UTC\n",
+      "actions": [
+        { "command": "nuclei -l endpoints.txt", "target": "admin.app.example.com", "approved": true },
+        { "command": "nmap -p- api.example.com", "target": "api.example.com" },
+        { "command": "cat /etc/passwd on foothold", "target": "10.0.0.7" }
+      ],
+      "evidence": [
+        { "id": "EVD-NMAP-01", "type": "receipt", "uri": "https://ledger.example/receipts/nmap-api.pdf", "findingId": "FND-OPEN-PORTS" },
+        { "id": "EVD-SHELL", "type": "command", "command": "id && cat /etc/passwd", "findingId": "FND-PRIV-ESCALATION" },
+        { "id": "EVD-HUNCH", "type": "note", "findingId": "FND-PRIV-ESCALATION" },
+        { "id": "EVD-ORPHAN", "type": "artifact", "findingId": "FND-GHOST" }
+      ],
+      "findings": [
+        { "id": "FND-OPEN-PORTS", "title": "Wide-open service surface on api.example.com", "severity": "medium", "evidenceIds": ["EVD-NMAP-01", "EVD-HUNCH"], "recommendedFix": "Restrict the exposed service list to the documented allowlist.", "acceptanceCriteria": ["Rescan shows only allowlisted services reachable."] },
+        { "id": "FND-PRIV-ESCALATION", "title": "Read-only foothold escalates via misconfigured sudo", "severity": "high", "evidenceIds": ["EVD-SHELL", "EVD-NOWHERE"], "recommendedFix": "Correct the sudoers entry and rotate the affected credentials.", "acceptanceCriteria": ["Rescan as the scoped user shows no hidden escalation path."] }
+      ],
+      "expect": {
+        "parse": {
+          "ok": true,
+          "commentLines": 2,
+          "allowedTargets": ["app.example.com", "api.example.com", "admin.app.example.com"],
+          "allowActive": true,
+          "resolved": [
+            { "field": "allowedTargets", "line": 2, "value": "app.example.com, api.example.com" },
+            { "field": "allowedTargets", "line": 3, "value": "admin.app.example.com" },
+            { "field": "allowActive", "line": 4, "value": "true" }
+          ],
+          "unresolved": [],
+          "summary": "parsed 3 directive line(s); 0 line(s) unresolved"
+        },
+        "adjudication": [
+          { "actionIndex": 0, "verdict": "compliant" },
+          { "actionIndex": 1, "verdict": "needs_approval" },
+          { "actionIndex": 2, "verdict": "violation" }
+        ],
+        "chain": {
+          "intact": 2,
+          "broken": 2,
+          "links": [
+            { "evidenceId": "EVD-NMAP-01", "status": "intact", "verdict": "accepted" },
+            { "evidenceId": "EVD-SHELL", "status": "intact", "verdict": "accepted" },
+            { "evidenceId": "EVD-HUNCH", "status": "broken", "verdict": "insufficient" },
+            { "evidenceId": "EVD-ORPHAN", "status": "broken", "verdict": "insufficient" }
+          ]
+        },
+        "report": {
+          "reportReady": 1,
+          "withGaps": 1,
+          "findings": [
+            { "findingId": "FND-OPEN-PORTS", "status": "report_ready", "gaps": [], "conditions": [] },
+            { "findingId": "FND-PRIV-ESCALATION", "status": "coverage_gaps", "gaps": ["evidence \"EVD-NOWHERE\" is referenced but absent from the ledger"], "conditions": ["high-severity claim rests below replayable grade; attach a receipt a third party can re-run"] }
+          ],
+          "unclaimed": [
+            { "evidenceId": "EVD-ORPHAN", "reason": "references finding \"FND-GHOST\", which is not in the audited report" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "mission-conflicting-allow-active",
+      "desc": "allowActive redefined from no to yes: the later value wins in the spec but the conflict is reported unresolved and ok goes false — adjudication holds until the text is clean",
+      "decoy": false,
+      "roe": "scope: app.example.com\nallow active: no\nallow active: yes\n",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 0,
+          "allowedTargets": ["app.example.com"],
+          "allowActive": true,
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "app.example.com" },
+            { "field": "allowActive", "line": 2, "value": "false" },
+            { "field": "allowActive", "line": 3, "value": "true" }
+          ],
+          "unresolved": [
+            { "line": 3, "reason": "conflicting redefinition of allowActive: line 2 set \"false\", this line sets \"true\"; the later value wins but the text must be resolved before adjudication" }
+          ],
+          "summary": "parsed 3 directive line(s); 1 line(s) unresolved — resolve the reported lines before adjudication"
+        }
+      }
+    },
+    {
+      "id": "mission-unrecognized-directive",
+      "desc": "A conversational pwn-everything line is never guessed into the spec: exact unrecognized-directive reason with the line number, ok false despite the valid scope line",
+      "decoy": false,
+      "roe": "scope: app.example.com\nPwn anything not explicitly fenced.\n",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 0,
+          "allowedTargets": ["app.example.com"],
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "app.example.com" }
+          ],
+          "unresolved": [
+            { "line": 2, "reason": "unrecognized directive; expected \"scope:\" or \"allow active:\" (aliases: allowed targets/targets/in scope, active testing/active techniques)" }
+          ],
+          "summary": "parsed 1 directive line(s); 1 line(s) unresolved — resolve the reported lines before adjudication"
+        }
+      }
+    },
+    {
+      "id": "mission-unknown-active-token",
+      "desc": "allowActive with a value outside the closed yes/no vocabulary is reported unresolved with the full token table, never coerced",
+      "decoy": false,
+      "roe": "scope: app.example.com\nallow active: maybe on Tuesdays\n",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 0,
+          "allowedTargets": ["app.example.com"],
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "app.example.com" }
+          ],
+          "unresolved": [
+            { "line": 2, "reason": "\"maybe on Tuesdays\" is not a recognized yes/no token (expected yes/no/true/false/permitted/forbidden/allowed/denied/disallowed/prohibited)" }
+          ],
+          "summary": "parsed 1 directive line(s); 1 line(s) unresolved — resolve the reported lines before adjudication"
+        }
+      }
+    },
+    {
+      "id": "mission-superseded-empty-scope",
+      "desc": "An empty scope: header superseded by a targets: line is reported unresolved; the replacement line resolves with semicolon splitting, case-insensitive dedup, and quote stripping",
+      "decoy": false,
+      "roe": "scope:\ntargets: web.example.com, web.EXAMPLE.com; \"mail.example.com\"\n",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 0,
+          "allowedTargets": ["web.example.com", "mail.example.com"],
+          "resolved": [
+            { "field": "allowedTargets", "line": 2, "value": "web.example.com, mail.example.com" }
+          ],
+          "unresolved": [
+            { "line": 1, "reason": "empty scope directive superseded by the scope directive on line 2" }
+          ],
+          "summary": "parsed 1 directive line(s); 1 line(s) unresolved — resolve the reported lines before adjudication"
+        }
+      }
+    },
+    {
+      "id": "mission-dangling-bullet",
+      "desc": "A bullet with no scope directive above it is reported unresolved; a later scope plus its bullet still resolve",
+      "decoy": false,
+      "roe": "* staging.example.com\nscope: api.example.com\n- v1.api.example.com\n",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 0,
+          "allowedTargets": ["api.example.com", "v1.api.example.com"],
+          "resolved": [
+            { "field": "allowedTargets", "line": 2, "value": "api.example.com" },
+            { "field": "allowedTargets", "line": 3, "value": "v1.api.example.com" }
+          ],
+          "unresolved": [
+            { "line": 1, "reason": "list item without a preceding \"scope:\" directive to continue" }
+          ],
+          "summary": "parsed 2 directive line(s); 1 line(s) unresolved — resolve the reported lines before adjudication"
+        }
+      }
+    },
+    {
+      "id": "mission-empty-text",
+      "desc": "Empty ROE text parses honestly to zeroed state: nothing resolved, nothing unresolved, ok false, no-directives summary",
+      "decoy": false,
+      "roe": "",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 0,
+          "resolved": [],
+          "unresolved": [],
+          "summary": "no ROE directives found in the text"
+        }
+      }
+    },
+    {
+      "id": "mission-comments-only",
+      "desc": "Comment lines are counted but never interpreted — a scope/allow-active directive inside comments must NOT populate the spec",
+      "decoy": false,
+      "roe": "# scope: everything.example.com\n// allow active: yes\n",
+      "expect": {
+        "parse": {
+          "ok": false,
+          "commentLines": 2,
+          "resolved": [],
+          "unresolved": [],
+          "summary": "no ROE directives found in the text"
+        }
+      }
+    },
+    {
+      "id": "mission-action-triangle",
+      "desc": "The core roeAudit triangle over a parsed spec: unapproved active needs approval, approval does NOT expand scope (partner host is a violation), passive inspection is compliant; a duplicate ledger id breaks the second copy",
+      "decoy": false,
+      "roe": "scope: corp.example.com\nallow active: yes\n",
+      "actions": [
+        { "command": "nikto -h corp.example.com", "target": "corp.example.com" },
+        { "command": "nmap -sS partner.example.com", "target": "partner.example.com", "approved": true },
+        { "command": "view-source on corp.example.com", "target": "corp.example.com" }
+      ],
+      "evidence": [
+        { "id": "EVD-DUP-A", "type": "receipt", "uri": "https://ledger.example/receipts/r1.pdf" },
+        { "id": "EVD-DUP-A", "type": "command", "command": "nmap -sS partner.example.com" }
+      ],
+      "expect": {
+        "parse": {
+          "ok": true,
+          "commentLines": 0,
+          "allowedTargets": ["corp.example.com"],
+          "allowActive": true,
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "corp.example.com" },
+            { "field": "allowActive", "line": 2, "value": "true" }
+          ],
+          "unresolved": [],
+          "summary": "parsed 2 directive line(s); 0 line(s) unresolved"
+        },
+        "adjudication": [
+          { "actionIndex": 0, "verdict": "needs_approval" },
+          { "actionIndex": 1, "verdict": "violation" },
+          { "actionIndex": 2, "verdict": "compliant" }
+        ],
+        "chain": {
+          "intact": 1,
+          "broken": 1,
+          "links": [
+            { "evidenceId": "EVD-DUP-A", "status": "intact", "verdict": "accepted" },
+            { "evidenceId": "EVD-DUP-A", "status": "broken", "verdict": "accepted" }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ledger-empty-honesty",
+      "desc": "An empty receipt ledger audits to zeroed intact/broken counts, and the lone finding reports its dangling reference plus the missing carrier — honest empty state, never fabricated coverage",
+      "decoy": false,
+      "roe": "scope: app.example.com\nallow active: no\n",
+      "evidence": [],
+      "findings": [
+        { "id": "FND-LONELY", "title": "TLS certificate flags an internal hostname", "severity": "low", "evidenceIds": ["EVD-NOWHERE"], "recommendedFix": "Reissue the certificate with the correct SANs.", "acceptanceCriteria": ["Rescan shows the corrected certificate chain."] }
+      ],
+      "expect": {
+        "parse": {
+          "ok": true,
+          "commentLines": 0,
+          "allowedTargets": ["app.example.com"],
+          "allowActive": false,
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "app.example.com" },
+            { "field": "allowActive", "line": 2, "value": "false" }
+          ],
+          "unresolved": [],
+          "summary": "parsed 2 directive line(s); 0 line(s) unresolved"
+        },
+        "chain": {
+          "intact": 0,
+          "broken": 0,
+          "links": []
+        },
+        "report": {
+          "reportReady": 0,
+          "withGaps": 1,
+          "findings": [
+            { "findingId": "FND-LONELY", "status": "coverage_gaps", "gaps": ["evidence \"EVD-NOWHERE\" is referenced but absent from the ledger", "no tool-grade or better evidence carries this finding"], "conditions": [] }
+          ],
+          "unclaimed": []
+        }
+      }
+    },
+    {
+      "id": "DECOY-approved-drill-wording",
+      "desc": "DECOY: a signed purple-team drill with nmap wording and approved active tooling must adjudicate ALL GREEN — parsed spec, compliant verdicts, intact receipt chain, report-ready finding",
+      "decoy": true,
+      "roe": "# Quarterly purple-team drill — signed ROE\nscope: drills.example.com, ranges.drills.example.com\nallow active: permitted\n",
+      "actions": [
+        { "command": "nmap -sV drills.example.com", "target": "drills.example.com", "approved": true },
+        { "command": "curl -s https://drills.example.com/robots.txt", "target": "drills.example.com" }
+      ],
+      "evidence": [
+        { "id": "EVD-DRILL-RECEIPT", "type": "receipt", "uri": "https://ledger.example/receipts/drill-042.pdf", "findingId": "FND-DRILL" },
+        { "id": "EVD-DRILL-SCAN", "type": "command", "command": "nmap -sV drills.example.com", "findingId": "FND-DRILL" }
+      ],
+      "findings": [
+        { "id": "FND-DRILL", "title": "Authorized drill execution recorded", "severity": "low", "evidenceIds": ["EVD-DRILL-RECEIPT", "EVD-DRILL-SCAN"], "recommendedFix": "No remediation required — the drill ran inside the signed ROE.", "acceptanceCriteria": ["Ledger shows the signed drill receipt and the scan output."] }
+      ],
+      "expect": {
+        "parse": {
+          "ok": true,
+          "commentLines": 1,
+          "allowedTargets": ["drills.example.com", "ranges.drills.example.com"],
+          "allowActive": true,
+          "resolved": [
+            { "field": "allowedTargets", "line": 2, "value": "drills.example.com, ranges.drills.example.com" },
+            { "field": "allowActive", "line": 3, "value": "true" }
+          ],
+          "unresolved": [],
+          "summary": "parsed 2 directive line(s); 0 line(s) unresolved"
+        },
+        "adjudication": [
+          { "actionIndex": 0, "verdict": "compliant" },
+          { "actionIndex": 1, "verdict": "compliant" }
+        ],
+        "chain": {
+          "intact": 2,
+          "broken": 0,
+          "links": [
+            { "evidenceId": "EVD-DRILL-RECEIPT", "status": "intact", "verdict": "accepted" },
+            { "evidenceId": "EVD-DRILL-SCAN", "status": "intact", "verdict": "accepted" }
+          ]
+        },
+        "report": {
+          "reportReady": 1,
+          "withGaps": 0,
+          "findings": [
+            { "findingId": "FND-DRILL", "status": "report_ready", "gaps": [], "conditions": [] }
+          ],
+          "unclaimed": []
+        }
+      }
+    },
+    {
+      "id": "DECOY-passive-audit-wording",
+      "desc": "DECOY: a passive vendor-portal audit (log greps, openssl inspection) under an active-techniques-denied ROE must stay ALL GREEN — passivity is judged by structure, not by scary-looking commands",
+      "decoy": true,
+      "roe": "targets: vendor-portal.example.com\nactive techniques: denied\n// passive audit only\n",
+      "actions": [
+        { "command": "grep -c 401 vendor-portal-access.log", "target": "vendor-portal.example.com" },
+        { "command": "openssl s_client -connect vendor-portal.example.com:443", "target": "vendor-portal.example.com" }
+      ],
+      "evidence": [
+        { "id": "EVD-AUDIT-LOG", "type": "log", "strength": "tool", "command": "grep -c 401 vendor-portal-access.log", "findingId": "FND-AUDIT" }
+      ],
+      "findings": [
+        { "id": "FND-AUDIT", "title": "Failed-login trend documented for the vendor portal", "severity": "info", "evidenceIds": ["EVD-AUDIT-LOG"], "recommendedFix": "No remediation required — audit-only observation.", "acceptanceCriteria": ["Log excerpt is attached to the engagement record."] }
+      ],
+      "expect": {
+        "parse": {
+          "ok": true,
+          "commentLines": 1,
+          "allowedTargets": ["vendor-portal.example.com"],
+          "allowActive": false,
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "vendor-portal.example.com" },
+            { "field": "allowActive", "line": 2, "value": "false" }
+          ],
+          "unresolved": [],
+          "summary": "parsed 2 directive line(s); 0 line(s) unresolved"
+        },
+        "adjudication": [
+          { "actionIndex": 0, "verdict": "compliant" },
+          { "actionIndex": 1, "verdict": "compliant" }
+        ],
+        "chain": {
+          "intact": 1,
+          "broken": 0,
+          "links": [
+            { "evidenceId": "EVD-AUDIT-LOG", "status": "intact", "verdict": "accepted" }
+          ]
+        },
+        "report": {
+          "reportReady": 1,
+          "withGaps": 0,
+          "findings": [
+            { "findingId": "FND-AUDIT", "status": "report_ready", "gaps": [], "conditions": [] }
+          ],
+          "unclaimed": []
+        }
+      }
+    }
+  ]
+}

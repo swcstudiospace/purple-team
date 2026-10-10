@@ -1,0 +1,107 @@
+{
+  "schema": "t3mp3st.bench/roe-adjudication/v1",
+  "engines": "dist/teams/white {roe-parser.parseRoe, white.roeAudit, evidence-chain.auditEvidenceChain, report-auditor.auditReport}",
+  "cases": 12,
+  "score": {
+    "verdicts": {
+      "hits": 25,
+      "total": 25,
+      "rate": 1
+    },
+    "discrimination": {
+      "decoyMissions": 2,
+      "decoyFlagged": 0
+    },
+    "penalty": {
+      "perDecoy": 5,
+      "applied": 0,
+      "penalizedHits": 25
+    },
+    "perCase": [
+      {
+        "id": "mission-full-adjudication",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-conflicting-allow-active",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-unrecognized-directive",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-unknown-active-token",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-superseded-empty-scope",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-dangling-bullet",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-empty-text",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-comments-only",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "mission-action-triangle",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "ledger-empty-honesty",
+        "decoy": false,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "DECOY-approved-drill-wording",
+        "decoy": true,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "DECOY-passive-audit-wording",
+        "decoy": true,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      }
+    ]
+  }
+}

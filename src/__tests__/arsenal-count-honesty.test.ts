@@ -11,7 +11,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // ARSENAL COUNT HONESTY — the "advertised = real, and nothing is silently dead".
 //
-// The arsenal advertises "117 tools". verify-claims defends that number by counting
+// The arsenal advertises "120 tools". verify-claims defends that number by counting
 // `id:`/`name:` source lines — a SOURCE-LINE count, which would keep passing even if
 // an entry became uncallable. This test locks the number to the REAL registered arrays
 // and, more importantly, pins the invariant that makes the count honest:
@@ -23,7 +23,7 @@ import {
 //   hydra reachable solely via the approval-gated post-ex drivers; bloodhound /
 //   atomic-red-team / d3fend import-only; pacu/frida catalog-only until narrow approved
 //   runners exist; osquery / velociraptor / suricata catalog-only pending scoped
-//   telemetry runners),
+//   telemetry runners; nist-800-115 / ptes / osstmm import-only governance catalogs),
 //   never by a silent DEFAULT/mint slip. Sibling of no-phantom-tools / stub-honesty.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -36,16 +36,16 @@ const isGated = (a: ToolAdapter) =>
   a.execution === 'catalog_only' || a.execution === 'import_only';
 
 describe('arsenal count honesty (advertised = real registered surface)', () => {
-  it('the advertised "117 tools" is the real registered surface, not a source-line count', () => {
+  it('the advertised "120 tools" is the real registered surface, not a source-line count', () => {
     const total = TOOL_ADAPTERS.length + BUILTIN_TOOLS.length + EXTERNAL_TOOLS.length;
     // Locks the headline to code. If the arsenal grows/shrinks, update this AND the
     // README / verify-claims headline together — that is the point of the lock.
     expect(
       total,
-      `arsenal size drifted from the advertised 117 (adapters=${TOOL_ADAPTERS.length}, ` +
+      `arsenal size drifted from the advertised 120 (adapters=${TOOL_ADAPTERS.length}, ` +
         `built-ins=${BUILTIN_TOOLS.length}, externals=${EXTERNAL_TOOLS.length}) — ` +
         'update the README / verify-claims headline to match',
-    ).toBe(117);
+    ).toBe(120);
     expect(total).toBeGreaterThanOrEqual(80); // stays consistent with verify-claims' `>= 80` gate
   });
 
@@ -63,17 +63,19 @@ describe('arsenal count honesty (advertised = real registered surface)', () => {
     expect(wronglyGated, `gated adapters that are still generically callable: ${wronglyGated.join(', ')}`).toEqual([]);
   });
 
-  it('the gated set is exactly the documented post-ex / import / detection / emulation tools', () => {
+  it('the gated set is exactly the documented post-ex / import / detection / emulation / governance tools', () => {
     const gated = TOOL_ADAPTERS.filter(isGated);
     // metasploit + hydra are catalog_only (callable only via the approval-gated hand-written
     // post-ex drivers); pacu/frida are catalog_only pending narrow approved runners; bloodhound,
     // atomic-red-team, and d3fend are import_only (collector/ontology output is imported, never
     // run here); osquery/velociraptor/suricata are catalog_only pending scoped telemetry runners;
     // attack-navigator is import_only (layer/STIX data imported, never executed) and caldera is
-    // catalog_only (emulation plans parsed for analysis; the platform is never operated).
+    // catalog_only (emulation plans parsed for analysis; the platform is never operated);
+    // nist-800-115/ptes/osstmm are import_only governance catalogs (framework section/phase/module
+    // data vendored for adjudication, never executed).
     expect(gated.map((a) => a.id).sort()).toEqual([
       'atomic-red-team', 'attack-navigator', 'bloodhound', 'caldera', 'd3fend', 'frida', 'hydra',
-      'metasploit', 'osquery', 'pacu', 'suricata', 'velociraptor',
+      'metasploit', 'nist-800-115', 'osquery', 'osstmm', 'pacu', 'ptes', 'suricata', 'velociraptor',
     ]);
     expect(TOOL_ADAPTERS.find((a) => a.id === 'bloodhound')?.execution).toBe('import_only');
     // Every gated adapter is genuinely off the generic surface.

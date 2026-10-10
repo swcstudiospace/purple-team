@@ -1,0 +1,68 @@
+schema: t3mp3st.bench/roe-adjudication/v1
+name: T3MP3ST ROE Adjudication Bench — v0
+description: |
+  White-pipeline benchmark. Each case is a MISSION: operator ROE text, optional
+  audited actions, optional receipt-ledger evidence, and optional report findings,
+  with KNOWN ground-truth verdicts from the four real white engines. The parse
+  axis pins the structured RoeSpec, every resolved directive (field, line,
+  normalized value), every unresolved line with its exact reason, counted
+  comments, ok, and the one-line summary. The adjudication axis pins v1
+  roeAudit verdicts over the PARSED spec (declared only when the text parses
+  ok). The chain axis pins intact/broken counts plus per-entry status and
+  platform verdict. The report axis pins report-ready vs coverage-gap findings,
+  the exact gap and condition strings, and unclaimed ledger evidence. Decoy
+  missions are fully BENIGN approved work — aggressive-sounding tooling under a
+  signed ROE with receipts attached — that must adjudicate ALL GREEN.
+
+engines: dist/teams/white {roe-parser.parseRoe, evidence-chain.auditEvidenceChain,
+  report-auditor.auditReport} + dist/teams/white.js (roeAudit) — the real
+  pipeline via the built dist/ output, never a vendored copy of the logic.
+
+scoring:
+  axes:
+    parsing:         { rule: 'ok/commentLines/spec/resolved (field,line,value)/unresolved (line, exact reason)/summary equal ground truth' }
+    adjudication:    { rule: 'per-action verdicts (compliant/violation/needs_approval) over the parsed spec equal ground truth' }
+    chain:           { rule: 'intact/broken counts plus per-entry status and accepted/insufficient verdict, in ledger order' }
+    report:          { rule: 'reportReady/withGaps, per-finding status with exact gap and condition strings, and the unclaimed-evidence list' }
+    discrimination:  { rule: 'decoy missions of benign approved work adjudicate ALL GREEN — never flagged, never talked into a violation' }
+  decoy_penalty: 5         # subtracted per decoy mission scored flagged
+  report: bench/roe-adjudication/report.json   # deterministic JSON (no timestamps)
+  self_test_default: true  # --self-test is the default; offline and deterministic
+
+cases:
+  - id: mission-full-adjudication
+    domains: [parse, adjudication, chain, report]
+    difficulty: hard
+  - id: mission-conflicting-allow-active
+    domains: [parse]
+    difficulty: medium
+  - id: mission-unrecognized-directive
+    domains: [parse]
+    difficulty: easy
+  - id: mission-unknown-active-token
+    domains: [parse]
+    difficulty: easy
+  - id: mission-superseded-empty-scope
+    domains: [parse]
+    difficulty: medium
+  - id: mission-dangling-bullet
+    domains: [parse]
+    difficulty: easy
+  - id: mission-empty-text
+    domains: [parse]
+    difficulty: easy
+  - id: mission-comments-only
+    domains: [parse]
+    difficulty: medium
+  - id: mission-action-triangle
+    domains: [parse, adjudication, chain]
+    difficulty: hard
+  - id: ledger-empty-honesty
+    domains: [parse, chain, report]
+    difficulty: medium
+  - id: DECOY-approved-drill-wording
+    domains: [parse, adjudication, chain, report]
+    difficulty: decoy
+  - id: DECOY-passive-audit-wording
+    domains: [parse, adjudication, chain, report]
+    difficulty: decoy

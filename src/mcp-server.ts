@@ -236,6 +236,11 @@ Requires: Target hostname or IP.`,
     inputSchema: { type: 'object', properties: {} }
   },
   {
+    name: 'tempest_white_roe',
+    description: `White ROE adjudication state on record (GET /api/teams/white/roe). Use when: the operator asks what the rules of engagement currently allow or deny, which ROE lines failed to parse and why, or the verdict on record for an action.`,
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
     name: 'tempest_hats_list',
     description: `Specialist hats with parent teams and live tool grants (GET /api/teams/tool-grants + /api/operators/prompts). Use when: the operator asks which hats are spawnable or what each hat may wield.`,
     inputSchema: { type: 'object', properties: {} }
@@ -435,6 +440,10 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
 
     case 'tempest_black_cover': {
       return tempestGet('/api/teams/black/cover');
+    }
+
+    case 'tempest_white_roe': {
+      return tempestGet('/api/teams/white/roe');
     }
 
     case 'tempest_hats_list': {

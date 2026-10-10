@@ -31,26 +31,39 @@ operator must see the ack before any backend call resolves.
 
 ## 2. Dispatch the adjudication
 
-Drive the `tempest_hat_dispatch` MCP tool with hat `arbiter` and the
-action as the task — or directly, composing the canonical calls:
+Read the ROE verdict state the backend computes over the on-record
+rules of engagement — the parsed spec, the operator lines that did not
+parse (each with its reason), and verdicts for any actions on record:
 
-```bash
-SPAWN=$(curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"arbiter"}')
-OP=$(echo "$SPAWN" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-curl -s -X POST http://127.0.0.1:3333/api/operators/$OP/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"ROE verdict","taskDescription":"<action>"}'
-```
+- ROE review — the `tempest_white_roe` MCP tool, or
+  `curl -s http://127.0.0.1:3333/api/teams/white/roe` (the parsed
+  `roe` spec with `ok` and `summary`, the `resolved` directives with
+  their source lines, and every `unresolved` line with its `reason`;
+  no ROE text is on record yet, so the backend derives no per-action
+  verdicts until a real source lands).
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+Relay the verdicts exactly as the backend returned them — never rule
+on an action the backend did not judge, never soften an `unresolved`
+line's `reason`, and never present a parse with `ok: false` as a clean
+bill. If the response reports no ROE text on record, say so — that is
+not an "everything allowed" verdict.
 
 Relay short progress updates quoting the mission id.
 
 ## 3. Completion summary
 
-Close with: action, mission id, ROE verdict (allowed, denied, or needs
-approval, with the deciding ROE text), dispute rulings if any, what would
-overturn each ruling, and the report pointer
+Close with: action, mission id, the parsed ROE standing (`ok` with the
+resolved targets/active rules), the verdict for the action under
+review as the backend returned it (allowed, denied, or needs approval,
+with the deciding ROE text) — or, with no ROE text on record, an
+honest statement that the backend cannot derive one, never an
+invented verdict — plus the `unresolved` lines with their
+reasons, dispute rulings if any, what would overturn each ruling, and
+the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 

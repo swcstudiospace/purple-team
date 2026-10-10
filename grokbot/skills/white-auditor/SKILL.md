@@ -31,25 +31,34 @@ The operator must see the ack before any backend call resolves.
 
 ## 2. Dispatch the review
 
-Drive the `tempest_hat_dispatch` MCP tool with hat `auditor` and the
-evidence scope as the task — or directly, composing the canonical calls:
+Read the evidence-chain audit the backend computes over the evidence
+ledger — one chain-link verdict per entry:
 
-```bash
-SPAWN=$(curl -s -X POST http://127.0.0.1:3333/api/operators/spawn \
-  -H 'Content-Type: application/json' \
-  -d '{"archetype":"auditor"}')
-OP=$(echo "$SPAWN" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-curl -s -X POST http://127.0.0.1:3333/api/operators/$OP/task \
-  -H 'Content-Type: application/json' \
-  -d '{"taskName":"evidence scoring","taskDescription":"<evidence>"}'
-```
+- Evidence-chain audit —
+  `curl -s http://127.0.0.1:3333/api/teams/white/evidence` (one
+  chain-link verdict per ledger entry — `evidenceId`, `status`,
+  `strength`, the platform `verdict`, and the `reason` behind every
+  `broken` link — plus the `intact`/`broken` totals and the `summary`).
+
+Off loopback, every curl needs
+`-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
+`T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
+
+Relay the `links` array as the backend returned it — status and
+strength per entry with the `reason` and appeal `conditions` behind
+every `broken` link. Never upgrade a `broken` link to `intact`, never
+re-derive a strength the backend already resolved, and never score an
+entry the backend did not audit. An empty `links` array means the
+ledger holds no evidence — say so; that is not a clean bill.
 
 Relay short progress updates quoting the mission id.
 
 ## 3. Completion summary
 
-Close with: scope, mission id, per-entry confidence labels, aggregate
-evidence-strength score, and the report pointer
+Close with: scope, mission id, the per-entry chain-link verdict
+(`evidenceId`, `status`, `strength`, with the `reason` and appeal
+`conditions` for each `broken` link), the `intact`/`broken` totals
+with the backend `summary`, and the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 

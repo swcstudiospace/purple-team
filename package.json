@@ -46,6 +46,7 @@
     "cloud:bench:live": "node scripts/cloud-misconfig-bench.mjs --live",
     "black:bench": "node scripts/opsec-review-bench.mjs",
     "blue:bench": "node scripts/detection-coverage-bench.mjs",
+    "white:bench": "node scripts/roe-adjudication-bench.mjs",
     "mobile:bench": "node scripts/mobile-static-bench.mjs",
     "binary:bench": "node scripts/binary-vuln-bench.mjs",
     "keys": "bash scripts/keys.sh",

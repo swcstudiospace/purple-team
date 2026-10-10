@@ -21,7 +21,7 @@ tradecraft, white adjudicates; nothing operates live estates.
 - [x] **Phase 16: Blue Playbook & Bench** - `ai-defense-playbook.ts`, `detection-coverage-bench` corpus harness, blue-sentinel/warden skill backends + MCP `tempest_blue_gaps` (2026-10-10)
 - [x] **Phase 17: Black Suite Core** - `emulation` catalog category + adapters, black v2 modules (noise budget, exfil cost model, opsec engine), black routes + grants (2026-10-10)
 - [x] **Phase 18: Black Playbook & Bench** - black playbook (ATT&CK-keyed), `opsec-review-bench` corpus harness, black-specter/wraith skill backends + MCP `tempest_black_cover` (2026-10-10)
-- [ ] **Phase 19: White Suite** - `governance` data packs, white v2 modules (ROE parser, evidence-chain validator, report auditor), ROE bench, white routes/skills/MCP
+- [x] **Phase 19: White Suite** - `governance` data packs, white v2 modules (ROE parser, evidence-chain validator, report auditor), ROE bench, white routes/skills/MCP (2026-10-10)
 - [ ] **Phase 20: Purple v2 & Defend UI** - id-keyed synthesis + residual-risk model, persisted color artifacts, Defend UI page, full gates & close-out
 
 ## Phase Details
@@ -93,6 +93,11 @@ Plans:
   2. Evidence-chain validator consumes the real receipt ledger, not mock data
   3. ROE bench self-test passes; routes/skills/MCP live; vitest + typecheck green
 
+**Plans**: 1 plan
+
+Plans:
+- [x] 19-01: White suite (governance packs, white v2, playbook, bench, wiring)
+
 ### Phase 20: Purple v2 & Defend UI
 **Goal**: The synthesis loop becomes id-keyed and the color suites get a surface.
 **Depends on**: Phases 15–19
@@ -110,5 +115,5 @@ Plans:
 | 16. Blue Playbook & Bench | 1/1 | Complete | 2026-10-10 |
 | 17. Black Suite Core | 1/1 | Complete | 2026-10-10 |
 | 18. Black Playbook & Bench | 1/1 | Complete | 2026-10-10 |
-| 19. White Suite | 0/0 | Not Started | — |
+| 19. White Suite | 1/1 | Complete | 2026-10-10 |
 | 20. Purple v2 & Defend UI | 0/0 | Not Started | — |

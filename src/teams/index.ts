@@ -29,6 +29,9 @@
  * - white  → read/inspect-grade only (same risk tiers as blue; overlap with blue is
  *            justified: both teams are read-only inspectors of evidence artifacts,
  *            with different purposes — control verification vs adjudication).
+ *            White additionally holds governance frameworks of its own (NIST SP
+ *            800-115 / PTES / OSSTMM — import-only adjudication rule catalogs);
+ *            still read-only inspectors, and still disjoint from black's grants.
  *
  * If a future team needs a tool id that does not exist in the catalog, grant the
  * closest existing id and note it here rather than inventing ids.
@@ -47,7 +50,7 @@ export const TEAM_ARCHETYPES: readonly ['black', 'blue', 'white'] = ['black', 'b
 // resolver-pinned DNS work through host/dnsx so black stays disjoint from both.
 const BLACK_TOOLS = ['host', 'subfinder', 'amass', 'dnsx', 'waybackurls', 'wafw00f', 'curl', 'httpx', 'attack-navigator', 'caldera'] as const;
 const BLUE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'checksec', 'openssl', 'gitleaks', 'trufflehog', 'trivy', 'syft', 'grype', 'osv-scanner', 'checkov', 'semgrep', 'dig', 'whois', 'sigma', 'atomic-red-team', 'osquery', 'suricata', 'd3fend'] as const;
-const WHITE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'gitleaks', 'dig', 'whois'] as const;
+const WHITE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'gitleaks', 'dig', 'whois', 'nist-800-115', 'ptes', 'osstmm'] as const;
 
 /**
  * Tool grants per team archetype. Unknown archetypes (including 'purple', which is

@@ -266,6 +266,9 @@ loopback trust as every other route (see Security Model above).
 | `GET` | `/api/teams/black/cover` | Read-only phase-grouped OPSEC review of the active RED plan, the most recently updated mission draft (`{ phases, egressDeclared, egressNotes, itemCount }`; no draft → empty phases) |
 | `GET` | `/api/teams/black/exfil` | Read-only ATT&CK-keyed egress cost report over planned exfil paths (`{ paths, totalVolumeMb, totalCost, budget, within }`; zeroed until a path store exists — drafts carry no channel/volume fields) |
 | `GET` | `/api/teams/black/noise` | Read-only tactic-tier noise budget over the active plan's actions (`{ entries, total, budget, within, tier, violations }`; no draft → total 0, tier `quiet`) |
+| `GET` | `/api/teams/white/roe` | Read-only structured parse of the on-record ROE text (`{ roe, resolved, unresolved, commentLines, ok, summary }`; no server state carries ROE text today → honest zeroed parse, `ok: false`) |
+| `GET` | `/api/teams/white/evidence` | Read-only replay-chain audit over the receipt ledger (`{ links, intact, broken, summary }`; replayable entries must carry a command/uri hook, duplicate ids break the chain) |
+| `GET` | `/api/teams/white/report-audit` | Read-only findings ↔ evidence coverage audit (`{ findings, reportReady, withGaps, unclaimedEvidence, summary }`; gaps named exactly, unclaimed ledger entries surfaced) |
 
 `POST /api/teams/purple/synthesize` body:
 
