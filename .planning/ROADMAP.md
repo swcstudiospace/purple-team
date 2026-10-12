@@ -55,6 +55,7 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
   5. Supersession log carries the phase-19 entry; docs/skills/MCP surfaces agree with the route behavior; gate table reports the running lint count with no net-new warnings
 
 **Plans**: TBD
+- [x] 22-01-PLAN.md
 
 ### Phase 23: One Risk Signal
 
@@ -101,7 +102,7 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 21. Retroactive Validation (Phases 15–20) | 3/3 | Complete    | 2026-10-12 |
-| 22. ROE Text as Server State | 0/TBD | Not started | - |
+| 22. ROE Text as Server State | 1/1 | In Progress | - |
 | 23. One Risk Signal | 0/TBD | Not started | - |
 | 24. Ops Evidence on This Host | 0/TBD | Not started | - |
 | 25. Lint Re-baseline & Close-Out | 0/TBD | Not started | - |

@@ -29,11 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 22 (ROE Text as Server State) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-12 — Phase 21 complete, transitioned to Phase 22
-
+Phase: 22 (ROE Text as Server State) — PLAN 01 COMPLETE
+Plan: 22-01 executed (d79fea9 feat + SUMMARY commit to follow)
+Status: Ready for verify-work / Phase 23
+Last activity: 2026-10-12 — 22-01 ROE text as server state shipped (PUT+GET, pins, bench, surfaces, supersession row)
 ## Completed Context
 
 - **v1.0** 2026-10-09: plan-based inference, Dark Purple core, white/red UI, Grok Bot package.
@@ -51,8 +50,8 @@ Last activity: 2026-10-12 — Phase 21 complete, transitioned to Phase 22
 
 ## Session Continuity
 
-Last session: 2026-10-12T22:36:39.254Z
-Stopped at: Phase 21 complete, ready to plan Phase 22
+Last session: 2026-10-12T23:30:00Z
+Stopped at: Completed 22-01-PLAN.md
 Resume file: None
 
 ## Performance Metrics
@@ -60,7 +59,9 @@ Resume file: None
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 21 P21-03 | 2min | 2 tasks | 3 files |
+| Phase 22 P22-01 | 9min | 3 tasks | 12 files |
 
 ## Decisions
 
 - [Phase 21]: 21-03: manual section-5.5 audit flip (workflow regenerates whole file); all six phases PARTIAL, zero compliant
+- [Phase 22]: 22-01: single atomic commit for all three tasks per plan same-commit bindings; mismatch shares the empty-state cannot-derive report; supersession Commit column cites the feat subject (hash in SUMMARY)
