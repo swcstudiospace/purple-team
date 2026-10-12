@@ -39,8 +39,8 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 
 **Plans**: TBD
 - [x] 21-01-PLAN.md
-- [ ] 21-02-PLAN.md
-- [ ] 21-03-PLAN.md
+- [x] 21-02-PLAN.md
+- [x] 21-03-PLAN.md
 
 ### Phase 22: ROE Text as Server State
 
@@ -100,7 +100,7 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 21. Retroactive Validation (Phases 15–20) | 1/3 | In Progress | - |
+| 21. Retroactive Validation (Phases 15–20) | 3/3 | In Progress | - |
 | 22. ROE Text as Server State | 0/TBD | Not started | - |
 | 23. One Risk Signal | 0/TBD | Not started | - |
 | 24. Ops Evidence on This Host | 0/TBD | Not started | - |

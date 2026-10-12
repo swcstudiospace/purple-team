@@ -5,17 +5,17 @@ milestone_name: Hardening & Validation
 current_phase: 21
 current_phase_name: Retroactive Validation (Phases 15–20)
 status: executing
-stopped_at: Phase 21 plan 02 complete (scale-out wave, five VALIDATION.md records, open finding F-20-01)
-last_updated: "2026-10-12T22:55:00.000Z"
+stopped_at: Phase 21 complete (all 3 plans; supersession log open; audit not_validated emptied)
+last_updated: "2026-10-12T22:36:39.288Z"
 last_activity: 2026-10-12
-last_activity_desc: Phase 21 plan 02 executed (15/16/17/18/20 VALIDATION.md committed; prompt:audit red recorded as F-20-01)
-state_head: b10a172
+last_activity_desc: "Phase 21 plan 03 executed (supersession log opened; audit not_validated emptied, all-partial; gate receipts measured)"
+state_head: 739da92ca4c65935b055614c17340bb8c4829e33
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 2
-  percent: 67
+  completed_plans: 3
+  percent: 100
 ---
 
 # Project State
@@ -29,10 +29,11 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 21 (Retroactive Validation (Phases 15–20)) — EXECUTING
-Plan: 2 of 3 complete (21-02 scale-out wave)
-Status: Executing Phase 21 — next: plan 21-03 (re-audit)
-Last activity: 2026-10-12 — Phase 21 plan 02 complete (commits 1f8018f, bc7cbf3, b10a172 docs, SUMMARY)
+Phase: 21 (Retroactive Validation (Phases 15–20)) — COMPLETE
+Plan: 3 of 3 complete (21-03 close-out wave)
+Status: Phase 21 complete — next: verify-work, then Phase 22
+Last activity: 2026-10-12 — Phase 21 plan 03 complete (commits 492eadf, 739da92 docs, SUMMARY)
+
 ## Completed Context
 
 - **v1.0** 2026-10-09: plan-based inference, Dark Purple core, white/red UI, Grok Bot package.
@@ -50,6 +51,16 @@ Last activity: 2026-10-12 — Phase 21 plan 02 complete (commits 1f8018f, bc7cbf
 
 ## Session Continuity
 
-Last session: 2026-10-12
-Stopped at: Phase 21 plan 02 complete — resume at plan 21-03 (re-audit; carries open finding F-20-01)
-Resume file: .planning/ROADMAP.md
+Last session: 2026-10-12T22:36:39.254Z
+Stopped at: Phase 21 complete (all 3 plans; supersession log open; audit not_validated emptied)
+Resume file: None
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 21 P21-03 | 2min | 2 tasks | 3 files |
+
+## Decisions
+
+- [Phase 21]: 21-03: manual section-5.5 audit flip (workflow regenerates whole file); all six phases PARTIAL, zero compliant
