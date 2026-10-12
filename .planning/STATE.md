@@ -3,10 +3,10 @@ gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Hardening & Validation
 status: planning
-last_updated: "2026-10-12T21:05:00.227Z"
+last_updated: "2026-10-12T21:32:13.000Z"
 last_activity: 2026-10-12
 progress:
-  total_phases: 0
+  total_phases: 5
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the archived v1.0–v1.3 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** Between milestones — v1.3 shipped; scope for the next milestone unchosen
+**Current focus:** v1.4 Hardening & Validation — roadmap created: 5 phases (21–25), 6 requirements mapped, 100% coverage
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: Not started (roadmap ready; Phase 21 next)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-10-12 — Milestone v1.4 started
+Status: Roadmap created — awaiting approval
+Last activity: 2026-10-12 — v1.4 ROADMAP.md written (21 Retroactive Validation → 22 ROE Text as Server State → 23 One Risk Signal → 24 Ops Evidence on This Host → 25 Lint Re-baseline & Close-Out)
 
 ## Completed Context
 
@@ -38,14 +38,14 @@ Last activity: 2026-10-12 — Milestone v1.4 started
 
 ## Pending Todos
 
-- Owner decision: next milestone scope.
+- Approve the v1.4 roadmap, then `/gsd:plan-phase 21`.
 
 ## Blockers/Concerns
 
-- v1.3 tech debt (accepted, in the audit): no phase VERIFICATION files; ROE verdicts-on-record need a ROE text source; residualRisk prose/riskTier duplication; installer matrix CI-only; docker healthcheck unrun.
+- v1.3 tech debt (accepted, in the audit): no phase VERIFICATION files; ROE verdicts-on-record need a ROE text source; residualRisk prose/riskTier duplication; installer matrix CI-only; docker healthcheck unrun — all now scheduled as Phases 21–25.
 
 ## Session Continuity
 
-Last session: 2026-10-10
-Stopped at: v1.3 archived; awaiting next-scope decision
-Resume file: None
+Last session: 2026-10-12
+Stopped at: v1.4 roadmap created (phases 21–25); awaiting approval before plan-phase 21
+Resume file: .planning/ROADMAP.md

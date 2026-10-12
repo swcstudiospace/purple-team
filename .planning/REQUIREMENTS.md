@@ -59,9 +59,9 @@ Requirement-to-phase mapping. Filled by the roadmapper.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| VAL-01 | — | unmapped |
-| ROE-01 | — | unmapped |
-| UNIFY-01 | — | unmapped |
-| OPS-01 | — | unmapped |
-| OPS-02 | — | unmapped |
-| LINT-01 | — | unmapped |
+| VAL-01 | Phase 21 | Pending |
+| ROE-01 | Phase 22 | Pending |
+| UNIFY-01 | Phase 23 | Pending |
+| OPS-01 | Phase 24 | Pending |
+| OPS-02 | Phase 24 | Pending |
+| LINT-01 | Phase 25 | Pending |
