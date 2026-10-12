@@ -54,6 +54,9 @@ describe('v1.3 class probes: phase-16 blue bench fail-closed pin', () => {
     const source = readFileSync(join(process.cwd(), 'scripts/detection-coverage-bench.mjs'), 'utf8');
     expect(source).toContain('dist/teams/blue');
     expect(source).toContain('run `npm run build`');
+    expect(source).toContain('import(');
+    expect(source).toContain('pathToFileURL');
+    expect(source).not.toContain('function coverageGaps');
   });
 });
 
@@ -74,6 +77,9 @@ describe('v1.3 class probes: phase-18 black bench fail-closed pin', () => {
     const source = readFileSync(join(process.cwd(), 'scripts/opsec-review-bench.mjs'), 'utf8');
     expect(source).toContain('dist/teams/black');
     expect(source).toContain('run `npm run build`');
+    expect(source).toContain('import(');
+    expect(source).toContain('pathToFileURL');
+    expect(source).not.toContain('function structuredNoiseBudget');
   });
 });
 
