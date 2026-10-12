@@ -86,9 +86,10 @@ curl -s http://127.0.0.1:3333/api/teams/white/roe
 ```
 
 Relay the parsed `roe` spec (`ok`, `summary`), the `resolved` directives,
-and every `unresolved` line with its `reason`. No ROE text is on record
-yet, so the backend derives no per-action verdicts until a real source
-lands — say so, never "everything allowed".
+every `unresolved` line with its `reason`, and — when ROE text is on
+record — the per-action `verdicts` with their provenance stamps
+(`roeRevision`, `roeTextHash`, `roeLines`). With nothing on record the
+backend derives no per-action verdicts — say so, never "everything allowed".
 
 ## 6. Synthesize
 

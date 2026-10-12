@@ -1,11 +1,11 @@
 {
   "schema": "t3mp3st.bench/roe-adjudication/v1",
   "engines": "dist/teams/white {roe-parser.parseRoe, white.roeAudit, evidence-chain.auditEvidenceChain, report-auditor.auditReport}",
-  "cases": 12,
+  "cases": 13,
   "score": {
     "verdicts": {
-      "hits": 25,
-      "total": 25,
+      "hits": 27,
+      "total": 27,
       "rate": 1
     },
     "discrimination": {
@@ -15,7 +15,7 @@
     "penalty": {
       "perDecoy": 5,
       "applied": 0,
-      "penalizedHits": 25
+      "penalizedHits": 27
     },
     "perCase": [
       {
@@ -98,6 +98,13 @@
       {
         "id": "DECOY-passive-audit-wording",
         "decoy": true,
+        "ok": true,
+        "flagged": false,
+        "misses": []
+      },
+      {
+        "id": "stored-record-provenance",
+        "decoy": false,
         "ok": true,
         "flagged": false,
         "misses": []

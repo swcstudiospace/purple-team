@@ -102,6 +102,38 @@ describe('remote /api guard', () => {
     }
   });
 
+  it('covers the ROE PUT verb: 401 without or with a wrong bearer, 200 with the token', async () => {
+    const app = express();
+    app.use(express.json());
+    app.use(createRemoteGuard({
+      token: 'secret',
+      bucket: createTokenBucket({ perMinute: 60, burst: 10 }),
+    }));
+    app.put('/api/teams/white/roe', (_req, res) => res.json({ ok: true }));
+    const { server, port } = await listen(app);
+    const url = `http://127.0.0.1:${port}/api/teams/white/roe`;
+    const headers = { 'Content-Type': 'application/json' };
+    const body = JSON.stringify({ text: 'allow active: no', actions: [] });
+    try {
+      const missing = await fetch(url, { method: 'PUT', headers, body });
+      expect(missing.status).toBe(401);
+      const wrong = await fetch(url, {
+        method: 'PUT',
+        headers: { ...headers, Authorization: 'Bearer nope' },
+        body,
+      });
+      expect(wrong.status).toBe(401);
+      const ok = await fetch(url, {
+        method: 'PUT',
+        headers: { ...headers, Authorization: 'Bearer secret' },
+        body,
+      });
+      expect(ok.status).toBe(200);
+    } finally {
+      await close(server);
+    }
+  });
+
   it('rate-limits a burst deterministically and refills one token per second at 60/min', async () => {
     const now = { t: 1_000 };
     const bucket = createTokenBucket({ perMinute: REMOTE_RATE_PER_MINUTE, burst: 2 });

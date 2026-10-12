@@ -237,7 +237,7 @@ Requires: Target hostname or IP.`,
   },
   {
     name: 'tempest_white_roe',
-    description: `White ROE adjudication state on record (GET /api/teams/white/roe). Use when: the operator asks what the rules of engagement currently allow or deny, which ROE lines failed to parse and why, or the verdict on record for an action.`,
+    description: `White ROE adjudication state on record (GET /api/teams/white/roe): the parsed spec plus provenance-stamped verdicts (revision, text hash, source lines) when ROE text is on record. Recording happens via the operator PUT /api/teams/white/roe — there is no MCP mutation tool. Use when: the operator asks what the rules of engagement currently allow or deny, which ROE lines failed to parse and why, or the verdict on record for an action.`,
     inputSchema: { type: 'object', properties: {} }
   },
   {

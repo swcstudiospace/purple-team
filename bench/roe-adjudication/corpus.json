@@ -377,5 +377,36 @@
         }
       }
     }
+    ,
+    {
+      "id": "stored-record-provenance",
+      "desc": "Text-to-parse-to-verdict chain as GET /api/teams/white/roe performs it: a stored PUT record's ROE text parses ok and the stored actions adjudicate to one compliant passive action, one needs_approval active action, and one off-scope violation",
+      "decoy": false,
+      "roe": "scope: app.example.com\nallow active: yes\n",
+      "actions": [
+        { "command": "curl https://app.example.com/health", "target": "app.example.com" },
+        { "command": "nmap -sV app.example.com", "target": "app.example.com" },
+        { "command": "sqlmap -u evil.example.com", "target": "evil.example.com" }
+      ],
+      "expect": {
+        "parse": {
+          "ok": true,
+          "commentLines": 0,
+          "allowedTargets": ["app.example.com"],
+          "allowActive": true,
+          "resolved": [
+            { "field": "allowedTargets", "line": 1, "value": "app.example.com" },
+            { "field": "allowActive", "line": 2, "value": "true" }
+          ],
+          "unresolved": [],
+          "summary": "parsed 2 directive line(s); 0 line(s) unresolved"
+        },
+        "adjudication": [
+          { "actionIndex": 0, "verdict": "compliant" },
+          { "actionIndex": 1, "verdict": "needs_approval" },
+          { "actionIndex": 2, "verdict": "violation" }
+        ]
+      }
+    }
   ]
 }
