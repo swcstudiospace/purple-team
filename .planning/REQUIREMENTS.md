@@ -10,7 +10,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (traceab
 
 ### Validation
 
-- [x] **VAL-01**: Each v1.3 phase directory 15–20 carries a `NN-VALIDATION.md` whose Per-Task Verification Map ties every phase requirement to a command actually run green during the pass, with ≥1 class-level negative probe per phase (e.g. `roeAudit(actions, {})` never all-compliant), an honest Manual-Only table, State-B dating (no invented wave-0 history), and a supersession log that later v1.4 phases update when they mutate validated surfaces.
+- [x] **VAL-01**: Each v1.3 phase directory 15–20 carries a `NN-VALIDATION.md` whose Per-Task Verification Map ties every phase requirement to a command actually run green during the pass, with ≥1 class-level negative probe per phase (e.g. `roeAudit(actions, {})` never all-compliant), an honest Manual-Only table, State-B dating (no invented wave-zero history), and a supersession log that later v1.4 phases update when they mutate validated surfaces.
 
 ### White ROE
 
