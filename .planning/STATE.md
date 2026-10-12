@@ -5,17 +5,17 @@ milestone_name: Hardening & Validation
 current_phase: 21
 current_phase_name: Retroactive Validation (Phases 15–20)
 status: executing
-stopped_at: Phase 21 plan 01 complete (tracer evidence loop, 19-VALIDATION.md validated)
-last_updated: "2026-10-12T22:22:00.000Z"
+stopped_at: Phase 21 plan 02 complete (scale-out wave, five VALIDATION.md records, open finding F-20-01)
+last_updated: "2026-10-12T22:55:00.000Z"
 last_activity: 2026-10-12
-last_activity_desc: Phase 21 plan 01 executed (6 probes green, 19-VALIDATION.md committed)
-state_head: 36491b7
+last_activity_desc: Phase 21 plan 02 executed (15/16/17/18/20 VALIDATION.md committed; prompt:audit red recorded as F-20-01)
+state_head: b10a172
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
-  percent: 33
+  completed_plans: 2
+  percent: 67
 ---
 
 # Project State
@@ -30,10 +30,9 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 ## Current Position
 
 Phase: 21 (Retroactive Validation (Phases 15–20)) — EXECUTING
-Plan: 1 of 3 complete (21-01 tracer evidence loop)
-Status: Executing Phase 21 — next: plan 21-02 (clone pattern x5)
-Last activity: 2026-10-12 — Phase 21 plan 01 complete (commits 7a9bfb9 test, 7c348ec docs, SUMMARY)
-
+Plan: 2 of 3 complete (21-02 scale-out wave)
+Status: Executing Phase 21 — next: plan 21-03 (re-audit)
+Last activity: 2026-10-12 — Phase 21 plan 02 complete (commits 1f8018f, bc7cbf3, b10a172 docs, SUMMARY)
 ## Completed Context
 
 - **v1.0** 2026-10-09: plan-based inference, Dark Purple core, white/red UI, Grok Bot package.
@@ -52,5 +51,5 @@ Last activity: 2026-10-12 — Phase 21 plan 01 complete (commits 7a9bfb9 test, 7
 ## Session Continuity
 
 Last session: 2026-10-12
-Stopped at: Phase 21 plan 01 complete — resume at plan 21-02
+Stopped at: Phase 21 plan 02 complete — resume at plan 21-03 (re-audit; carries open finding F-20-01)
 Resume file: .planning/ROADMAP.md
