@@ -14,7 +14,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (traceab
 
 ### White ROE
 
-- [ ] **ROE-01**: An operator can load ROE text into server state via a `/api/*` mutation route, and `GET /api/teams/white/roe` returns the deterministic parse plus provenance-stamped `RoeVerdict`s (ROE revision/text hash, line refs) when and only when `parseRoe` is `ok:true`; missing or corrupt stored ROE fails closed to cannot-derive; emissions are `redactSecrets`-wrapped; ROE text is treated as untrusted data (deterministic scope only, data-only delimiting if ever surfaced to referee LLMs).
+- [x] **ROE-01**: An operator can load ROE text into server state via a `/api/*` mutation route, and `GET /api/teams/white/roe` returns the deterministic parse plus provenance-stamped `RoeVerdict`s (ROE revision/text hash, line refs) when and only when `parseRoe` is `ok:true`; missing or corrupt stored ROE fails closed to cannot-derive; emissions are `redactSecrets`-wrapped; ROE text is treated as untrusted data (deterministic scope only, data-only delimiting if ever surfaced to referee LLMs).
 
 ### Purple risk signal
 
@@ -60,7 +60,7 @@ Requirement-to-phase mapping. Filled by the roadmapper.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | VAL-01 | Phase 21 | Complete |
-| ROE-01 | Phase 22 | Pending |
+| ROE-01 | Phase 22 | Complete |
 | UNIFY-01 | Phase 23 | Pending |
 | OPS-01 | Phase 24 | Pending |
 | OPS-02 | Phase 24 | Pending |
