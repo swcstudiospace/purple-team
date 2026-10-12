@@ -13,6 +13,18 @@ run authorized adversarial research with scope receipts, approval gates, and evi
 Every adversarial claim hardens into scoped, receipt-backed, retestable evidence — power without
 provenance is failure.
 
+## Current Milestone: v1.4 Hardening & Validation
+
+**Goal:** Close the v1.3 audit tech-debt and promote unvalidated phases to verified.
+
+**Target features:**
+- ROE-01 — real ROE text source in server state; `/api/teams/white/roe` emits verdicts-on-record
+- VAL-01 — retroactive validate-phase for v1.3 phases 15–20 (VALIDATION.md, Nyquist promotion)
+- UNIFY-01 — residualRisk prose and riskTier unified into one signal across all consumers
+- OPS-01 — docker healthcheck exercised in a real container
+- OPS-02 — desktop installer matrix built on this host (not CI-only)
+- LINT-01 — lint warning baseline restored to ≤176 with no new warnings
+
 ## Requirements
 
 ### Validated
@@ -36,7 +48,12 @@ provenance is failure.
 
 ### Active
 
-- [ ] Next milestone: scope unchosen (candidates in `.planning/v1.3-MILESTONE-AUDIT.md` tech-debt list)
+- [ ] ROE-01: Operator can load ROE text into server state so `/api/teams/white/roe` produces verdicts-on-record
+- [ ] VAL-01: Phases 15–20 carry retroactive VALIDATION.md evidence (validate-phase pass, Nyquist promotion)
+- [ ] UNIFY-01: residualRisk prose and riskTier collapse into one deterministic signal; every consumer updated
+- [ ] OPS-01: Docker healthcheck verified by a real container run
+- [ ] OPS-02: Desktop installer matrix observed building on this host
+- [ ] LINT-01: Lint warning count back to ≤176 with zero new warnings
 
 ### Out of Scope
 
@@ -77,5 +94,22 @@ provenance is failure.
 | v1.2 non-loopback binds fail closed without a bearer | Intentionally breaks unauthenticated Docker `0.0.0.0` exposure — the vulnerability being closed | ✓ Good |
 | v1.2 Windows webview origin (`tauri.localhost`) trusted as page origin, never as Host | Host allow-list stays literal loopback to keep the anti-rebinding gate intact | ✓ Good |
 
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
-*Last updated: 2026-10-10 after v1.2 archive*
+*Last updated: 2026-10-12 at v1.4 start*

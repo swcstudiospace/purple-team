@@ -1,9 +1,15 @@
 ---
-gsd_state_version: '1.0'
-status: ready
+gsd_state_version: "1.0"
+milestone: v1.4
+milestone_name: Hardening & Validation
+status: planning
+last_updated: "2026-10-12T21:05:00.227Z"
+last_activity: 2026-10-12
 progress:
   total_phases: 0
   completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
   percent: 0
 ---
 
@@ -18,9 +24,10 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: none (no active milestone)
-Status: v1.3 archived 2026-10-10 (audit: tech_debt, same no-gaps classification as v1.2)
-Next: choose the next milestone scope (candidates in `.planning/v1.3-MILESTONE-AUDIT.md` tech-debt list)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-10-12 — Milestone v1.4 started
 
 ## Completed Context
 
