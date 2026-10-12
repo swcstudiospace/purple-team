@@ -2,13 +2,18 @@
 gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Hardening & Validation
+current_phase: 21
+current_phase_name: Retroactive Validation (Phases 15–20)
 status: planning
-last_updated: "2026-10-12T21:32:13.000Z"
+stopped_at: v1.4 roadmap created (phases 21–25); awaiting approval before plan-phase 21
+last_updated: "2026-10-12T22:13:07.618Z"
 last_activity: 2026-10-12
+last_activity_desc: v1.4 ROADMAP.md written (21 Retroactive Validation → 22 ROE Text as Server State → 23 One Risk Signal → 24 Ops Evidence on This Host → 25 Lint Re-baseline & Close-Out)
+state_head: 58568a7af86f1a7380d7b4d4c45b4999f3a7f410
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
+  total_plans: 3
   completed_plans: 0
   percent: 0
 ---
@@ -24,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: Not started (roadmap ready; Phase 21 next)
+Phase: 21 (Retroactive Validation (Phases 15–20)) — READY TO EXECUTE
 Plan: —
 Status: Roadmap created — awaiting approval
 Last activity: 2026-10-12 — v1.4 ROADMAP.md written (21 Retroactive Validation → 22 ROE Text as Server State → 23 One Risk Signal → 24 Ops Evidence on This Host → 25 Lint Re-baseline & Close-Out)
