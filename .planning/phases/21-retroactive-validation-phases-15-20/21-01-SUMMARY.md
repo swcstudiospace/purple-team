@@ -135,3 +135,7 @@ None - no external service configuration required.
 ---
 *Phase: 21-retroactive-validation-phases-15-20*
 *Completed: 2026-10-12*
+
+## Self-Check: PASSED
+
+- Probe file, 19-VALIDATION.md, and SUMMARY.md all present on disk; commits `7a9bfb9` (test) and `7c348ec` (docs) verified in history with test-before-docs order and zero `src` paths in the docs commit.

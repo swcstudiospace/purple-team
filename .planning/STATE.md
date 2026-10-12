@@ -4,18 +4,18 @@ milestone: v1.4
 milestone_name: Hardening & Validation
 current_phase: 21
 current_phase_name: Retroactive Validation (Phases 15–20)
-status: planning
-stopped_at: v1.4 roadmap created (phases 21–25); awaiting approval before plan-phase 21
-last_updated: "2026-10-12T22:13:07.618Z"
+status: executing
+stopped_at: Phase 21 plan 01 complete (tracer evidence loop, 19-VALIDATION.md validated)
+last_updated: "2026-10-12T22:22:00.000Z"
 last_activity: 2026-10-12
-last_activity_desc: v1.4 ROADMAP.md written (21 Retroactive Validation → 22 ROE Text as Server State → 23 One Risk Signal → 24 Ops Evidence on This Host → 25 Lint Re-baseline & Close-Out)
-state_head: 58568a7af86f1a7380d7b4d4c45b4999f3a7f410
+last_activity_desc: Phase 21 plan 01 executed (6 probes green, 19-VALIDATION.md committed)
+state_head: 36491b7
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 33
 ---
 
 # Project State
@@ -25,14 +25,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the archived v1.0–v1.3 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** v1.4 Hardening & Validation — roadmap created: 5 phases (21–25), 6 requirements mapped, 100% coverage
+**Current focus:** Phase 21 — Retroactive Validation (Phases 15–20)
 
 ## Current Position
 
-Phase: 21 (Retroactive Validation (Phases 15–20)) — READY TO EXECUTE
-Plan: —
-Status: Roadmap created — awaiting approval
-Last activity: 2026-10-12 — v1.4 ROADMAP.md written (21 Retroactive Validation → 22 ROE Text as Server State → 23 One Risk Signal → 24 Ops Evidence on This Host → 25 Lint Re-baseline & Close-Out)
+Phase: 21 (Retroactive Validation (Phases 15–20)) — EXECUTING
+Plan: 1 of 3 complete (21-01 tracer evidence loop)
+Status: Executing Phase 21 — next: plan 21-02 (clone pattern x5)
+Last activity: 2026-10-12 — Phase 21 plan 01 complete (commits 7a9bfb9 test, 7c348ec docs, SUMMARY)
 
 ## Completed Context
 
@@ -52,5 +52,5 @@ Last activity: 2026-10-12 — v1.4 ROADMAP.md written (21 Retroactive Validation
 ## Session Continuity
 
 Last session: 2026-10-12
-Stopped at: v1.4 roadmap created (phases 21–25); awaiting approval before plan-phase 21
+Stopped at: Phase 21 plan 01 complete — resume at plan 21-02
 Resume file: .planning/ROADMAP.md
