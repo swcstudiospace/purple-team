@@ -6598,13 +6598,17 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     return;
   }
   const previous = roeRecords.get('latest');
+  const prevRevision =
+    typeof previous?.revision === 'number' && Number.isFinite(previous.revision)
+      ? Math.floor(previous.revision)
+      : 0;
   const record: RoeRecord = {
     id: 'latest',
-    revision: (previous?.revision ?? 0) + 1,
+    revision: prevRevision + 1,
     textHash: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16),
     text,
     actions: actions as AuditedAction[],
-    createdAt: previous?.createdAt ?? nowIso(),
+    createdAt: typeof previous?.createdAt === 'string' ? previous.createdAt : nowIso(),
     updatedAt: nowIso(),
   };
   roeRecords.set('latest', record);
@@ -6621,8 +6625,9 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
 // (teams/white/roe-parser.ts parseRoe) plus roeAudit verdicts over the stored
 // actions when and only when the parse is ok:true. Fail-closed ladder, always
 // 200: no record or a shapeless record (text not a string, actions not an
-// array — the replaceMapContents restore silently drops id-less rows into
-// this same state) returns the honest zeroed parse; a record whose stored
+// element-valid array of objects, revision/timestamps not finite scalars —
+// the replaceMapContents restore silently drops id-less rows into this same
+// state) returns the honest zeroed parse; a record whose stored
 // textHash no longer matches the stored text (write-time-redaction drift)
 // returns the same cannot-derive report with no verdicts member; an ok:false
 // parse returns parse plus provenance with no verdicts member; only an
@@ -6631,7 +6636,13 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
 // refs. Never continue with an empty spec: ok:false never yields verdicts.
 app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
   const record = roeRecords.get('latest');
-  if (!record || typeof record.text !== 'string' || !Array.isArray(record.actions)) {
+  const storedActions: unknown = record?.actions;
+  const actionsOk =
+    Array.isArray(storedActions) &&
+    !(storedActions as unknown[]).some((a) => !a || typeof a !== 'object' || Array.isArray(a));
+  const revisionOk = typeof record?.revision === 'number' && Number.isFinite(record.revision);
+  const timestampsOk = typeof record?.createdAt === 'string' && typeof record?.updatedAt === 'string';
+  if (!record || typeof record.text !== 'string' || !actionsOk || !revisionOk || !timestampsOk) {
     const parse = { ...parseRoe(''), summary: 'no ROE text on record' };
     res.json(redactSecrets(parse));
     return;
