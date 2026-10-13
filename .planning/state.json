@@ -6,33 +6,33 @@
     {
       "number": "21",
       "name": "Retroactive Validation (Phases 15–20)",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "22",
       "name": "ROE Text as Server State",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "23",
       "name": "One Risk Signal",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "24",
       "name": "Ops Evidence on This Host",
-      "status": "pending"
+      "status": "complete"
     },
     {
       "number": "25",
       "name": "Lint Re-baseline & Close-Out",
-      "status": "pending"
+      "status": "complete"
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step",
-    "reason": "Phase 21 of 5 · 0% · executing"
+    "command": "/gsd:progress",
+    "label": "Show progress",
+    "reason": "Unsure of state — showing progress"
   },
-  "updated_at": "2026-10-12T22:15:05.093Z"
+  "updated_at": "2026-10-13T02:33:14.820Z"
 }

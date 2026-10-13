@@ -13,17 +13,23 @@ run authorized adversarial research with scope receipts, approval gates, and evi
 Every adversarial claim hardens into scoped, receipt-backed, retestable evidence — power without
 provenance is failure.
 
-## Current Milestone: v1.4 Hardening & Validation
+## Next Milestone: v2 (unplanned)
 
-**Goal:** Close the v1.3 audit tech-debt and promote unvalidated phases to verified.
+**Candidates recorded at v1.4 close (audit 2026-10-13, owner-accepted):**
 
-**Target features:**
-- ROE-01 — real ROE text source in server state; `/api/teams/white/roe` emits verdicts-on-record
-- VAL-01 — retroactive validate-phase for v1.3 phases 15–20 (VALIDATION.md, Nyquist promotion)
-- UNIFY-01 — residualRisk prose and riskTier unified into one signal across all consumers
-- OPS-01 — docker healthcheck exercised in a real container
-- OPS-02 — desktop installer matrix built on this host (not CI-only)
-- LINT-01 — lint warning baseline restored to ≤176 with no new warnings
+Close-out follow-ups (v1.4 audit tech debt):
+- [ ] F-20-01 — `prompt:audit` red at the frozen v1.3 boundary (29/34; 5 UI-default-prompt checks), proven pre-existing; reconcile against the 39/39 claim's inputs
+- [ ] Stale v1.3 audit Nyquist prose (`v1.3-MILESTONE-AUDIT.md` lines 66–70 still read "no VALIDATION.md") — refresh via normal planning
+- [ ] Phase 23 manual remainder — browser render of the operators.html Tier cell against a live server; reconcile the 23-VERIFICATION frontmatter/body status mismatch
+- [ ] F-25-01 (v2-lint-scope) — 18 never-linted files holding 16 errors + 112 warnings outside the measured 176/0 scope
+- [ ] Stray repo-root artifact file `Heads-up: while wiring GET '` — delete or move on next touch
+
+Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
+- [ ] Persisted verdict ledger slot and ROE revision history
+- [ ] Purple auto-consumption of recorded verdicts
+- [ ] Text provenance (who/when/source) on ROE records
+- [ ] Install-and-launch verification of the built `.deb`/AppImage
+- [ ] Per-rule lint budgets and doctor-integrated lint gate
 
 ## Requirements
 
@@ -53,7 +59,7 @@ provenance is failure.
 
 ### Active
 
-- (none — v1.4 scope delivered)
+- (none — v1.4 scope delivered; next-milestone candidates recorded above)
 
 ### Out of Scope
 
@@ -67,8 +73,8 @@ provenance is failure.
 - TypeScript ESM, Node >= 22.19, vitest, express; UI is static pages under `docs/` served at `/ui` (bundled into Tauri via `frontendDist`, also served by the sidecar).
 - Repo: `github.com/swcstudiospace/purple-team`, MIT, fresh history from 2026-10-10 (pre-reset bundle at `../purple-team-pre-reset.bundle`).
 - Desktop: Tauri 2.12 shell spawns the packaged API server as a sidecar on 127.0.0.1:3333; capabilities stay `core:default`.
-- GSD planning (this directory): v1.0–v1.2 archived under `.planning/milestones/`.
-- Known debt (accepted at v1.2 close): no phase VERIFICATION files; installer matrix CI-only; docker healthcheck edited but unrun; mobile `gen/` needs JDK/Android-SDK or macOS/Xcode.
+- GSD planning (this directory): v1.0–v1.4 archived under `.planning/milestones/`.
+- Known debt (accepted at v1.4 close, 2026-10-13 audit): F-20-01 prompt-audit divergence; stale v1.3 audit Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field mismatch; F-25-01 lint-gate scope gap (18 files / 16 errors / 112 warnings outside the measured 176/0); stray repo-root artifact file — all recorded as next-milestone candidates above. Mobile `gen/` still needs JDK/Android-SDK or macOS/Xcode.
 
 ## Constraints
 
@@ -93,6 +99,11 @@ provenance is failure.
 | v1.2 Rust spawns sidecar via `std::process::Command`, not tauri-plugin-shell | Keeps capabilities at `core:default`; renderer gains no execution surface | ✓ Good |
 | v1.2 non-loopback binds fail closed without a bearer | Intentionally breaks unauthenticated Docker `0.0.0.0` exposure — the vulnerability being closed | ✓ Good |
 | v1.2 Windows webview origin (`tauri.localhost`) trusted as page origin, never as Host | Host allow-list stays literal loopback to keep the anti-rebinding gate intact | ✓ Good |
+| v1.4 retroactive validation: manual section-5.5 audit flip; all six v1.3 phases honest PARTIAL, zero Nyquist-compliant | Workflow regenerates the whole audit file; honesty beats green | ✓ Good |
+| v1.4 ROE store: single `'latest'` slot; parse-mismatch shares the empty-state cannot-derive report | Fail-closed by construction; no permissive fallbacks | ✓ Good |
+| v1.4 risk signal: single tier-keyed `residualRisk` writer + whole-vocabulary parity pins; prose field kept (shape stable) | API-stability constraint outweighs dropping the field | ✓ Good |
+| v1.4 ops probes repointed to deliberately-open `/health`; no new bearer-guard exemptions | Evidence must not widen the unauthenticated surface | ✓ Good |
+| v1.4 lint baseline: guard-throw fix (message verbatim) + doctor hygiene pin (census ceiling, config anchors) | Mechanical drift prevention over periodic manual re-measures | ✓ Good |
 
 ## Evolution
 
@@ -112,4 +123,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-13 after Phase 23*
+*Last updated: 2026-10-13 after v1.4 milestone*

@@ -2,19 +2,19 @@
 gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Hardening & Validation
-current_phase: 25
-status: completed
+status: Awaiting next milestone
 stopped_at: Phase 25 complete — all phases complete
-last_updated: "2026-10-13T02:14:57.011Z"
+last_updated: "2026-10-13T02:33:14.811Z"
 last_activity: 2026-10-13
-last_activity_desc: Phase 25 complete
-state_head: 1f1600996b7f657fb94d8d547c4523f0b9eea0df
+last_activity_desc: Milestone v1.4 completed and archived
+state_head: 828313f550fd73c5c4d0d7363326f383657cb013
 progress:
   total_phases: 5
   completed_phases: 5
   total_plans: 7
   completed_plans: 7
   percent: 100
+current_phase: 25
 ---
 
 # Project State
@@ -28,10 +28,10 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 25
-Plan: Not started
-Status: All phases complete
-Last activity: 2026-10-13 — Phase 25 complete
+Phase: Milestone v1.4 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-13 — Milestone v1.4 completed and archived
 
 ## Completed Context
 
@@ -71,3 +71,7 @@ Resume file: None
 - [Phase 23]: 23-01: two-commit split per dispatch binding (derivation+consumers+supersession in feat, docsite mirror wholesale in docs); supersession row uses explicit P20-C1/C2b/C3a/C4 tokens for grep-proof acceptance
 - [Phase 24]: 24-01: Rule-1 probe hostname localhost→127.0.0.1 (busybox wget ::1-first vs IPv4-only bind) and bundler category Security→Utility (invalid category); image t3mp3st:ops01 final .Id 55d8c979; deb+AppImage host-built with sha256; test:pr exit 0
 - [Phase 25]: 25-01: Option A guard-throw (message verbatim, ceiling stays 5); doctor-venue hygiene pin (census-before-config, block severity); hold knob exit 0; measured 176/0; F-25-01 scope gap as owner follow-up; test:pr exit 0
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone
