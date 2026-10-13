@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.4
 milestone_name: Hardening & Validation
-current_phase: 24
-current_phase_name: Ops Evidence on This Host
-status: executing
-stopped_at: Phase 23 complete, ready to plan Phase 24
-last_updated: "2026-10-13T01:02:12.159Z"
+current_phase: 25
+current_phase_name: Lint Re-baseline & Close-Out
+status: planning
+stopped_at: Phase 24 complete, ready to plan Phase 25
+last_updated: "2026-10-13T01:32:05.556Z"
 last_activity: 2026-10-13
-last_activity_desc: Phase 23 complete, transitioned to Phase 24
-state_head: 17cad606010e585d1c6e8df716a6d3848c80ab48
+last_activity_desc: Phase 24 complete, transitioned to Phase 25
+state_head: 16876be480532ddfcf1b9c99e9a85b9e77420d2f
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 6
-  completed_plans: 5
-  percent: 60
+  completed_plans: 6
+  percent: 80
 ---
 
 # Project State
@@ -29,10 +29,11 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 24 (Ops Evidence on This Host) — PLAN 01 COMPLETE
-Plan: 24-01 executed (3/3 tasks, commits ca35d87/cbf29c4/ecc3df2)
-Status: Awaiting verify-work / next plan
-Last activity: 2026-10-13 — 24-01 complete (OPS-01 + OPS-02 evidenced on this host)
+Phase: 25 — Lint Re-baseline & Close-Out
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-13 — Phase 24 complete, transitioned to Phase 25
+
 ## Completed Context
 
 - **v1.0** 2026-10-09: plan-based inference, Dark Purple core, white/red UI, Grok Bot package.
@@ -51,7 +52,7 @@ Last activity: 2026-10-13 — 24-01 complete (OPS-01 + OPS-02 evidenced on this 
 ## Session Continuity
 
 Last session: 2026-10-13T00:20:00Z
-Stopped at: Phase 23 complete, ready to plan Phase 24
+Stopped at: Phase 24 complete, ready to plan Phase 25
 Resume file: None
 
 ## Performance Metrics

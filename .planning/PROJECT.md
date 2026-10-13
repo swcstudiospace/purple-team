@@ -48,11 +48,10 @@ provenance is failure.
 - ✓ Retroactive validation evidence for v1.3 phases 15–20: six template-shaped NN-VALIDATION.md records, six class-level negative probes (pinned green), SUPERSESSION.md log, audit Nyquist block flipped to honest partial — v1.4 Phase 21
 - ✓ ROE text as server state: sanctioned roeRecords store, PUT/GET pair with provenance-stamped verdicts (ok:true-gated), fail-closed corruption ladder, 64 KiB cap, sharpened pins, bench provenance case, supersession entry — v1.4 Phase 22
 - ✓ One risk signal: single tier-keyed residualRisk derivation, whole-vocabulary parity pin, response shape unchanged, consumers + docsite mirror cutover, supersession entry — v1.4 Phase 23
+- ✓ Ops evidence on this host: docker healthcheck observed live (healthy/failure/fail-closed, inspect receipts, token prefix-only), installer matrix built on-host (deb + AppImage sha256 receipts, CI-evidence-only cells) — v1.4 Phase 24
 
 ### Active
 
-- [ ] OPS-01: Docker healthcheck verified by a real container run
-- [ ] OPS-02: Desktop installer matrix observed building on this host
 - [ ] LINT-01: Lint warning count back to ≤176 with zero new warnings
 
 ### Out of Scope

@@ -22,8 +22,8 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (traceab
 
 ### Operations evidence
 
-- [ ] **OPS-01**: The Docker healthcheck is evidenced in a real container: Dockerfile/compose probes reconciled (repointed to the deliberately-open `/health`; no new guard exemption), a with-token run showing the observed `starting → healthy` transition, the failure path observed (retries exhausting into `unhealthy`), and a no-token fail-closed startup refusal — with container IDs and inspect receipts recorded.
-- [ ] **OPS-02**: The desktop installer matrix is built on this host: fresh `sidecar:build` → `tauri build --bundles deb,appimage` with a per-target receipt table (target / built-on-host / artifact path / byte size / sha256 / launched?) and explicit `CI-evidence-only` cells for msi/nsis/app/dmg; cross-compiled artifacts never count as host-observed.
+- [x] **OPS-01**: The Docker healthcheck is evidenced in a real container: Dockerfile/compose probes reconciled (repointed to the deliberately-open `/health`; no new guard exemption), a with-token run showing the observed `starting → healthy` transition, the failure path observed (retries exhausting into `unhealthy`), and a no-token fail-closed startup refusal — with container IDs and inspect receipts recorded.
+- [x] **OPS-02**: The desktop installer matrix is built on this host: fresh `sidecar:build` → `tauri build --bundles deb,appimage` with a per-target receipt table (target / built-on-host / artifact path / byte size / sha256 / launched?) and explicit `CI-evidence-only` cells for msi/nsis/app/dmg; cross-compiled artifacts never count as host-observed.
 
 ### Lint hygiene
 
@@ -62,6 +62,6 @@ Requirement-to-phase mapping. Filled by the roadmapper.
 | VAL-01 | Phase 21 | Complete |
 | ROE-01 | Phase 22 | Complete |
 | UNIFY-01 | Phase 23 | Complete |
-| OPS-01 | Phase 24 | Pending |
-| OPS-02 | Phase 24 | Pending |
+| OPS-01 | Phase 24 | Complete |
+| OPS-02 | Phase 24 | Complete |
 | LINT-01 | Phase 25 | Pending |
