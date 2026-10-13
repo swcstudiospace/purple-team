@@ -132,3 +132,77 @@ and prove nothing about the guard — recorded here as the honest-mechanism choi
 | `GET /api/health` with bearer | `200` |
 
 Containers kept (no `--rm`) until transcription; torn down after Task-2 commit.
+
+## Task 3 — Host installer matrix (CI-verbatim chain)
+
+### Step 0 — host prep (D-05)
+
+`sudo apt-get update && sudo apt-get install -y patchelf` → `patchelf 0.18.0`
+(Ubuntu noble distro package; same package CI installs at tauri-build.yml:57).
+apt printed one unrelated warning (hashicorp repo GPG `NO_PUBKEY FC9CA96ACA026560`;
+index fallback, install unaffected).
+
+### Stale-byte check (pre-build)
+
+| File | Bytes | mtime | sha256 |
+|---|---|---|---|
+| `src-tauri/binaries/t3mp3st-server-linux-x64` | 89571371 | 2026-10-10 01:20:12 | `202c228c7a7839f21ef1782680cebab124cddd32a312015ff3316b1f3c2ff378` |
+| `src-tauri/binaries/t3mp3st-server-x86_64-unknown-linux-gnu` | 89571371 | 2026-10-10 01:20:12 | `202c228c7a7839f21ef1782680cebab124cddd32a312015ff3316b1f3c2ff378` |
+
+Oct-10 vintage confirmed stale → mandatory fresh `sidecar:build` before bundling.
+
+### Chain (exactly CI order: tauri-build.yml:59-66)
+
+| Step | Wall time |
+|---|---|
+| `npm run build` (tsc) | 7 s (epoch 1791854150 → 1791854157) |
+| `npm run sidecar:build` | 9 s (epoch 1791854162 → 1791854171; pkg base cached) |
+| `npx tauri build --bundles deb,appimage` attempt 1 | 138 s (epoch 1791854182 → 1791854320) — FAILED at bundler settings (see D2) |
+| `npx tauri build --bundles deb,appimage` attempt 2 | 128 s (epoch 1791854350 → 1791854478) — 2 bundles |
+| `df -h .` before → after | `387G 364G 23G 95%` → `387G 366G 21G 95%` |
+
+### Deviation D2 (Rule 1 — bug / Rule 3 — blocker, found during Task 3)
+
+Attempt 1 compiled the release binary (`Finished release profile in 2m 09s`) then
+failed: `failed to build bundler settings: invalid category`. Root cause:
+`src-tauri/tauri.conf.json:32` `"category": "Security"` — not a valid Tauri
+`AppCategory` (no desktop taxonomy ships a Security category). Fix:
+`"category": "Utility"` (closest honest category for a console app).
+Grep confirms no scaffold pin constrains `category`
+(`tauri-scaffold-static.test.ts` and `docs/TAURI.md` have zero `categor` hits);
+post-fix pins re-verified 26/26 green. Attempt 2 (release compile cached, 25 s)
+bundled both targets.
+
+### Fresh-sidecar receipt (post-build)
+
+| File | Bytes | mtime | sha256 |
+|---|---|---|---|
+| `src-tauri/binaries/t3mp3st-server-linux-x64` | 89934154 | 2026-10-13 01:16:10 | `ac05547ecf39241d94c7e6c13552454b5abcad2f9cf65e1ccaf0a5ab4e55c842` |
+| `src-tauri/binaries/t3mp3st-server-x86_64-unknown-linux-gnu` | 89934154 | 2026-10-13 01:16:10 | `ac05547ecf39241d94c7e6c13552454b5abcad2f9cf65e1ccaf0a5ab4e55c842` |
+
+Both names fresh (size changed 89571371 → 89934154, mtime at/after chain start).
+`git check-ignore src-tauri/target` exit 0 (Task 1); bundle paths never git-stored.
+
+### Bundle receipt table (glob-first: `src-tauri/target/release/bundle/{deb,appimage}/`)
+
+| Target | Built-on-host? | Artifact path | Bytes | sha256 | Launched? |
+|---|---|---|---|---|---|
+| deb | yes | `src-tauri/target/release/bundle/deb/T3MP3ST_1.0.0_amd64.deb` | 36376766 | `9bcfa006aedbbcc188bd31a3440ace516d30a83e772d788f6fe5c058365cd595` | no (install-and-launch deferred to v2) |
+| AppImage | yes | `src-tauri/target/release/bundle/appimage/T3MP3ST_1.0.0_amd64.AppImage` | 112257528 | `87e3222d7aa5a259a9e0a860b4801c7c8060b47e03b9c467e7c267c768b42154` | no — `--appimage-extract-and-run` attempted: binary executes, then panics `Failed to initialize gtk backend … Failed to initialize GTK` (headless host, no display). Extraction/bundling proven; GUI launch needs a display (v2). |
+| msi | CI-evidence-only | — | — | — | CI: `tauri-build.yml` windows-latest `--bundles msi,nsis` (https://github.com/swcstudiospace/purple-team/blob/main/.github/workflows/tauri-build.yml#L35-L43); green run at phase commit SHA |
+| nsis | CI-evidence-only | — | — | — | CI: same windows-latest row as msi |
+| app | CI-evidence-only | — | — | — | CI: `tauri-build.yml` macos-latest `--bundles app,dmg` (same URL); green run at phase commit SHA |
+| dmg | CI-evidence-only | — | — | — | CI: same macos-latest row as app |
+
+Cross-compiled artifacts never counted as host-observed (locked constraint).
+
+### Gate receipts
+
+| Gate | Result |
+|---|---|
+| `npm run test:pr` | exit 0 |
+| eslint | `177 problems (0 errors, 177 warnings)` — warnings are pre-existing `no-explicit-any` / `no-non-null-assertion` in `src/**`; this phase touches no lint-scoped file (Dockerfile, DOCKER.md, tauri.conf.json, receipts), so the count is unchanged by the phase |
+| vitest | `Test Files 102 passed (102)`, `Tests 1125 passed (1125)` |
+| scaffold pins | `tauri-scaffold-static.test.ts` 26/26 pass (re-run after category fix) |
+| doctor | `28/33 checks passed, 5 warning(s), 0 blocker(s)` (warnings: optional nmap/nuclei/semgrep/promptfoo missing; API-health offline — pre-existing) |
+| `git status` (phase scope) | only `Dockerfile`, `docs/DOCKER.md`, `src-tauri/tauri.conf.json`, phase-dir receipts modified; `dist/` and `src-tauri/target/` untouched by git |
