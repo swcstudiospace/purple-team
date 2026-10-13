@@ -12,9 +12,9 @@ function gap(findingId: string, coverage: DetectionGap['coverage']): DetectionGa
 }
 
 function row(synthesis: DarkPurpleSynthesis, findingId: string): DarkPurpleSynthesis['coverageMatrix'][number] {
-  const entry = synthesis.coverageMatrix.find(entry => entry.findingId === findingId);
-  expect(entry, `coverageMatrix row missing for ${findingId}`).toBeDefined();
-  return entry!;
+  const entry = synthesis.coverageMatrix.find(row => row.findingId === findingId);
+  if (!entry) throw new Error(`coverageMatrix row missing for ${findingId}`);
+  return entry;
 }
 
 describe('purple v2: id-keyed correlation', () => {
