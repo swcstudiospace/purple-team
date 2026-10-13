@@ -37,6 +37,7 @@ Zero diff to `docker-compose.yml` (probe already bearer-correct) and zero diff t
 | build wall time | 128 s (epoch 1791853584 → 1791853712) |
 | `grep -c '/health' Dockerfile` | 1 (line 40 only; no `/api/health` remains) |
 | `git check-ignore src-tauri/target` | exit 0 (ignored — build outputs never git-stored) |
+| SUPERSEDED | First-build rows above describe the path-only image; the Rule-1 hostname fix (Task 2, D1) rebuilt the same tag — final `.Id sha256:55d8c97978e4673f780577caba0679bc8b8b4aac55cf693e3c4fd9aed695f410`, size 575743158, HEALTHCHECK `http://127.0.0.1:3333/health`. All run evidence is off the final digest. |
 
 ### Tool versions (this host)
 
@@ -57,3 +58,77 @@ Zero diff to `docker-compose.yml` (probe already bearer-correct) and zero diff t
 |---|---|
 | pre-build | `/dev/sda1 387G 357G 30G 93% /` |
 | post-image-build | `/dev/sda1 387G 363G 25G 94% /` |
+
+## Task 2 — Three evidenced container runs
+
+**Image:** `t3mp3st:ops01` rebuilt after the Rule-1 hostname fix —
+`.Id sha256:55d8c97978e4673f780577caba0679bc8b8b4aac55cf693e3c4fd9aed695f410`,
+size 575743158 bytes, rebuild wall 73 s (epoch 1791853925 → 1791853998).
+First-build .Id `2109efdb…` (128 s) superseded; only the final image ran the evidence below.
+**Token (throwaway, `openssl rand -hex 32`):** prefix `dc6401a1`,
+sha256 `a41e38bbb842c4d76598fc2710e1957316910e83fe5b22ac3f6a43a0b61203c2`.
+Full value held in `/tmp/ops01-token` (mode 600, never committed).
+**No `--rm` on any receipted run.** `docker ps` pre-check: port 3333 free.
+
+### Deviation D1 (Rule 1 — bug, found during Task 2)
+
+First with-token run against the path-only fix went `starting → unhealthy`
+(streak 0→1→2→3, 01:09:19 → 01:10:58) with Health Log
+`wget: can't connect to remote host: Connection refused` resolving
+`localhost:3333 ([::1]:3333)`. Root cause: busybox wget resolves `localhost`
+IPv6-first (`::1`, see container `/etc/hosts`), while the server binds IPv4-only
+`0.0.0.0:3333` (`ss -tlnp` inside container: `0.0.0.0:3333 LISTEN`, node pid 29) —
+yet `wget http://127.0.0.1:3333/health` from inside the container returned
+`remote file exists`, exit 0. So the image probe was doubly broken (guarded path
+AND unroutable hostname). Fix: `Dockerfile:40` hostname `localhost` → `127.0.0.1`
+(same literal compose and DOCKER.md already use; no guard/exemption/compose/src change).
+The stale `t3mp3st-ops01-healthy` container was removed before rebuilding
+(receipts above are from the superseded image and are NOT cited as evidence).
+
+### Run (a) — healthy (image HEALTHCHECK as reconciled)
+
+`docker run -d --name t3mp3st-ops01-healthy -e T3MP3ST_BEARER_TOKEN="$TOKEN" t3mp3st:ops01`
+
+| Field | Value |
+|---|---|
+| container ID | `f06912521376649c4016c7e8c8d709eb55aabdb045b7445051b5cd7918fac22b` |
+| transition transcript | `01:13:26 starting streak=0` → `01:13:31 healthy streak=0` |
+| final Health JSON | `{"Status":"healthy","FailingStreak":0,"Log":[{"Start":"2026-10-13T01:13:31.230786663Z","End":"2026-10-13T01:13:31.294900221Z","ExitCode":0,"Output":"Connecting to 127.0.0.1:3333 (127.0.0.1:3333)\nremote file exists\n"}]}` |
+| server log tail | `[2026-10-13T01:13:31.287Z] GET /health` (probe served, 200) |
+
+### Run (b) — failure path (pre-fix probe replayed via runtime override)
+
+Mechanism: `--health-cmd "wget --no-verbose --tries=1 --spider
+http://127.0.0.1:3333/api/health || exit 1"` with
+`--health-interval=5s --health-timeout=5s --health-start-period=5s --health-retries=3`
+on the SAME image digest. The override replays the documented pre-fix defect (guarded
+`/api/health`, no auth) against the real guard; the `127.0.0.1` literal isolates the
+guard-401 mechanism (a verbatim `localhost` replay would fail at TCP `::1` refused
+and prove nothing about the guard — recorded here as the honest-mechanism choice).
+
+| Field | Value |
+|---|---|
+| container ID | `7103122780fa51f2f39488bb92eb9f86e9a7ad00070f68b11e5e280091208656` |
+| transition transcript | `01:13:42 starting streak=0` → `01:13:47 starting streak=1` → `01:13:53 starting streak=2` → `01:13:58 unhealthy streak=3` |
+| verbatim Log Output (every probe) | `Connecting to 127.0.0.1:3333 (127.0.0.1:3333)\nwget: server returned error: HTTP/1.1 401 Unauthorized` (ExitCode 1; 5-entry ring 01:14:07 → 01:14:28, streak kept climbing to 9 — probes keep failing while unhealthy, as designed) |
+| final status | `unhealthy streak=9` (observed transition into unhealthy at streak 3) |
+
+### Run (c) — no-token fail-closed refusal
+
+`docker run --name t3mp3st-ops01-notoken t3mp3st:ops01` (foreground, default restart policy `no`).
+
+| Field | Value |
+|---|---|
+| container ID | `a86e06055f7d4f2125d36206bdfe6ec9fd8b04612334ffbb410c01e91706cabc` |
+| exit code | `exit=1` (StartedAt 2026-10-13T01:14:04Z, FinishedAt 2026-10-13T01:14:06Z) |
+| verbatim refusal | `[T3MP3ST] Refusing to bind non-loopback host "0.0.0.0" without a bearer token. Set T3MP3ST_BEARER_TOKEN or T3MP3ST_BEARER_TOKEN_FILE and restart.` |
+
+### Guard-intact negative probes (live healthy container, via `docker exec` + image `curl`)
+
+| Probe | Result |
+|---|---|
+| `GET /api/health` no auth | `401` (guard holds — no exemption landed) |
+| `GET /health` no auth | `200` (open by design) |
+| `GET /api/health` with bearer | `200` |
+
+Containers kept (no `--rm`) until transcription; torn down after Task-2 commit.
