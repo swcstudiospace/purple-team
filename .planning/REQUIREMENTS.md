@@ -27,7 +27,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (traceab
 
 ### Lint hygiene
 
-- [ ] **LINT-01**: The eslint warning baseline returns to ≤176 (0 errors intact) by fixing the one net-new phase-20 warning in code (or a narrow line-scoped suppression with recorded reason), the measured count lands in the close-out gate table, and a lint-hygiene pin (inline-disable ceiling + config-diff watch) prevents silent drift; every v1.4 phase reports the running count and allows no net-new warnings.
+- [x] **LINT-01**: The eslint warning baseline returns to ≤176 (0 errors intact) by fixing the one net-new phase-20 warning in code (or a narrow line-scoped suppression with recorded reason), the measured count lands in the close-out gate table, and a lint-hygiene pin (inline-disable ceiling + config-diff watch) prevents silent drift; every v1.4 phase reports the running count and allows no net-new warnings. (Closed 2026-10-13: measured `✖ 176 problems (0 errors, 176 warnings)`, guard-throw in purple-v2 row(), doctor pin + hold knob green, test:pr exit 0; F-25-01 scope gap as owner follow-up.)
 
 ## v2 Requirements
 
@@ -64,4 +64,4 @@ Requirement-to-phase mapping. Filled by the roadmapper.
 | UNIFY-01 | Phase 23 | Complete |
 | OPS-01 | Phase 24 | Complete |
 | OPS-02 | Phase 24 | Complete |
-| LINT-01 | Phase 25 | Pending |
+| LINT-01 | Phase 25 | Complete |

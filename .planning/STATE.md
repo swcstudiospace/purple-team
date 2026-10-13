@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 25 (Lint Re-baseline & Close-Out) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-13 — Phase 24 complete, transitioned to Phase 25
+Phase: 25 (Lint Re-baseline & Close-Out) — COMPLETE
+Plan: 25-01 complete (measured 176/0, hygiene pin, F-25-01 registered)
+Status: v1.4 milestone ready to close — verify-work / ship may proceed
+Last activity: 2026-10-13 — Phase 25 complete, LINT-01 closed
 
 ## Completed Context
 
@@ -51,8 +51,8 @@ Last activity: 2026-10-13 — Phase 24 complete, transitioned to Phase 25
 
 ## Session Continuity
 
-Last session: 2026-10-13T00:20:00Z
-Stopped at: Phase 24 complete, ready to plan Phase 25
+Last session: 2026-10-13T02:04:40Z
+Stopped at: Phase 25 complete (25-01), v1.4 ready to close
 Resume file: None
 
 ## Performance Metrics
@@ -63,6 +63,7 @@ Resume file: None
 | Phase 22 P22-01 | 9min | 3 tasks | 12 files |
 | Phase 23 P23-01 | 8min | 3 tasks | 11 files |
 | Phase 24 P24-01 | 19min | 3 tasks | 4 files |
+| Phase 25 P25-01 | 12min | 3 tasks | 6 files |
 
 ## Decisions
 
@@ -70,3 +71,4 @@ Resume file: None
 - [Phase 22]: 22-01: single atomic commit for all three tasks per plan same-commit bindings; mismatch shares the empty-state cannot-derive report; supersession Commit column cites the feat subject (hash in SUMMARY)
 - [Phase 23]: 23-01: two-commit split per dispatch binding (derivation+consumers+supersession in feat, docsite mirror wholesale in docs); supersession row uses explicit P20-C1/C2b/C3a/C4 tokens for grep-proof acceptance
 - [Phase 24]: 24-01: Rule-1 probe hostname localhost→127.0.0.1 (busybox wget ::1-first vs IPv4-only bind) and bundler category Security→Utility (invalid category); image t3mp3st:ops01 final .Id 55d8c979; deb+AppImage host-built with sha256; test:pr exit 0
+- [Phase 25]: 25-01: Option A guard-throw (message verbatim, ceiling stays 5); doctor-venue hygiene pin (census-before-config, block severity); hold knob exit 0; measured 176/0; F-25-01 scope gap as owner follow-up; test:pr exit 0

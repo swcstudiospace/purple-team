@@ -21,7 +21,7 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 - [x] **Phase 22: ROE Text as Server State** - ROE-01: sanctioned ROE store + `/api/*` mutation route; `GET /api/teams/white/roe` emits provenance-stamped verdicts when and only when the parse is `ok:true`; fail-closed (completed 2026-10-12)
 - [x] **Phase 23: One Risk Signal** - UNIFY-01: `residualRisk` prose becomes a pure derived rendering of the deterministic `riskTier`; every consumer updated same-commit; API shape unchanged (completed 2026-10-13)
 - [x] **Phase 24: Ops Evidence on This Host** - OPS-01 + OPS-02: real-container healthcheck (healthy transition, failure path, no-token refusal) + host installer matrix with per-target sha256 receipts (completed 2026-10-13)
-- [ ] **Phase 25: Lint Re-baseline & Close-Out** - LINT-01: fix the net-new phase-20 warning, measure ≤176 in the close-out gate table, lint-hygiene pin, full gates green
+- [x] **Phase 25: Lint Re-baseline & Close-Out** - LINT-01: fix the net-new phase-20 warning, measure ≤176 in the close-out gate table, lint-hygiene pin, full gates green (completed 2026-10-13)
 
 ## Phase Details
 
@@ -97,7 +97,8 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
   3. The lint-hygiene pin (inline-disable ceiling + config-diff watch) exists and is enforced by doctor or CI
   4. Full gates re-run green as close-out evidence (lint, typecheck, vitest, doctor); ROADMAP/STATE reflect completion
 
-**Plans**: TBD
+**Plans**: Complete
+- [x] 25-01-PLAN.md (measured 176/0, hygiene pin, F-25-01, full gates green)
 
 ## Progress
 
@@ -107,4 +108,4 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 | 22. ROE Text as Server State | 1/1 | Complete    | 2026-10-12 |
 | 23. One Risk Signal | 1/1 | Complete    | 2026-10-13 |
 | 24. Ops Evidence on This Host | 1/1 | Complete    | 2026-10-13 |
-| 25. Lint Re-baseline & Close-Out | 0/TBD | Not started | - |
+| 25. Lint Re-baseline & Close-Out | 1/1 | Complete | 2026-10-13 |
