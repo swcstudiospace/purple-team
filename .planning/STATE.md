@@ -5,10 +5,10 @@ milestone_name: Hardening & Validation
 current_phase: 23
 current_phase_name: One Risk Signal
 status: executing
-stopped_at: Phase 22 complete, ready to plan Phase 23
-last_updated: "2026-10-13T00:10:07.954Z"
-last_activity: 2026-10-12
-last_activity_desc: Phase 22 complete, transitioned to Phase 23
+stopped_at: Phase 23 plan 23-01 executed, SUMMARY written
+last_updated: "2026-10-13T00:20:00.000Z"
+last_activity: 2026-10-13
+last_activity_desc: Phase 23 plan 23-01 executed (UNIFY-01 single risk signal)
 state_head: 03cf521b4af112f8905b55970ba06aadd1d4f225
 progress:
   total_phases: 5
@@ -29,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 23 (One Risk Signal) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-12 — Phase 22 complete, transitioned to Phase 23
+Phase: 23 (One Risk Signal) — PLAN 23-01 COMPLETE
+Plan: 23-01 complete (3/3 tasks, 2 production commits + SUMMARY pending)
+Status: Executed, awaiting verification
+Last activity: 2026-10-13 — Phase 23 plan 23-01 executed (UNIFY-01)
 
 ## Completed Context
 
@@ -51,8 +51,8 @@ Last activity: 2026-10-12 — Phase 22 complete, transitioned to Phase 23
 
 ## Session Continuity
 
-Last session: 2026-10-12T23:30:00Z
-Stopped at: Phase 22 complete, ready to plan Phase 23
+Last session: 2026-10-13T00:20:00Z
+Stopped at: Phase 23 plan 23-01 executed, SUMMARY written
 Resume file: None
 
 ## Performance Metrics
@@ -61,8 +61,10 @@ Resume file: None
 |------|----------|-------|-------|
 | Phase 21 P21-03 | 2min | 2 tasks | 3 files |
 | Phase 22 P22-01 | 9min | 3 tasks | 12 files |
+| Phase 23 P23-01 | 8min | 3 tasks | 11 files |
 
 ## Decisions
 
 - [Phase 21]: 21-03: manual section-5.5 audit flip (workflow regenerates whole file); all six phases PARTIAL, zero compliant
 - [Phase 22]: 22-01: single atomic commit for all three tasks per plan same-commit bindings; mismatch shares the empty-state cannot-derive report; supersession Commit column cites the feat subject (hash in SUMMARY)
+- [Phase 23]: 23-01: two-commit split per dispatch binding (derivation+consumers+supersession in feat, docsite mirror wholesale in docs); supersession row uses explicit P20-C1/C2b/C3a/C4 tokens for grep-proof acceptance
