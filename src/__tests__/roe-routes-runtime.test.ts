@@ -131,8 +131,34 @@ let baseA = '';
 let baseB = '';
 let dirA = '';
 let dirB = '';
+let savedEnv: Record<string, string | undefined> = {};
+
+function pinLoopbackEnv(): void {
+  // Deployment settings (DOCKER=true, T3MP3ST_HOST) must not leak into the
+  // test worker: a non-loopback bind refuses to start without a bearer, which
+  // would kill the worker or stall readiness. Pin loopback for the imports,
+  // restore the operator's environment in afterAll.
+  savedEnv = {
+    DOCKER: process.env.DOCKER,
+    T3MP3ST_HOST: process.env.T3MP3ST_HOST,
+    T3MP3ST_BEARER_TOKEN: process.env.T3MP3ST_BEARER_TOKEN,
+    T3MP3ST_BEARER_TOKEN_FILE: process.env.T3MP3ST_BEARER_TOKEN_FILE,
+  };
+  delete process.env.DOCKER;
+  process.env.T3MP3ST_HOST = '127.0.0.1';
+  delete process.env.T3MP3ST_BEARER_TOKEN;
+  delete process.env.T3MP3ST_BEARER_TOKEN_FILE;
+}
+
+function restoreEnv(): void {
+  for (const [key, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
 
 beforeAll(async () => {
+  pinLoopbackEnv();
   dirA = mkdtempSync(join(tmpdir(), 'roe-routes-a-'));
   writeFileSync(join(dirA, 'state.json'), '{}');
   dirB = mkdtempSync(join(tmpdir(), 'roe-routes-b-'));
@@ -147,6 +173,7 @@ beforeAll(async () => {
 }, 180000);
 
 afterAll(() => {
+  restoreEnv();
   rmSync(dirA, { recursive: true, force: true });
   rmSync(dirB, { recursive: true, force: true });
 });
@@ -244,6 +271,7 @@ describe('roe routes runtime (clean slot)', () => {
 
 describe('roe routes runtime (tampered persisted record)', () => {
   beforeAll(async () => {
+    pinLoopbackEnv();
     vi.resetModules();
     const portB = await freePort();
     process.env.T3MP3ST_STATE_DIR = dirB;
