@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { noiseBudget, coverAudit } from '../teams/black.js';
 import { detectionGaps, hardeningPlan } from '../teams/blue.js';
 import { roeAudit, adjudicateEvidence } from '../teams/white.js';
-import { synthesize } from '../teams/purple.js';
+import { synthesize, type PurpleRiskTier } from '../teams/purple.js';
 
 describe('black team: noiseBudget', () => {
   it('scores a quiet, bounded, routed plan at 100 with no violations', () => {
@@ -249,10 +249,10 @@ describe('purple synthesis', () => {
     const result = synthesize({ findings, detections, verdicts });
 
     expect(result.coverageMatrix).toHaveLength(2);
-    expect(result.coverageMatrix[0]).toMatchObject({ findingId: 'f1', detection: 'none', verdict: 'compliant' });
-    expect(result.coverageMatrix[0].residualRisk).toContain('no detection');
-    expect(result.coverageMatrix[1]).toMatchObject({ findingId: 'f2', detection: 'covered' });
-    expect(result.coverageMatrix[1].residualRisk).toContain('low residual risk');
+    expect(result.coverageMatrix[0]).toMatchObject({ findingId: 'f1', detection: 'none', verdict: 'compliant', riskTier: 'critical' });
+    expect(result.coverageMatrix[0].residualRisk).toBe('critical residual risk — f1 (SQL injection in /api/users) sits at the top tier; do not declare the posture acceptable while this row is critical');
+    expect(result.coverageMatrix[1]).toMatchObject({ findingId: 'f2', detection: 'covered', riskTier: 'medium' });
+    expect(result.coverageMatrix[1].residualRisk).toBe('medium residual risk — f2 (Missing security headers) sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable');
     expect(result.unresolved).toEqual(['f1']);
     expect(result.nextMissions.some(m => m.startsWith('Detection engineering:'))).toBe(true);
   });
@@ -282,4 +282,78 @@ describe('purple synthesis', () => {
     expect(result.coverageMatrix[0].detection).toBe('none');
     expect(result.unresolved).toEqual(['f1']);
   });
+  it('derives residualRisk strictly from riskTier across the whole tier vocabulary', () => {
+    // Whole-vocabulary parity pin (purple-v2 CASES-loop idiom): every tier in
+    // the PurpleRiskTier vocabulary renders its exact template via string
+    // equality — prose drift can no longer pass alongside a green tier pin.
+    const EXPECTED: Record<PurpleRiskTier, string> = {
+      critical: 'critical residual risk — p-critical (T) sits at the top tier; do not declare the posture acceptable while this row is critical',
+      high: 'high residual risk — p-high (T) sits above appetite; do not declare the posture acceptable while this row is high',
+      medium: 'medium residual risk — p-medium (T) sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable',
+      low: 'low residual risk — p-low (T) sits at a low tier; confirm its matrix row before declaring the posture acceptable',
+      info: 'informational residual risk — p-info (T) carries no tiered risk; track its matrix row only',
+    };
+    const CASES: Array<{ tier: PurpleRiskTier; severity?: string; coverage: 'none' | 'partial' | 'covered' }> = [
+      { tier: 'info', severity: 'info', coverage: 'covered' },
+      { tier: 'low', severity: 'low', coverage: 'covered' },
+      { tier: 'medium', severity: 'medium', coverage: 'covered' },
+      { tier: 'high', severity: 'medium', coverage: 'none' },
+      { tier: 'critical', severity: 'critical', coverage: 'covered' },
+    ];
+    for (const entry of CASES) {
+      const id = `p-${entry.tier}`;
+      const result = synthesize({
+        findings: [{ id, title: 'T', severity: entry.severity }],
+        detections: [{ findingId: id, coverage: entry.coverage, recommendedControl: 'parity-pin' }],
+        verdicts: [],
+        verdictsByFinding: { [id]: { verdict: 'compliant' } },
+      });
+      expect(result.coverageMatrix[0].riskTier, `${id} tier`).toBe(entry.tier);
+      expect(result.coverageMatrix[0].residualRisk, `${id} prose`).toBe(EXPECTED[entry.tier]);
+    }
+  });
+
+  it('renders the floored/bumped tier template at tier-boundary input combos', () => {
+    // Adjacency coverage: each combo yields a tier different from its severity
+    // base, and the prose must equal that tier's exact template.
+    const CASES: Array<{
+      id: string; severity?: string; coverage: 'none' | 'partial' | 'covered';
+      verdict?: 'compliant' | 'violation'; tier: PurpleRiskTier; prose: string;
+    }> = [
+      { id: 'b-high', severity: 'medium', coverage: 'none', verdict: 'compliant', tier: 'high', prose: 'high residual risk — b-high (T) sits above appetite; do not declare the posture acceptable while this row is high' },
+      { id: 'b-medium', severity: 'low', coverage: 'none', verdict: 'compliant', tier: 'medium', prose: 'medium residual risk — b-medium (T) sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable' },
+      { id: 'b-critical', severity: 'high', coverage: 'none', verdict: 'compliant', tier: 'critical', prose: 'critical residual risk — b-critical (T) sits at the top tier; do not declare the posture acceptable while this row is critical' },
+      { id: 'b-floor', severity: 'low', coverage: 'covered', verdict: 'violation', tier: 'high', prose: 'high residual risk — b-floor (T) sits above appetite; do not declare the posture acceptable while this row is high' },
+    ];
+    for (const entry of CASES) {
+      const result = synthesize({
+        findings: [{ id: entry.id, title: 'T', severity: entry.severity }],
+        detections: [{ findingId: entry.id, coverage: entry.coverage, recommendedControl: 'parity-pin' }],
+        verdicts: [],
+        verdictsByFinding: { [entry.id]: { verdict: entry.verdict ?? 'compliant' } },
+      });
+      expect(result.coverageMatrix[0].riskTier, `${entry.id} tier`).toBe(entry.tier);
+      expect(result.coverageMatrix[0].residualRisk, `${entry.id} prose`).toBe(entry.prose);
+    }
+  });
+
+  it('interpolates a missing or empty title as an empty subject', () => {
+    const missing = synthesize({
+      findings: [{ id: 't-missing', severity: 'info' }],
+      detections: [{ findingId: 't-missing', coverage: 'covered', recommendedControl: 'parity-pin' }],
+      verdicts: [],
+      verdictsByFinding: { 't-missing': { verdict: 'compliant' } },
+    });
+    expect(missing.coverageMatrix[0].riskTier).toBe('info');
+    expect(missing.coverageMatrix[0].residualRisk).toBe('informational residual risk — t-missing carries no tiered risk; track its matrix row only');
+    const empty = synthesize({
+      findings: [{ id: 't-empty', title: '', severity: 'low' }],
+      detections: [{ findingId: 't-empty', coverage: 'covered', recommendedControl: 'parity-pin' }],
+      verdicts: [],
+      verdictsByFinding: { 't-empty': { verdict: 'compliant' } },
+    });
+    expect(empty.coverageMatrix[0].riskTier).toBe('low');
+    expect(empty.coverageMatrix[0].residualRisk).toBe('low residual risk — t-empty sits at a low tier; confirm its matrix row before declaring the posture acceptable');
+  });
+
 });

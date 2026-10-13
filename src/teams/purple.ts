@@ -44,17 +44,20 @@ export interface DarkPurpleSynthesis {
   correlation: PurpleCorrelationMode;
 }
 
-const RISK_BY_SEVERITY: Record<string, string> = {
-  critical: 'severe',
-  high: 'high',
-  medium: 'moderate',
-  low: 'low',
-  info: 'informational',
+// ── Residual-risk prose model ───────────────────────────────────────────────
+// Single writer: prose is a pure derived rendering of the tier computed by
+// residualRiskTier() above. Templates key STRICTLY on the tier — no branch on
+// detection, verdict, or severity — so tier/prose contradiction is structurally
+// impossible. {findingId}{subject} interpolate rendered data, not signal inputs.
+// Tier-honest framing only: no template claims a specific detection or verdict
+// fact, since e.g. tier high serves both no-detection and violation rows.
+const RISK_PROSE_BY_TIER: Record<PurpleRiskTier, (findingId: string, subject: string) => string> = {
+  critical: (id, s) => `critical residual risk — ${id}${s} sits at the top tier; do not declare the posture acceptable while this row is critical`,
+  high: (id, s) => `high residual risk — ${id}${s} sits above appetite; do not declare the posture acceptable while this row is high`,
+  medium: (id, s) => `medium residual risk — ${id}${s} sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable`,
+  low: (id, s) => `low residual risk — ${id}${s} sits at a low tier; confirm its matrix row before declaring the posture acceptable`,
+  info: (id, s) => `informational residual risk — ${id}${s} carries no tiered risk; track its matrix row only`,
 };
-
-function riskWord(severity: string | undefined): string {
-  return (severity && RISK_BY_SEVERITY[severity]) || 'moderate';
-}
 
 // ── Residual-risk tier model ────────────────────────────────────────────────
 // Deterministic f(severity, detection coverage, verdict), never prose:
@@ -120,21 +123,9 @@ export function synthesize(input: {
     const verdict = verdictById
       ? verdictById[finding.id]?.verdict
       : input.verdicts[index]?.verdict;
-    const risk = riskWord(finding.severity);
     const subject = finding.title ? ` (${finding.title})` : '';
     const riskTier = residualRiskTier(finding.severity, detection, verdict);
-
-    let residualRisk: string;
-    if (detection === 'none') {
-      residualRisk = `${risk} residual risk — no detection covers ${finding.id}${subject}; close the gap before declaring the posture acceptable`;
-    } else if (detection === 'partial') {
-      residualRisk = `${risk} residual risk — detection is partial for ${finding.id}${subject}; harden the missing chain links`;
-    } else if (verdict === 'violation') {
-      residualRisk = `low residual risk — detection covers ${finding.id}${subject}, pending ROE remediation of the violating action`;
-    } else {
-      residualRisk = `low residual risk — detection covers ${finding.id}${subject}`;
-    }
-
+    const residualRisk = RISK_PROSE_BY_TIER[riskTier](finding.id, subject);
     return { findingId: finding.id, detection, verdict, riskTier, residualRisk };
   });
 

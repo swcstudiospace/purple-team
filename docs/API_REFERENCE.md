@@ -284,9 +284,18 @@ loopback trust as every other route (see Security Model above).
 All three fields must be arrays (`400` otherwise). Findings whose `id` exists
 in the findings ledger get their stored title/severity merged in read-only.
 Responds `201` with the `DarkPurpleSynthesis` (`coverageMatrix` with
-`findingId`/`detection`/`verdict`/`residualRisk`, plus `unresolved` and
-`nextMissions`). Purple is an orchestrator capability, not a spawnable
-operator archetype — the spawnable teams are `black`, `blue`, and `white`.
+`findingId`/`detection`/`verdict`/`riskTier`/`residualRisk`, plus `unresolved`
+and `nextMissions`). `riskTier` is the authoritative residual-risk signal: a
+deterministic `f(severity, detection, verdict)` per coverage-matrix row.
+`residualRisk` is a pure derived rendering of `riskTier` — never an
+independent assessment. Vocabulary note: the purple synthesis tier
+(`PurpleRiskTier` in `src/teams/purple.ts`: `critical` `high` `medium` `low`
+`info`) is unrelated to the arsenal approval-gate tier (`RiskTier` in
+`src/types/index.ts`: `local_read` `passive` `active` `intrusive` `credential`
+`dangerous`, gating tool execution); the shared name is coincidence and
+renaming either requires contract sanction. Purple is an orchestrator
+capability, not a spawnable operator archetype — the spawnable teams are
+`black`, `blue`, and `white`.
 
 ## Provider IDs And Keyless Semantics
 
