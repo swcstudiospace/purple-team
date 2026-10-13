@@ -47,10 +47,10 @@ provenance is failure.
 - ✓ Color suites at red parity: detection/emulation/governance catalog categories (+12 adapters, 120 total), D3FEND + ATT&CK v19.2 attributed vendors, blue/black/white engine suites, three deterministic corpus benches (CI-pinned), four playbooks, nine color routes, purple v2 id-keyed synthesis + riskTier + persistence, Defend UI, 12 MCP tools — v1.3 Phases 15–20
 - ✓ Retroactive validation evidence for v1.3 phases 15–20: six template-shaped NN-VALIDATION.md records, six class-level negative probes (pinned green), SUPERSESSION.md log, audit Nyquist block flipped to honest partial — v1.4 Phase 21
 - ✓ ROE text as server state: sanctioned roeRecords store, PUT/GET pair with provenance-stamped verdicts (ok:true-gated), fail-closed corruption ladder, 64 KiB cap, sharpened pins, bench provenance case, supersession entry — v1.4 Phase 22
+- ✓ One risk signal: single tier-keyed residualRisk derivation, whole-vocabulary parity pin, response shape unchanged, consumers + docsite mirror cutover, supersession entry — v1.4 Phase 23
 
 ### Active
 
-- [ ] UNIFY-01: residualRisk prose and riskTier collapse into one deterministic signal; every consumer updated
 - [ ] OPS-01: Docker healthcheck verified by a real container run
 - [ ] OPS-02: Desktop installer matrix observed building on this host
 - [ ] LINT-01: Lint warning count back to ≤176 with zero new warnings
@@ -112,4 +112,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-12 after Phase 22*
+*Last updated: 2026-10-13 after Phase 23*

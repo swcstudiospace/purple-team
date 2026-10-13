@@ -19,7 +19,7 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 
 - [x] **Phase 21: Retroactive Validation (Phases 15–20)** - VAL-01: template-shaped `NN-VALIDATION.md` per v1.3 phase against the frozen boundary, class-level negative probes, Nyquist promotion, supersession log (completed 2026-10-12)
 - [x] **Phase 22: ROE Text as Server State** - ROE-01: sanctioned ROE store + `/api/*` mutation route; `GET /api/teams/white/roe` emits provenance-stamped verdicts when and only when the parse is `ok:true`; fail-closed (completed 2026-10-12)
-- [ ] **Phase 23: One Risk Signal** - UNIFY-01: `residualRisk` prose becomes a pure derived rendering of the deterministic `riskTier`; every consumer updated same-commit; API shape unchanged
+- [x] **Phase 23: One Risk Signal** - UNIFY-01: `residualRisk` prose becomes a pure derived rendering of the deterministic `riskTier`; every consumer updated same-commit; API shape unchanged (completed 2026-10-13)
 - [ ] **Phase 24: Ops Evidence on This Host** - OPS-01 + OPS-02: real-container healthcheck (healthy transition, failure path, no-token refusal) + host installer matrix with per-target sha256 receipts
 - [ ] **Phase 25: Lint Re-baseline & Close-Out** - LINT-01: fix the net-new phase-20 warning, measure ≤176 in the close-out gate table, lint-hygiene pin, full gates green
 
@@ -104,6 +104,6 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 |-------|----------------|--------|-----------|
 | 21. Retroactive Validation (Phases 15–20) | 3/3 | Complete    | 2026-10-12 |
 | 22. ROE Text as Server State | 1/1 | Complete    | 2026-10-12 |
-| 23. One Risk Signal | 1/1 | In Progress | - |
+| 23. One Risk Signal | 1/1 | Complete    | 2026-10-13 |
 | 24. Ops Evidence on This Host | 0/TBD | Not started | - |
 | 25. Lint Re-baseline & Close-Out | 0/TBD | Not started | - |

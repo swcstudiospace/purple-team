@@ -18,7 +18,7 @@ Requirements for this milestone. Each maps to exactly one roadmap phase (traceab
 
 ### Purple risk signal
 
-- [ ] **UNIFY-01**: `residualRisk` prose becomes a pure derived rendering of the deterministic `riskTier` (single writer in `src/teams/purple.ts`), the API response shape is unchanged, and every consumer is updated in the same commit with prose↔tier parity pins: `docs/operators.html` (tier rendered), `docs/API_REFERENCE.md` (tier documented, prose marked derived), dark-purple SKILL.md relay, `teams-modules.test.ts` pins strengthened to assert agreement.
+- [x] **UNIFY-01**: `residualRisk` prose becomes a pure derived rendering of the deterministic `riskTier` (single writer in `src/teams/purple.ts`), the API response shape is unchanged, and every consumer is updated in the same commit with prose↔tier parity pins: `docs/operators.html` (tier rendered), `docs/API_REFERENCE.md` (tier documented, prose marked derived), dark-purple SKILL.md relay, `teams-modules.test.ts` pins strengthened to assert agreement.
 
 ### Operations evidence
 
@@ -61,7 +61,7 @@ Requirement-to-phase mapping. Filled by the roadmapper.
 |-------------|-------|--------|
 | VAL-01 | Phase 21 | Complete |
 | ROE-01 | Phase 22 | Complete |
-| UNIFY-01 | Phase 23 | Pending |
+| UNIFY-01 | Phase 23 | Complete |
 | OPS-01 | Phase 24 | Pending |
 | OPS-02 | Phase 24 | Pending |
 | LINT-01 | Phase 25 | Pending |
