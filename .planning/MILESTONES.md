@@ -2,6 +2,8 @@
 
 ## v1.4 Hardening & Validation (Shipped: 2026-10-13)
 
+**Delivered:** Evidence quality, not capability — v1.3's phases retroactively validated against a frozen boundary, ROE verdicts given provenance, the purple risk signal collapsed to one, ops claims executed for real with receipts, and the lint baseline re-measured and pinned.
+
 **Phases completed:** 5 phases, 7 plans, 20 tasks
 
 **Key accomplishments:**
@@ -12,5 +14,16 @@
 - residualRisk prose collapsed into a single Record<PurpleRiskTier, renderer> derivation with whole-vocabulary string-equality parity pins, tier-rendering UI, and wholesale mirror regen
 - Reconciled Docker healthcheck to the open /health, evidenced healthy/failure/refusal container runs off one image digest, and built host deb + AppImage with sha256 receipts — all transcribed in 24-receipts.md.
 - Baseline restored to a measured 176 with 0 errors via guard-throw fix, pinned by two block-severity doctor checks, full test:pr green, scope gap honestly registered as F-25-01.
+
+**Stats:**
+- 107 files changed, +9,914 / −206 (milestone range); 61,896 lines of TypeScript in `src/`
+- 5 phases, 7 plans, 20 tasks, 62 commits
+- 2 days from milestone start to ship (2026-10-12 → 2026-10-13)
+
+**Git range:** `8a2d261` (milestone start) → `828313f` (phase 25 complete); `feat(22-01)` → `feat(25-01)` with phase-21 probes as `test(21-01)`
+
+**Closeout:** `override_closeout` — readiness reported phases 21/22/24 verification **stale** (later milestone phases touched covered files after their verifier runs passed); all five VERIFICATION.md runs passed at run time (21: 24/24, 22: 7/7, 23: 12/12, 24: 7/7, 25: 6/6) and the close audit cross-verified them. Owner accepted the override 2026-10-13. Requirements 6/6 checked; pre-close artifact audit all clear. Milestone audit status **tech_debt** (owner-accepted 2026-10-13): 5 recorded follow-ups (F-20-01, stale v1.3 audit Nyquist prose, operators.html Tier-cell browser render + 23-VERIFICATION status mismatch, F-25-01 lint-scope widening, stray repo-root artifact file) — carried into PROJECT.md and ROADMAP.md next-milestone candidates.
+
+**What's next:** v2 unplanned — bootstrap with `/gsd:new-milestone` from the recorded candidates (deferred ROE ledger/consumption/provenance, install-and-launch verification, per-rule lint budgets, plus the five close-out follow-ups).
 
 ---

@@ -21,10 +21,10 @@ current_phase: 25
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the archived v1.0–v1.3 records.
+See: .planning/PROJECT.md (updated 2026-10-13) and .planning/milestones/ for the archived v1.0–v1.4 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** Phase 21 — Retroactive Validation (Phases 15–20)
+**Current focus:** Next milestone unplanned — bootstrap with `/gsd:new-milestone` (candidates: 5 v1.4 audit follow-ups + deferred v2 requirements, listed in PROJECT.md).
 
 ## Current Position
 
@@ -39,14 +39,18 @@ Last activity: 2026-10-13 — Milestone v1.4 completed and archived
 - **v1.1** 2026-10-09: six specialist hats, Grok slash grammar, UI polish, Tauri scaffold.
 - **v1.2** 2026-10-10 (tag `v1.2`): re-home (MIT), Tauri bundle completion, node22 sidecar, remote-access hardening.
 - **v1.3** 2026-10-10 (`f654ea1`→`4c37232`): color suites at red parity — `detection`/`emulation`/`governance` catalog categories (+12 adapters, 120 total, pins kept honest); D3FEND + ATT&CK v19.2 vendors (attributed); blue/black/white engine suites; three corpus+judge benches (detection 4/4, opsec 6/6, roe 6/6 — deterministic, CI-pinned, decoy-penalized); four playbooks (defense 20, tradecraft 20, adjudication 18); nine color routes; purple v2 id-keyed synthesis + riskTier + persistence; `docs/defend.html`; MCP 12 tools. Full gates at close: lint 0 errors, typecheck clean, 1103 tests / 100 files, doctor, prompt audit 39/39.
+- **v1.4** 2026-10-13 (`8a2d261`→`828313f`, tag `v1.4`): hardening & validation — retroactive validation of phases 15–20 (six `NN-VALIDATION.md`, six class-level negative probes, `SUPERSESSION.md` log, audit Nyquist block honest all-PARTIAL); ROE text as server state (`roeRecords` + PUT/GET, provenance-stamped ok:true-gated verdicts, fail-closed); one risk signal (single tier-keyed `residualRisk` derivation, shape unchanged, consumers mirrored same-commit); ops evidence on this host (docker healthy/failure/refusal runs off `t3mp3st:ops01`, host deb + AppImage sha256 receipts); lint re-baseline (measured 176/0, doctor hygiene pin, hold knob). Gates at close: lint 0 errors / 176 warnings, typecheck clean, `test:pr` exit 0. Audit: tech_debt, owner-accepted 2026-10-13 (5 follow-ups carried to next-milestone candidates).
 
 ## Pending Todos
 
-- Approve the v1.4 roadmap, then `/gsd:plan-phase 21`.
+- Bootstrap the next milestone: `/gsd:new-milestone` (scope candidates in PROJECT.md / ROADMAP.md).
+- Carry the 5 v1.4 audit tech-debt follow-ups into that milestone's scope: F-20-01 prompt-audit divergence; stale v1.3 audit Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field reconciliation; F-25-01 lint-scope widening (18 files / 16 errors / 112 warnings); stray repo-root artifact file.
+- Owner follow-ups from v1.4 audit: schedule `/gsd:validate-phase 22`–`25` (four draft VALIDATION.md coverage TODOs).
 
 ## Blockers/Concerns
 
-- v1.3 tech debt (accepted, in the audit): no phase VERIFICATION files; ROE verdicts-on-record need a ROE text source; residualRisk prose/riskTier duplication; installer matrix CI-only; docker healthcheck unrun — all now scheduled as Phases 21–25.
+- v1.4 closeout ran as `override_closeout`: readiness reported phases 21/22/24 verification **stale** (later phases touched covered files after their verifiers passed; all five VERIFICATION runs passed at run time and were cross-verified by the close audit). Owner accepted 2026-10-13. If those surfaces change again, re-run the verifiers before trusting the reports.
+- v1.4 audit tech debt (accepted, owner 2026-10-13): F-20-01 prompt-audit divergence at the frozen v1.3 boundary; stale v1.3 audit Nyquist prose; operators.html Tier-cell manual remainder + 23-VERIFICATION status mismatch; F-25-01 lint-scope gap; stray repo-root artifact file — all scheduled as next-milestone candidates.
 
 ## Session Continuity
 
@@ -66,11 +70,7 @@ Resume file: None
 
 ## Decisions
 
-- [Phase 21]: 21-03: manual section-5.5 audit flip (workflow regenerates whole file); all six phases PARTIAL, zero compliant
-- [Phase 22]: 22-01: single atomic commit for all three tasks per plan same-commit bindings; mismatch shares the empty-state cannot-derive report; supersession Commit column cites the feat subject (hash in SUMMARY)
-- [Phase 23]: 23-01: two-commit split per dispatch binding (derivation+consumers+supersession in feat, docsite mirror wholesale in docs); supersession row uses explicit P20-C1/C2b/C3a/C4 tokens for grep-proof acceptance
-- [Phase 24]: 24-01: Rule-1 probe hostname localhost→127.0.0.1 (busybox wget ::1-first vs IPv4-only bind) and bundler category Security→Utility (invalid category); image t3mp3st:ops01 final .Id 55d8c979; deb+AppImage host-built with sha256; test:pr exit 0
-- [Phase 25]: 25-01: Option A guard-throw (message verbatim, ceiling stays 5); doctor-venue hygiene pin (census-before-config, block severity); hold knob exit 0; measured 176/0; F-25-01 scope gap as owner follow-up; test:pr exit 0
+- [v1.4 close]: full per-phase decision log moved to `.planning/milestones/v1.4-phases/` and PROJECT.md Key Decisions — retroactive validation honest-PARTIAL flip; ROE single-slot fail-closed store; single tier-keyed risk writer with shape kept; ops probes on deliberately-open `/health` (no guard exemptions); lint guard-throw + doctor hygiene pin.
 
 ## Operator Next Steps
 
