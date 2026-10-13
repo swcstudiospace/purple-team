@@ -29,11 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-10) and .planning/milestones/ for the
 
 ## Current Position
 
-Phase: 24 (Ops Evidence on This Host) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-13 — Phase 23 complete, transitioned to Phase 24
-
+Phase: 24 (Ops Evidence on This Host) — PLAN 01 COMPLETE
+Plan: 24-01 executed (3/3 tasks, commits ca35d87/cbf29c4/ecc3df2)
+Status: Awaiting verify-work / next plan
+Last activity: 2026-10-13 — 24-01 complete (OPS-01 + OPS-02 evidenced on this host)
 ## Completed Context
 
 - **v1.0** 2026-10-09: plan-based inference, Dark Purple core, white/red UI, Grok Bot package.
@@ -62,9 +61,11 @@ Resume file: None
 | Phase 21 P21-03 | 2min | 2 tasks | 3 files |
 | Phase 22 P22-01 | 9min | 3 tasks | 12 files |
 | Phase 23 P23-01 | 8min | 3 tasks | 11 files |
+| Phase 24 P24-01 | 19min | 3 tasks | 4 files |
 
 ## Decisions
 
 - [Phase 21]: 21-03: manual section-5.5 audit flip (workflow regenerates whole file); all six phases PARTIAL, zero compliant
 - [Phase 22]: 22-01: single atomic commit for all three tasks per plan same-commit bindings; mismatch shares the empty-state cannot-derive report; supersession Commit column cites the feat subject (hash in SUMMARY)
 - [Phase 23]: 23-01: two-commit split per dispatch binding (derivation+consumers+supersession in feat, docsite mirror wholesale in docs); supersession row uses explicit P20-C1/C2b/C3a/C4 tokens for grep-proof acceptance
+- [Phase 24]: 24-01: Rule-1 probe hostname localhost→127.0.0.1 (busybox wget ::1-first vs IPv4-only bind) and bundler category Security→Utility (invalid category); image t3mp3st:ops01 final .Id 55d8c979; deb+AppImage host-built with sha256; test:pr exit 0
