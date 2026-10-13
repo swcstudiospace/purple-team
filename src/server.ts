@@ -919,6 +919,7 @@ interface RoeRecord {
   id: string;
   revision: number;
   textHash: string;
+  actionsHash: string;
   text: string;
   actions: AuditedAction[];
   createdAt: string;
@@ -6581,6 +6582,18 @@ app.get('/api/teams/black/noise', (_req: Request, res: Response): void => {
 // security code; PUT is in STATE_CHANGING_METHODS so the loopback
 // CSRF/Origin guard covers it too.
 const ROE_BODY_CAP_BYTES = 64 * 1024;
+// Action elements roeAudit can safely consume: objects whose audited fields are
+// strings when present. Shared by the PUT 400 gate and the GET restore ladder
+// so a bad record can never persist in the single slot (a non-string target
+// would throw inside roeAudit's trim call on the next GET).
+function isRoeActionElementValid(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const action = value as Record<string, unknown>;
+  if (action.command !== undefined && typeof action.command !== 'string') return false;
+  if (action.target !== undefined && typeof action.target !== 'string') return false;
+  return true;
+}
+
 app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const text = body.text;
@@ -6589,8 +6602,8 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'text must be a non-empty string' });
     return;
   }
-  if (!Array.isArray(actions) || actions.some((a) => !a || typeof a !== 'object' || Array.isArray(a))) {
-    res.status(400).json({ error: 'actions must be an array of action objects' });
+  if (!Array.isArray(actions) || actions.some((a) => !isRoeActionElementValid(a))) {
+    res.status(400).json({ error: 'actions must be an array of action objects with string command/target fields' });
     return;
   }
   if (Buffer.byteLength(text, 'utf8') > ROE_BODY_CAP_BYTES) {
@@ -6606,6 +6619,7 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     id: 'latest',
     revision: prevRevision + 1,
     textHash: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16),
+    actionsHash: createHash('sha256').update(JSON.stringify(actions), 'utf8').digest('hex').slice(0, 16),
     text,
     actions: actions as AuditedAction[],
     createdAt: typeof previous?.createdAt === 'string' ? previous.createdAt : nowIso(),
@@ -6625,10 +6639,12 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
 // (teams/white/roe-parser.ts parseRoe) plus roeAudit verdicts over the stored
 // actions when and only when the parse is ok:true. Fail-closed ladder, always
 // 200: no record or a shapeless record (text not a string, actions not an
-// element-valid array of objects, revision/timestamps not finite scalars —
+// element-valid array of objects with string command/target fields,
+// revision/timestamps not finite scalars —
 // the replaceMapContents restore silently drops id-less rows into this same
 // state) returns the honest zeroed parse; a record whose stored
-// textHash no longer matches the stored text (write-time-redaction drift)
+// textHash/actionsHash no longer matches the stored text/actions
+// (write-time-redaction drift rewrites action strings such as ?token= URLs)
 // returns the same cannot-derive report with no verdicts member; an ok:false
 // parse returns parse plus provenance with no verdicts member; only an
 // ok:true parse returns parse plus provenance plus verdicts, each stamped
@@ -6639,7 +6655,7 @@ app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
   const storedActions: unknown = record?.actions;
   const actionsOk =
     Array.isArray(storedActions) &&
-    !(storedActions as unknown[]).some((a) => !a || typeof a !== 'object' || Array.isArray(a));
+    (storedActions as unknown[]).every((a) => isRoeActionElementValid(a));
   const revisionOk = typeof record?.revision === 'number' && Number.isFinite(record.revision);
   const timestampsOk = typeof record?.createdAt === 'string' && typeof record?.updatedAt === 'string';
   if (!record || typeof record.text !== 'string' || !actionsOk || !revisionOk || !timestampsOk) {
@@ -6648,7 +6664,8 @@ app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
     return;
   }
   const recomputed = createHash('sha256').update(record.text, 'utf8').digest('hex').slice(0, 16);
-  if (recomputed !== record.textHash) {
+  const recomputedActions = createHash('sha256').update(JSON.stringify(record.actions), 'utf8').digest('hex').slice(0, 16);
+  if (recomputed !== record.textHash || recomputedActions !== record.actionsHash) {
     const parse = { ...parseRoe(''), summary: 'no ROE text on record' };
     res.json(redactSecrets(parse));
     return;

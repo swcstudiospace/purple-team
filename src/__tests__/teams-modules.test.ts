@@ -357,4 +357,20 @@ describe('purple synthesis', () => {
     expect(empty.coverageMatrix[0].residualRisk).toBe('low residual risk — t-empty sits at a low tier; confirm its matrix row before declaring the posture acceptable');
   });
 
+  it('falls back to medium for inherited Object property severities with agreeing prose (no throw)', () => {
+    for (const severity of ['constructor', 'toString', '__proto__']) {
+      const id = `p-inherit-${severity.length}`;
+      const result = synthesize({
+        findings: [{ id, title: 'T', severity }],
+        detections: [{ findingId: id, coverage: 'covered', recommendedControl: 'inheritance-pin' }],
+        verdicts: [],
+        verdictsByFinding: { [id]: { verdict: 'compliant' } },
+      });
+      expect(result.coverageMatrix[0].riskTier, severity).toBe('medium');
+      expect(result.coverageMatrix[0].residualRisk, severity).toBe(
+        `medium residual risk — ${id} (T) sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable`,
+      );
+    }
+  });
+
 });

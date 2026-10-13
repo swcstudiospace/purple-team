@@ -142,9 +142,14 @@ async function main() {
 
   const eslintConfig = await readFile('eslint.config.js', 'utf8').catch(() => '');
   const lintAnchors = [
+    'js.configs.recommended,',
+    '...tseslint.configs.recommended,',
     "'@typescript-eslint/no-unused-vars': ['warn', {",
     "'@typescript-eslint/no-explicit-any': 'warn',",
     "'@typescript-eslint/no-non-null-assertion': 'warn',",
+    "'prefer-const': 'error',",
+    "'no-var': 'error',",
+    "'eqeqeq': ['error', 'always'],",
     "'curly': ['warn', 'multi-line'],",
     "ignores: ['dist/**', 'node_modules/**', '*.js', '*.mjs'],",
   ];

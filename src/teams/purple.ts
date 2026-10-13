@@ -85,7 +85,7 @@ function residualRiskTier(
   detection: DetectionGap['coverage'],
   verdict: string | undefined,
 ): PurpleRiskTier {
-  const baseIndex = severity !== undefined && RISK_TIER_BY_SEVERITY[severity] !== undefined
+  const baseIndex = severity !== undefined && Object.prototype.hasOwnProperty.call(RISK_TIER_BY_SEVERITY, severity)
     ? RISK_TIER_BY_SEVERITY[severity]
     : RISK_TIER_DEFAULT_INDEX;
   let tierIndex = baseIndex;
