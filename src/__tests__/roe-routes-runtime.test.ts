@@ -97,10 +97,16 @@ async function waitReady(base: string, timeoutMs: number): Promise<void> {
 // booted server module (PERSIST_DEBOUNCE_MS, no flush hook exported), and
 // fake timers in this worker would also freeze the boot I/O and readiness
 // polling. A real wait is the only way to let the snapshot land on disk.
-async function waitPersist(): Promise<void> {
-  const { promise, resolve } = Promise.withResolvers<void>();
-  setTimeout(resolve, 1600);
-  await promise;
+async function flushTo(dir: string, expectRevision: number): Promise<void> {
+  // Await the real signal: flushPersist clears the server's pending debounced
+  // snapshot and writes it through, so no wall-clock wait is needed (fake
+  // timers would freeze the server's boot I/O in this in-process worker).
+  const flush = serverAModule.flushPersist;
+  if (!flush) throw new Error('server module did not expose flushPersist');
+  await flush();
+  const snapshot = readRoeSnapshot(dir);
+  const record = (snapshot.roeRecords as Array<{ revision: number }>)[0];
+  expect(record?.revision).toBe(expectRevision);
 }
 
 async function putRoe(base: string, payload: unknown): Promise<{ status: number; json: unknown }> {
@@ -129,7 +135,7 @@ function readRoeSnapshot(dir: string): RoeStoredSnapshot {
 
 let baseA = '';
 let baseB = '';
-let serverAModule: Record<string, unknown> = {};
+let serverAModule: { flushPersist?: () => Promise<void> } = {};
 let dirA = '';
 let dirB = '';
 let savedEnv: Record<string, string | undefined> = {};
@@ -229,8 +235,9 @@ describe('roe routes runtime (clean slot)', () => {
   });
 
   it('second PUT increments revision and preserves createdAt across the persist cycle', { timeout: 30000 }, async () => {
-    // Let the first PUT's debounced snapshot land, then capture its stamp.
-    await waitPersist();
+    // Flush the first PUT's debounced snapshot through the real signal, then
+    // capture its stamp.
+    await flushTo(dirA, 1);
     const before = readRoeSnapshot(dirA);
     expect(before.roeRecords).toHaveLength(1);
     expect(before.roeRecords[0].revision).toBe(1);
@@ -239,7 +246,7 @@ describe('roe routes runtime (clean slot)', () => {
     expect(put.status).toBe(200);
     expect(put.json).toMatchObject({ revision: 2, textHash: sha16(SECOND_TEXT) });
 
-    await waitPersist();
+    await flushTo(dirA, 2);
     const after = readRoeSnapshot(dirA);
     expect(after.roeRecords).toHaveLength(1);
     expect(after.roeRecords[0].revision).toBe(2);
@@ -275,7 +282,7 @@ describe('roe routes runtime (tampered persisted record)', () => {
     pinLoopbackEnv();
     // Server A's debounced snapshot must land in dirA BEFORE dirB becomes the
     // state dir, or the delayed write clobbers the tampered fixture.
-    await (serverAModule as { flushPersist?: () => Promise<void> }).flushPersist?.();
+    await serverAModule.flushPersist?.();
     vi.resetModules();
     const portB = await freePort();
     process.env.T3MP3ST_STATE_DIR = dirB;
