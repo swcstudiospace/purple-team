@@ -49,10 +49,11 @@ provenance is failure.
 - ✓ ROE text as server state: sanctioned roeRecords store, PUT/GET pair with provenance-stamped verdicts (ok:true-gated), fail-closed corruption ladder, 64 KiB cap, sharpened pins, bench provenance case, supersession entry — v1.4 Phase 22
 - ✓ One risk signal: single tier-keyed residualRisk derivation, whole-vocabulary parity pin, response shape unchanged, consumers + docsite mirror cutover, supersession entry — v1.4 Phase 23
 - ✓ Ops evidence on this host: docker healthcheck observed live (healthy/failure/fail-closed, inspect receipts, token prefix-only), installer matrix built on-host (deb + AppImage sha256 receipts, CI-evidence-only cells) — v1.4 Phase 24
+- ✓ Lint re-baseline: measured 176/0 errors, phase-20 warning fixed in code, doctor lint-hygiene pin (census ceiling + config anchors) enforced via test:pr, hold knob proven — v1.4 Phase 25
 
 ### Active
 
-- [ ] LINT-01: Lint warning count back to ≤176 with zero new warnings
+- (none — v1.4 scope delivered)
 
 ### Out of Scope
 

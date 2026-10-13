@@ -108,4 +108,4 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 | 22. ROE Text as Server State | 1/1 | Complete    | 2026-10-12 |
 | 23. One Risk Signal | 1/1 | Complete    | 2026-10-13 |
 | 24. Ops Evidence on This Host | 1/1 | Complete    | 2026-10-13 |
-| 25. Lint Re-baseline & Close-Out | 1/1 | Complete | 2026-10-13 |
+| 25. Lint Re-baseline & Close-Out | 1/1 | Complete    | 2026-10-13 |
