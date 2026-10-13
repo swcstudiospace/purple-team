@@ -153,7 +153,10 @@ export function parseRoe(text: string): RoeParseResult {
     if (activePrefix) {
       bulletField = null;
       const rawValue = content.slice(activePrefix.length).trim();
-      const parsed = BOOLEAN_TOKENS[rawValue.replace(/[.!]$/, '').toLowerCase()];
+      const token = rawValue.replace(/[.!]$/, '').toLowerCase();
+      const parsed = Object.prototype.hasOwnProperty.call(BOOLEAN_TOKENS, token)
+        ? BOOLEAN_TOKENS[token]
+        : undefined;
       if (parsed === undefined) {
         unresolved.push({
           line,

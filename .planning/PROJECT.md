@@ -13,6 +13,24 @@ run authorized adversarial research with scope receipts, approval gates, and evi
 Every adversarial claim hardens into scoped, receipt-backed, retestable evidence — power without
 provenance is failure.
 
+## Next Milestone: v2 (unplanned)
+
+**Candidates recorded at v1.4 close (audit 2026-10-13, owner-accepted):**
+
+Close-out follow-ups (v1.4 audit tech debt):
+- [ ] F-20-01 — `prompt:audit` red at the frozen v1.3 boundary (29/34; 5 UI-default-prompt checks), proven pre-existing; reconcile against the 39/39 claim's inputs
+- [ ] Stale v1.3 audit Nyquist prose (`v1.3-MILESTONE-AUDIT.md` lines 66–70 still read "no VALIDATION.md") — refresh via normal planning
+- [ ] Phase 23 manual remainder — browser render of the operators.html Tier cell against a live server; reconcile the 23-VERIFICATION frontmatter/body status mismatch
+- [ ] F-25-01 (v2-lint-scope) — 18 never-linted files holding 16 errors + 112 warnings outside the measured 176/0 scope
+- [ ] Stray repo-root artifact file `Heads-up: while wiring GET '` — delete or move on next touch
+
+Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
+- [ ] Persisted verdict ledger slot and ROE revision history
+- [ ] Purple auto-consumption of recorded verdicts
+- [ ] Text provenance (who/when/source) on ROE records
+- [ ] Install-and-launch verification of the built `.deb`/AppImage
+- [ ] Per-rule lint budgets and doctor-integrated lint gate
+
 ## Requirements
 
 ### Validated
@@ -33,10 +51,15 @@ provenance is failure.
 - ✓ Node server sidecar: `@yao-pkg/pkg` node22 binary from `dist/server.js`, `externalBin` + docs resources, Rust spawn/reap outside dev, same-origin `/ui/` navigation, tauri.localhost origin handling — v1.2 Phase 12
 - ✓ Remote-access hardening: non-loopback binds (incl. Docker) refuse to start without `T3MP3ST_BEARER_TOKEN[_FILE]`; `/api` bearer + per-IP 60/min burst-120 limit; loopback unchanged; MCP proxy sends the bearer — v1.2 Phase 13
 - ✓ Color suites at red parity: detection/emulation/governance catalog categories (+12 adapters, 120 total), D3FEND + ATT&CK v19.2 attributed vendors, blue/black/white engine suites, three deterministic corpus benches (CI-pinned), four playbooks, nine color routes, purple v2 id-keyed synthesis + riskTier + persistence, Defend UI, 12 MCP tools — v1.3 Phases 15–20
+- ✓ Retroactive validation evidence for v1.3 phases 15–20: six template-shaped NN-VALIDATION.md records, six class-level negative probes (pinned green), SUPERSESSION.md log, audit Nyquist block flipped to honest partial — v1.4 Phase 21
+- ✓ ROE text as server state: sanctioned roeRecords store, PUT/GET pair with provenance-stamped verdicts (ok:true-gated), fail-closed corruption ladder, 64 KiB cap, sharpened pins, bench provenance case, supersession entry — v1.4 Phase 22
+- ✓ One risk signal: single tier-keyed residualRisk derivation, whole-vocabulary parity pin, response shape unchanged, consumers + docsite mirror cutover, supersession entry — v1.4 Phase 23
+- ✓ Ops evidence on this host: docker healthcheck observed live (healthy/failure/fail-closed, inspect receipts, token prefix-only), installer matrix built on-host (deb + AppImage sha256 receipts, CI-evidence-only cells) — v1.4 Phase 24
+- ✓ Lint re-baseline: measured 176/0 errors, phase-20 warning fixed in code, doctor lint-hygiene pin (census ceiling + config anchors) enforced via test:pr, hold knob proven — v1.4 Phase 25
 
 ### Active
 
-- [ ] Next milestone: scope unchosen (candidates in `.planning/v1.3-MILESTONE-AUDIT.md` tech-debt list)
+- (none — v1.4 scope delivered; next-milestone candidates recorded above)
 
 ### Out of Scope
 
@@ -50,8 +73,8 @@ provenance is failure.
 - TypeScript ESM, Node >= 22.19, vitest, express; UI is static pages under `docs/` served at `/ui` (bundled into Tauri via `frontendDist`, also served by the sidecar).
 - Repo: `github.com/swcstudiospace/purple-team`, MIT, fresh history from 2026-10-10 (pre-reset bundle at `../purple-team-pre-reset.bundle`).
 - Desktop: Tauri 2.12 shell spawns the packaged API server as a sidecar on 127.0.0.1:3333; capabilities stay `core:default`.
-- GSD planning (this directory): v1.0–v1.2 archived under `.planning/milestones/`.
-- Known debt (accepted at v1.2 close): no phase VERIFICATION files; installer matrix CI-only; docker healthcheck edited but unrun; mobile `gen/` needs JDK/Android-SDK or macOS/Xcode.
+- GSD planning (this directory): v1.0–v1.4 archived under `.planning/milestones/`.
+- Known debt (accepted at v1.4 close, 2026-10-13 audit): F-20-01 prompt-audit divergence; stale v1.3 audit Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field mismatch; F-25-01 lint-gate scope gap (18 files / 16 errors / 112 warnings outside the measured 176/0); stray repo-root artifact file — all recorded as next-milestone candidates above. Mobile `gen/` still needs JDK/Android-SDK or macOS/Xcode.
 
 ## Constraints
 
@@ -76,6 +99,28 @@ provenance is failure.
 | v1.2 Rust spawns sidecar via `std::process::Command`, not tauri-plugin-shell | Keeps capabilities at `core:default`; renderer gains no execution surface | ✓ Good |
 | v1.2 non-loopback binds fail closed without a bearer | Intentionally breaks unauthenticated Docker `0.0.0.0` exposure — the vulnerability being closed | ✓ Good |
 | v1.2 Windows webview origin (`tauri.localhost`) trusted as page origin, never as Host | Host allow-list stays literal loopback to keep the anti-rebinding gate intact | ✓ Good |
+| v1.4 retroactive validation: manual section-5.5 audit flip; all six v1.3 phases honest PARTIAL, zero Nyquist-compliant | Workflow regenerates the whole audit file; honesty beats green | ✓ Good |
+| v1.4 ROE store: single `'latest'` slot; parse-mismatch shares the empty-state cannot-derive report | Fail-closed by construction; no permissive fallbacks | ✓ Good |
+| v1.4 risk signal: single tier-keyed `residualRisk` writer + whole-vocabulary parity pins; prose field kept (shape stable) | API-stability constraint outweighs dropping the field | ✓ Good |
+| v1.4 ops probes repointed to deliberately-open `/health`; no new bearer-guard exemptions | Evidence must not widen the unauthenticated surface | ✓ Good |
+| v1.4 lint baseline: guard-throw fix (message verbatim) + doctor hygiene pin (census ceiling, config anchors) | Mechanical drift prevention over periodic manual re-measures | ✓ Good |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-10-10 after v1.2 archive*
+*Last updated: 2026-10-13 after v1.4 milestone*

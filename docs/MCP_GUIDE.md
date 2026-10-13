@@ -85,7 +85,7 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_purple_synthesize` | `POST /api/teams/purple/synthesize` (`findings`, `detections`) |
 | `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (detection-coverage gaps over the whole findings ledger) |
 | `tempest_black_cover` | `GET /api/teams/black/cover` (phase-grouped opsec review of the active red plan) |
-| `tempest_white_roe` | `GET /api/teams/white/roe` (on-record ROE parse: `ok`, `resolved`, `unresolved`) |
+| `tempest_white_roe` | `GET /api/teams/white/roe` (on-record ROE parse plus provenance-stamped verdicts when ROE text is on record: `ok`, `resolved`, `unresolved`, `verdicts` with `roeRevision`/`roeTextHash`/`roeLines`; recording happens via the operator `PUT /api/teams/white/roe` — no MCP mutation tool) |
 
 Loopback guard: with no bearer set, the proxy refuses any `T3MP3ST_URL`
 whose host is not exactly `localhost`, `::1`, or a full dotted quad in

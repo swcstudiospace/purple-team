@@ -39,8 +39,10 @@ parse (each with its reason), and verdicts for any actions on record:
   `curl -s http://127.0.0.1:3333/api/teams/white/roe` (the parsed
   `roe` spec with `ok` and `summary`, the `resolved` directives with
   their source lines, and every `unresolved` line with its `reason`;
-  no ROE text is on record yet, so the backend derives no per-action
-  verdicts until a real source lands).
+  when ROE text is on record the backend also returns per-action
+  `verdicts` stamped with the stored revision, text hash, and source
+  lines — relay the stamps; with nothing on record it returns the
+  honest zeroed parse and derives no verdicts).
 
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or

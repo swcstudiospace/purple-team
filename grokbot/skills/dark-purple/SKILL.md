@@ -86,9 +86,10 @@ curl -s http://127.0.0.1:3333/api/teams/white/roe
 ```
 
 Relay the parsed `roe` spec (`ok`, `summary`), the `resolved` directives,
-and every `unresolved` line with its `reason`. No ROE text is on record
-yet, so the backend derives no per-action verdicts until a real source
-lands — say so, never "everything allowed".
+every `unresolved` line with its `reason`, and — when ROE text is on
+record — the per-action `verdicts` with their provenance stamps
+(`roeRevision`, `roeTextHash`, `roeLines`). With nothing on record the
+backend derives no per-action verdicts — say so, never "everything allowed".
 
 ## 6. Synthesize
 
@@ -105,7 +106,7 @@ curl -s -X POST http://127.0.0.1:3333/api/teams/purple/synthesize \
 correlates by id no matter how the arrays are ordered; omit it and the
 backend pairs `verdicts` positionally. Quote the response's
 `correlation` field (`id` or `positional-fallback`) and relay each
-`coverageMatrix` row — `findingId`, `detection`, `verdict`,
+`coverageMatrix` row — `findingId`, `detection`, `verdict`, `riskTier`,
 `residualRisk` — plus `unresolved` and `nextMissions`, exactly as
 returned.
 
@@ -113,8 +114,8 @@ returned.
 
 Close with: scope, mission id, findings by severity, hat verdicts in
 loop order (red, black, blue, white), the synthesis correlation mode and
-per-finding residual risks, the synthesis pointer, and the report
-pointer (`/tempest-report <mission id>`).
+per-finding residual-risk tiers with their residual risks, the synthesis
+pointer, and the report pointer (`/tempest-report <mission id>`).
 
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or

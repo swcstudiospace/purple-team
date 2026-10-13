@@ -266,7 +266,8 @@ loopback trust as every other route (see Security Model above).
 | `GET` | `/api/teams/black/cover` | Read-only phase-grouped OPSEC review of the active RED plan, the most recently updated mission draft (`{ phases, egressDeclared, egressNotes, itemCount }`; no draft → empty phases) |
 | `GET` | `/api/teams/black/exfil` | Read-only ATT&CK-keyed egress cost report over planned exfil paths (`{ paths, totalVolumeMb, totalCost, budget, within }`; zeroed until a path store exists — drafts carry no channel/volume fields) |
 | `GET` | `/api/teams/black/noise` | Read-only tactic-tier noise budget over the active plan's actions (`{ entries, total, budget, within, tier, violations }`; no draft → total 0, tier `quiet`) |
-| `GET` | `/api/teams/white/roe` | Read-only structured parse of the on-record ROE text (`{ roe, resolved, unresolved, commentLines, ok, summary }`; no server state carries ROE text today → honest zeroed parse, `ok: false`) |
+| `GET` | `/api/teams/white/roe` | Structured parse of the on-record ROE text plus provenance-stamped verdicts (`{ roe, resolved, unresolved, commentLines, ok, summary, provenance, verdicts }`; `verdicts` appear only when `ok` is `true`, each carrying `roeRevision`, `roeTextHash`, and `roeLines`; no record, corrupt record, hash mismatch, or `ok: false` → honest `200` report with no `verdicts` member) |
+| `PUT` | `/api/teams/white/roe` | Record sanctioned ROE text plus the actions to adjudicate (`{ text, actions }`; `text` capped at 64 KiB utf8 bytes via `Buffer.byteLength`; missing/empty/non-string `text` or non-array `actions` → `400`, oversize text → `413`; stamps monotonic `revision` plus 16-char sha256 `textHash`, answers `200` with `{ revision, textHash, ok, summary }`; replace-latest single slot) |
 | `GET` | `/api/teams/white/evidence` | Read-only replay-chain audit over the receipt ledger (`{ links, intact, broken, summary }`; replayable entries must carry a command/uri hook, duplicate ids break the chain) |
 | `GET` | `/api/teams/white/report-audit` | Read-only findings ↔ evidence coverage audit (`{ findings, reportReady, withGaps, unclaimedEvidence, summary }`; gaps named exactly, unclaimed ledger entries surfaced) |
 
@@ -283,9 +284,18 @@ loopback trust as every other route (see Security Model above).
 All three fields must be arrays (`400` otherwise). Findings whose `id` exists
 in the findings ledger get their stored title/severity merged in read-only.
 Responds `201` with the `DarkPurpleSynthesis` (`coverageMatrix` with
-`findingId`/`detection`/`verdict`/`residualRisk`, plus `unresolved` and
-`nextMissions`). Purple is an orchestrator capability, not a spawnable
-operator archetype — the spawnable teams are `black`, `blue`, and `white`.
+`findingId`/`detection`/`verdict`/`riskTier`/`residualRisk`, plus `unresolved`
+and `nextMissions`). `riskTier` is the authoritative residual-risk signal: a
+deterministic `f(severity, detection, verdict)` per coverage-matrix row.
+`residualRisk` is a pure derived rendering of `riskTier` — never an
+independent assessment. Vocabulary note: the purple synthesis tier
+(`PurpleRiskTier` in `src/teams/purple.ts`: `critical` `high` `medium` `low`
+`info`) is unrelated to the arsenal approval-gate tier (`RiskTier` in
+`src/types/index.ts`: `local_read` `passive` `active` `intrusive` `credential`
+`dangerous`, gating tool execution); the shared name is coincidence and
+renaming either requires contract sanction. Purple is an orchestrator
+capability, not a spawnable operator archetype — the spawnable teams are
+`black`, `blue`, and `white`.
 
 ## Provider IDs And Keyless Semantics
 

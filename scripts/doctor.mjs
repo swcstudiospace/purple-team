@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import process from 'node:process';
@@ -125,6 +125,36 @@ async function main() {
     const activation = await apiGet('/api/arsenal/activation');
     check('Arsenal activation plan', activation.ok && activation.data.schema_version === 't3mp3st_arsenal_activation/v1', `${activation.data.summary?.total || 0} wired / doc ${activation.data.localPlanDoc || 'missing'}`);
   }
+
+  let inlineDisableCount = 0;
+  try {
+    const entries = await readdir('src', { recursive: true, withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.ts')) continue;
+      const dir = entry.parentPath ?? entry.path;
+      const text = await readFile(`${dir}/${entry.name}`, 'utf8');
+      inlineDisableCount += (text.match(/eslint-disable/g) ?? []).length;
+    }
+  } catch {
+    inlineDisableCount = Number.MAX_SAFE_INTEGER;
+  }
+  check('Lint hygiene: inline eslint-disable ceiling', inlineDisableCount <= 5, `${inlineDisableCount}/5 inline disables in src/**/*.ts (repo-root cwd)`, 'block');
+
+  const eslintConfig = await readFile('eslint.config.js', 'utf8').catch(() => '');
+  const lintAnchors = [
+    'js.configs.recommended,',
+    '...tseslint.configs.recommended,',
+    "'@typescript-eslint/no-unused-vars': ['warn', {",
+    "'@typescript-eslint/no-explicit-any': 'warn',",
+    "'@typescript-eslint/no-non-null-assertion': 'warn',",
+    "'prefer-const': 'error',",
+    "'no-var': 'error',",
+    "'eqeqeq': ['error', 'always'],",
+    "'curly': ['warn', 'multi-line'],",
+    "ignores: ['dist/**', 'node_modules/**', '*.js', '*.mjs'],",
+  ];
+  const missingAnchors = lintAnchors.filter(anchor => !eslintConfig.includes(anchor));
+  check('Lint hygiene: eslint config not loosened', missingAnchors.length === 0, missingAnchors.length ? `missing/weakened: ${missingAnchors.join(' | ')}` : 'all rule + ignores anchors intact', 'block');
 
   const blocks = checks.filter(item => !item.passed && item.severity === 'block');
   const warnings = checks.filter(item => !item.passed && item.severity === 'warn');

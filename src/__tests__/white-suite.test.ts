@@ -89,6 +89,18 @@ describe('white suite: parseRoe', () => {
   });
 });
 
+describe('white suite: parseRoe fails closed on inherited property names', () => {
+  it('resolves constructor/toString/__proto__ allow-active values as unresolved with no ok path to verdicts', () => {
+    for (const token of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const parse = parseRoe(`scope: app.example.com\nallow active: ${token}`);
+      expect(parse.ok, token).toBe(false);
+      expect(parse.roe.allowActive, token).toBeUndefined();
+      expect(parse.unresolved.map((issue) => issue.line), token).toEqual([2]);
+      expect(parse.unresolved[0].reason, token).toContain('not a recognized yes/no token');
+    }
+  });
+});
+
 describe('white suite: v1 roeAudit fed by a parsed spec', () => {
   it('hands parseRoe output straight to roeAudit and rules per action', () => {
     const parse = parseRoe('scope: app.example.com\nallow active: yes');

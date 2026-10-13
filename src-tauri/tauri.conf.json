@@ -29,7 +29,7 @@
     "active": true,
     "targets": ["deb", "appimage", "msi", "nsis", "app", "dmg"],
     "icon": ["icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
-    "category": "Security",
+    "category": "Utility",
     "longDescription": "T3MP3ST — single-operator localhost red-team console. Desktop shell over the loopback API server.",
     "externalBin": ["binaries/t3mp3st-server"],
     "resources": {

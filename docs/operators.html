@@ -93,7 +93,7 @@
 <div data-state="success" class="st-success" hidden><p><strong>Synthesis recorded.</strong> <span data-ok></span></p></div>
 <div data-state="data" hidden>
 <h3 class="card__title">Coverage matrix</h3>
-<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
+<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Tier</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
 <h3 class="card__title">Unresolved</h3>
 <ul class="feed" id="unresolvedList"></ul>
 <h3 class="card__title">Next missions</h3>
@@ -263,6 +263,7 @@ async function runPurple() {
         return '<tr><td class="mono">' + Shell.escHtml(row.findingId) + '</td>'
           + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.detection || 'none') + '</span></td>'
           + '<td>' + Shell.escHtml(row.verdict || '—') + '</td>'
+          + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.riskTier || '—') + '</span></td>'
           + '<td>' + Shell.escHtml(row.residualRisk || '') + '</td></tr>';
       }).join('');
     }

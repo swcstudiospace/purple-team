@@ -119,6 +119,7 @@
     "maintainer:sync": "node scripts/sync-bt6-maintainer.mjs",
     "sidecar:build": "node scripts/build-sidecar.mjs",
     "tauri:dev": "tauri dev",
+    "tauri": "tauri",
     "tauri:build": "npm run build && npm run sidecar:build && tauri build",
     "tauri:ios": "tauri ios dev",
     "tauri:android": "tauri android dev"

@@ -96,7 +96,7 @@ Open:
 http://127.0.0.1:3333/ui/
 ```
 
-The server binds to `127.0.0.1` by default. Do not expose it to a network unless you understand the command-execution and browser-origin risk. If you intentionally bind elsewhere with `T3MP3ST_HOST`, put it behind your own access control.
+The server binds to `127.0.0.1` by default and does not require a token there. A non-loopback `T3MP3ST_HOST` (and Docker, which binds `0.0.0.0`) will not start until `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE` is set. `/api` then requires that bearer.
 
 If you need outbound test traffic to use a SOCKS5 proxy, configure it with `TEMPEST_PROXY_URL` or through the War Room settings. The expected form is:
 
@@ -159,6 +159,52 @@ npm run update:hard
 ```
 
 The updater protects local secrets and run artifacts listed in `scripts/update-protected.txt`.
+
+## Inference Providers
+
+T3MP3ST accepts hosted keys, local endpoints, and plan sign-ins. `POST
+`/api/models`` lists models for a provider; mission/general/admiral routes
+take a `provider` field.
+
+- ChatGPT Plan: connect with the `openai` PKCE flow in Settings — no API
+  key; subscription OAuth is the only auth. See [API
+  Reference](#api-reference-subscription-oauth-chatgpt-plan-claudegrok-plans).
+- Cursor Plan: install the `cursor-agent` CLI, sign in, then connect — the
+  CLI's own login is used, keyless.
+- Claude/Grok plans: sign in through Settings (Anthropic PKCE / X DEVICE
+  flow); tokens stay on the server.
+- OpenRouter and other hosted providers: set the provider key as shown in
+  Configure A Model above.
+
+## The White/Red UI
+
+The War Room at `/ui/` is compartmentalized: white pages (overview, mission,
+evidence, engagements, settings, about) for planning and review, red pages
+(operators, arsenal, terminal, range) for active operations — all inside one
+shared shell. Open `http://127.0.0.1:3333/ui/` after `npm run server`.
+
+## Dark Purple Teams
+
+Missions run on three spawnable team archetypes — `black` (offense), `blue`
+(detection), `white` (ROE/oversight) — each with its own arsenal grant
+table (`GET /api/teams/tool-grants`). Purple is the orchestrator that
+correlates the three outputs into one posture ledger via `POST
+/api/teams/purple/synthesize`. See [API
+Reference](#api-reference-dark-purple-teams).
+
+## Grok Bot Quickstart
+
+Five team seats (commander, red, black, blue, white) drive the loopback
+backend through saved skills:
+
+1. Start the backend: `npm run server` (gateway default
+   `http://127.0.0.1:3333`).
+2. Each seat runs `/tempest bootstrap` to register its seat id and check
+   gateway reachability.
+3. Talk to COMMANDER; it tasks the team seats and consolidates evidence.
+   Seven saved skills cover bootstrap, run, mission, operators, status,
+   report, and memory — see `grokbot/skills/index.json` and [MCP
+   Guide](#mcp-guide-tempest-bot-proxy-tools-tempest_).
 
 ## Common Problems
 

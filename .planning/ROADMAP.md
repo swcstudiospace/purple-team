@@ -1,15 +1,35 @@
-# Roadmap
+# Roadmap: T3MP3ST — Red Team AI
 
-- v1.0 (Phases 1–5): Plan-based inference, Dark Purple core, white/red UI, Grok Bot — shipped 2026-10-09
-- v1.1 (Phases 6–10): Specialized hats, Grok slash abstractions, UI polish, Tauri wrapper — shipped 2026-10-09
-- v1.2 (Phases 11–14): Tauri bundle completion, node server sidecar, remote-access hardening — shipped 2026-10-10
-- v1.3 (Phases 15–20): Color suites at red parity — blue/black/white catalog categories, engines, benches, playbooks, routes, purple v2, Defend UI — shipped 2026-10-10
+## Milestones
 
-Archives: `.planning/milestones/` (v1.2 + v1.3 phase dirs in `v*-phases/`).
+- ✅ **v1.0 Plan-Based Inference, Dark Purple Core, White/Red UI & Grok Bot** — Phases 1-5 (shipped 2026-10-09)
+- ✅ **v1.1 Specialist Hats, Grok Abstractions, UI Redesign, Tauri Wrapper** — Phases 6-10 (shipped 2026-10-09)
+- ✅ **v1.2 Re-home Completion: Tauri Bundling & Remote Hardening** — Phases 11-14 (shipped 2026-10-10)
+- ✅ **v1.3 Color Team Suites at Red Parity** — Phases 15-20 (shipped 2026-10-10)
+- ✅ **v1.4 Hardening & Validation** — Phases 21-25 (shipped 2026-10-13)
+
+Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREMENTS.md` / `v*-STATE.md`, phase dirs in `v*-phases/`).
+
+## Phases
+
+<details>
+<summary>✅ v1.4 Hardening & Validation (Phases 21-25) — SHIPPED 2026-10-13</summary>
+
+- [x] Phase 21: Retroactive Validation (Phases 15–20) (3/3 plans) — completed 2026-10-12
+- [x] Phase 22: ROE Text as Server State (1/1 plans) — completed 2026-10-12
+- [x] Phase 23: One Risk Signal (1/1 plans) — completed 2026-10-13
+- [x] Phase 24: Ops Evidence on This Host (1/1 plans) — completed 2026-10-13
+- [x] Phase 25: Lint Re-baseline & Close-Out (1/1 plans) — completed 2026-10-13
+
+</details>
 
 ## Next milestone
 
-Not started. The color-suite research doc (`v1.3-RESEARCH-color-suites.md`) is
-fully delivered; candidate follow-ups live in the v1.3 audit's tech-debt list
-(retroactive validate-phase, ROE text source, installer matrix) — bootstrap
-the next milestone when scope is chosen.
+Not started. Candidate scope is recorded in `.planning/PROJECT.md` (Next Milestone section):
+the five v1.4 audit tech-debt follow-ups (F-20-01 prompt-audit divergence; stale v1.3 audit
+Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field
+reconciliation; F-25-01 lint-scope widening; stray repo-root artifact file) plus the deferred
+v2 requirements (persisted ROE verdict ledger and revision history, purple auto-consumption of
+recorded verdicts, ROE text provenance, install-and-launch verification of the built
+`.deb`/AppImage, per-rule lint budgets + doctor-integrated lint gate). Bootstrap the next
+milestone with `/gsd:new-milestone`.

@@ -11,6 +11,60 @@ updated: "2026-07-20"
 ---
 # T3MP3ST Changelog
 
+## 2026-10-10 — v1.2 Phase 13: bearer auth off loopback
+
+Non-loopback binds, including Docker's `0.0.0.0`, refuse to start without
+`T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE`. `/api` then requires
+that bearer and is rate-limited (60/minute, burst 120). Loopback is unchanged:
+no token, no limit. The Grok Bot proxy sends the bearer and still refuses a
+non-loopback URL when the token is unset.
+
+## 2026-10-09 — t3mp3st v1.1: Specialized Hats, Grok Abstractions, UI Redesign, Tauri
+
+Four shipped phases:
+
+- Phase 6 — Specialized team hats (`5706640`): spawnable `specter`/`wraith`
+  (black), `sentinel`/`warden` (blue), `arbiter`/`auditor` (white) with
+  per-hat prompts, subset-disciplined grants, lane routing, and 17/17
+  operator prompts in the manifest.
+- Phase 7 — Grok chat abstractions (`41f3f4e`): seven hat-scoped slash
+  skills with one shared grammar (`grokbot/skills/GRAMMAR.md`) plus
+  `tempest_hats_list` / `tempest_hat_dispatch` MCP proxy tools.
+- Phase 8 — UI redesign polish (`3d462fd`): refined component system on
+  tokens, buttery motion with reduced-motion kill-switch, mobile
+  viewports, hats surface on the operators page.
+- Phase 9 — Tauri 2.0 wrapper (`c78ac35` + bundle wiring): locked-down
+  `src-tauri/` scaffold, `docs/` frontend, alongside-loopback-server
+  strategy; icon generation, mobile init, and node sidecar are recorded
+  follow-ups (tauri CLI absent on this box).
+
+Trust notes (unchanged): loopback-trust surfaces; remote bearer auth and
+per-user rate limits remain follow-ups.
+
+## 2026-10-09 — t3mp3st Milestone: Providers, Dark Purple, White/Red UI, Grok Bot
+
+Four shipped phases (SPE-9606):
+
+- Phase 1 — Inference providers (`bfa8031`): ChatGPT Plan (`chatgpt`
+  provider id, `openai` PKCE sign-in via Settings, OAuth-only with no
+  API-key path) and Cursor Plan (`cursor` provider id, keyless via the
+  local `cursor-agent` CLI login, model on the `::` separator); plus
+  Claude/Grok plan sign-ins and OpenRouter support.
+- Phase 2 — Dark Purple core (`8f991e1`): spawnable `black`/`blue`/`white`
+  team archetypes with per-team arsenal grants (`GET
+  /api/teams/tool-grants`) and purple posture synthesis (`POST
+  /api/teams/purple/synthesize`, `201` with the `DarkPurpleSynthesis`).
+- Phase 3 — White/red compartmentalized UI rebuild (`b86a397`): white
+  pages (overview, mission, evidence, engagements, settings, about) and
+  red pages (operators, arsenal, terminal, range) in one shared shell.
+- Phase 4 — Grok Bot package + MCP gateway tools (`78012c5`): five team
+  seats driven through seven saved skills (`/tempest bootstrap` first)
+  against the loopback gateway, plus nine `tempest_*` MCP proxy tools.
+
+Trust notes: the API and bot proxy are loopback-trust surfaces (no
+per-user auth on the wire); remote bearer auth and per-user rate limits
+are recorded follow-ups, not features in this milestone.
+
 ## 2026-05-28 — Cognitive v3 + Integrity Hardening
 
 A focused self-improvement pass on the Cybench harness, motivated by
