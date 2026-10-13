@@ -14,13 +14,17 @@ The two "edited but never executed" ops claims become receipt-grade evidence: th
 ## Implementation Decisions
 
 ### Owner-decided direction (locked at research/roadmap time)
-- **OPS-01 probe reconciliation**: Dockerfile HEALTHCHECK repoints to the open `/health` handler (serves both `/health` and `/api/health`); compose probe already correct (bearer header); NO new bearer-guard exemption — `/api/health` stays guarded. DOCKER.md curl examples fixed to match.
-- **Three evidenced runs**: (a) with `T3MP3ST_BEARER_TOKEN` — observed `starting → healthy` transition with inspect receipts; (b) failure path observed — retries exhausting into `unhealthy` (a probe only ever seen healthy proves nothing); (c) no-token run — fail-closed startup refusal.
-- **OPS-02 receipts discipline**: per-target table (target / built-on-host? / artifact path / byte size / sha256 / launched?); msi/nsis/app/dmg recorded as `CI-evidence-only`; cross-compiled artifacts NEVER count as host-observed; tool versions + wall time recorded.
-- **One phase carries both requirements** (roadmap-approved grouping): shared receipt discipline, shared host prep.
+- **D-01:** OPS-01 probe reconciliation — Dockerfile HEALTHCHECK repoints to the open `/health` handler (serves both `/health` and `/api/health`); compose probe already correct (bearer header); NO new bearer-guard exemption — `/api/health` stays guarded. DOCKER.md curl examples fixed to match.
+- **D-02:** Three evidenced runs: (a) with `T3MP3ST_BEARER_TOKEN` — observed `starting → healthy` transition with inspect receipts; (b) failure path observed — retries exhausting into `unhealthy` (a probe only ever seen healthy proves nothing); (c) no-token run — fail-closed startup refusal.
+- **D-03:** OPS-02 receipts discipline — per-target table (target / built-on-host? / artifact path / byte size / sha256 / launched?); msi/nsis/app/dmg recorded as `CI-evidence-only`; cross-compiled artifacts NEVER count as host-observed; tool versions + wall time recorded.
+- **D-04:** One phase carries both requirements (shared receipt discipline, shared host prep).
 
 ### Host prep (decided)
-- `patchelf` install (apt) sequenced as step 0 of OPS-02 — required for deb/appimage bundling per STACK research; if the host blocks the install, the receipt table records the blocker honestly (partial green, no laundering).
+- **D-05:** `patchelf` install (apt) sequenced as step 0 of OPS-02 — required for deb/appimage bundling per STACK research; if the host blocks the install, the receipt table records the blocker honestly (partial green, no laundering).
+
+### Receipts detail (owner decisions 2026-10-13)
+- **D-06:** Throwaway bearer token recorded PREFIX-ONLY (first 8 chars + sha256), never the full value.
+- **D-07:** AppImage launch smoke attempted via `--appimage-extract-and-run`; `launched?` cell truthful either way.
 
 ### Locked constraints (binding)
 - Guard semantics untouched; no endpoint that 200s regardless of server health; loopback-only runs don't count.
