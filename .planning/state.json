@@ -1,38 +1,12 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v1.4 — Hardening & Validation",
-  "phases": [
-    {
-      "number": "21",
-      "name": "Retroactive Validation (Phases 15–20)",
-      "status": "complete"
-    },
-    {
-      "number": "22",
-      "name": "ROE Text as Server State",
-      "status": "complete"
-    },
-    {
-      "number": "23",
-      "name": "One Risk Signal",
-      "status": "complete"
-    },
-    {
-      "number": "24",
-      "name": "Ops Evidence on This Host",
-      "status": "complete"
-    },
-    {
-      "number": "25",
-      "name": "Lint Re-baseline & Close-Out",
-      "status": "complete"
-    }
-  ],
+  "milestone": "v1.5",
+  "phases": [],
   "next": {
-    "command": "/gsd:progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd:discuss-phase",
+    "label": "Discuss the first phase",
+    "reason": "Project initialized — plan your first phase"
   },
-  "updated_at": "2026-10-13T02:33:14.820Z"
+  "updated_at": "2026-10-13T22:50:51.386Z"
 }

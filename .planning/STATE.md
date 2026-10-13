@@ -1,20 +1,16 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.4
-milestone_name: Hardening & Validation
-status: Awaiting next milestone
-stopped_at: Phase 25 complete — all phases complete
-last_updated: "2026-10-13T02:33:14.811Z"
+milestone: v1.5
+milestone_name: Four-Hat Runtime Parity
+status: blocked
+last_updated: "2026-10-13T23:24:01.688Z"
 last_activity: 2026-10-13
-last_activity_desc: Milestone v1.4 completed and archived
-state_head: 828313f550fd73c5c4d0d7363326f383657cb013
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 7
-  completed_plans: 7
-  percent: 100
-current_phase: 25
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -24,14 +20,14 @@ current_phase: 25
 See: .planning/PROJECT.md (updated 2026-10-13) and .planning/milestones/ for the archived v1.0–v1.4 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** Next milestone unplanned — bootstrap with `/gsd:new-milestone` (candidates: 5 v1.4 audit follow-ups + deferred v2 requirements, listed in PROJECT.md).
+**Current focus:** Approved v1.5 Four-Hat Runtime Parity — requirements initialization blocked until a fresh OMP host mounts verified `swarm_assignment`. Unrelated v1.4/v2 debt remains deferred.
 
 ## Current Position
 
-Phase: Milestone v1.4 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-13 — Milestone v1.4 completed and archived
+Status: Blocked — current host tool registry is stale; no product specialist has dispatched
+Last activity: 2026-10-13 — Milestone v1.5 started
 
 ## Completed Context
 
@@ -43,20 +39,23 @@ Last activity: 2026-10-13 — Milestone v1.4 completed and archived
 
 ## Pending Todos
 
-- Bootstrap the next milestone: `/gsd:new-milestone` (scope candidates in PROJECT.md / ROADMAP.md).
-- Carry the 5 v1.4 audit tech-debt follow-ups into that milestone's scope: F-20-01 prompt-audit divergence; stale v1.3 audit Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field reconciliation; F-25-01 lint-scope widening (18 files / 16 errors / 112 warnings); stray repo-root artifact file.
+- Resume approved v1.5 initialization and complete requirements/roadmap after the normal OMP restart.
+- Deferred outside v1.5: the 5 v1.4 audit follow-ups remain candidates for a later milestone; do not silently add them to the approved parity scope.
 - Owner follow-ups from v1.4 audit: schedule `/gsd:validate-phase 22`–`25` (four draft VALIDATION.md coverage TODOs).
 
 ## Blockers/Concerns
+
+- **v1.5 blocker:** runtime bootstrap commits `8700465` and `4e8d9e7` are verified, but the already-running OMP host still exposes the old five-tool registry. `PurpleVerifiedResume` confirmed `swarm_assignment` absent; real task `T1b29-req` remains BLOCKED at attempt 1, with twelve downstream tasks PLANNED. Normal host/session restart is required; no supported plugin reload command is available. Do not substitute denied eval/shell signing.
+- User explicitly approved **Resume full milestone**: after restart, clear only the resolved transport block through legal A01 transitions, obtain the exact canonical specialist prompt, and resume correlation `1b299db3-62f2-4a31-a133-5bb01be01615`.
 
 - v1.4 closeout ran as `override_closeout`: readiness reported phases 21/22/24 verification **stale** (later phases touched covered files after their verifiers passed; all five VERIFICATION runs passed at run time and were cross-verified by the close audit). Owner accepted 2026-10-13. If those surfaces change again, re-run the verifiers before trusting the reports.
 - v1.4 audit tech debt (accepted, owner 2026-10-13): F-20-01 prompt-audit divergence at the frozen v1.3 boundary; stale v1.3 audit Nyquist prose; operators.html Tier-cell manual remainder + 23-VERIFICATION status mismatch; F-25-01 lint-scope gap; stray repo-root artifact file — all scheduled as next-milestone candidates.
 
 ## Session Continuity
 
-Last session: 2026-10-13T02:04:40Z
-Stopped at: Phase 25 complete — all phases complete
-Resume file: None
+Last session: 2026-10-13T23:24:01.688Z
+Stopped at: v1.5 requirements initialization — stale mounted OMP registry blocks typed signed dispatch
+Resume file: .planning/.continue-here.md
 
 ## Performance Metrics
 
@@ -74,4 +73,4 @@ Resume file: None
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Restart OMP normally in this repo, resume the preserved session/graph, confirm fresh A01 tools include `swarm_assignment`, then continue approved v1.5. No new key is needed.

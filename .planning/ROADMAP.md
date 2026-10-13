@@ -10,6 +10,14 @@
 
 Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREMENTS.md` / `v*-STATE.md`, phase dirs in `v*-phases/`).
 
+## Current Milestone: v1.5 Four-Hat Runtime Parity
+
+User approved full Red/Blue/Black/White runtime parity. Initialization has started; requirements,
+formal phase mapping after phase 25, and implementation plans are not yet produced. Authenticated
+controller correlation `1b299db3-62f2-4a31-a133-5bb01be01615` is preserved; `T1b29-req` is BLOCKED
+because this running OMP host has not loaded the verified `swarm_assignment` operation.
+A normal OMP restart is the remaining prerequisite. No v1.5 phase or product acceptance is complete.
+
 ## Phases
 
 <details>
@@ -23,9 +31,9 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 
 </details>
 
-## Next milestone
+## Deferred milestone candidates
 
-Not started. Candidate scope is recorded in `.planning/PROJECT.md` (Next Milestone section):
+Deferred outside the approved v1.5 parity scope. Candidate scope is recorded in `.planning/PROJECT.md` (Next Milestone section):
 the five v1.4 audit tech-debt follow-ups (F-20-01 prompt-audit divergence; stale v1.3 audit
 Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field
 reconciliation; F-25-01 lint-scope widening; stray repo-root artifact file) plus the deferred
