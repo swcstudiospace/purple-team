@@ -17,10 +17,11 @@ docker compose down
 
 The API server is available at `http://localhost:3333`.
 
-Test endpoints:
+Test endpoints (guarded `/api/*` paths need the bearer; `/health` is the open probe):
 ```bash
-curl http://localhost:3333/api/health
-curl http://localhost:3333/api/bounty/platforms
+curl -H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN" http://127.0.0.1:3333/api/health
+curl http://127.0.0.1:3333/health
+curl -H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN" http://127.0.0.1:3333/api/bounty/platforms
 ```
 
 ## Prerequisites
