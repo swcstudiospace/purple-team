@@ -324,6 +324,7 @@ describe('purple synthesis', () => {
       { id: 'b-medium', severity: 'low', coverage: 'none', verdict: 'compliant', tier: 'medium', prose: 'medium residual risk — b-medium (T) sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable' },
       { id: 'b-critical', severity: 'high', coverage: 'none', verdict: 'compliant', tier: 'critical', prose: 'critical residual risk — b-critical (T) sits at the top tier; do not declare the posture acceptable while this row is critical' },
       { id: 'b-floor', severity: 'low', coverage: 'covered', verdict: 'violation', tier: 'high', prose: 'high residual risk — b-floor (T) sits above appetite; do not declare the posture acceptable while this row is high' },
+      { id: 'b-partial-floor', severity: 'medium', coverage: 'partial', verdict: 'violation', tier: 'high', prose: 'high residual risk — b-partial-floor (T) sits above appetite; do not declare the posture acceptable while this row is high' },
     ];
     for (const entry of CASES) {
       const result = synthesize({

@@ -46,7 +46,7 @@ export interface DarkPurpleSynthesis {
 
 // ── Residual-risk prose model ───────────────────────────────────────────────
 // Single writer: prose is a pure derived rendering of the tier computed by
-// residualRiskTier() above. Templates key STRICTLY on the tier — no branch on
+// residualRiskTier() below. Templates key STRICTLY on the tier — no branch on
 // detection, verdict, or severity — so tier/prose contradiction is structurally
 // impossible. {findingId}{subject} interpolate rendered data, not signal inputs.
 // Tier-honest framing only: no template claims a specific detection or verdict
