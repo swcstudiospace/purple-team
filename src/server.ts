@@ -1239,7 +1239,7 @@ function schedulePersist(reason: string): void {
 // Flush any pending debounced snapshot NOW (used on graceful shutdown so the debounce window
 // can't drop the last <1s of state on SIGTERM/SIGINT — Ctrl-C, docker stop, systemctl restart).
 // state.json is the only restore source, so this closes the data-loss gap the debounce opened.
-async function flushPersist(): Promise<void> {
+export async function flushPersist(): Promise<void> {
   if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
   if (persistPending) {
     persistPending = false;

@@ -129,6 +129,7 @@ function readRoeSnapshot(dir: string): RoeStoredSnapshot {
 
 let baseA = '';
 let baseB = '';
+let serverAModule: Record<string, unknown> = {};
 let dirA = '';
 let dirB = '';
 let savedEnv: Record<string, string | undefined> = {};
@@ -166,8 +167,8 @@ beforeAll(async () => {
   const portA = await freePort();
   process.env.T3MP3ST_STATE_DIR = dirA;
   process.env.T3MP3ST_PORT = String(portA);
-  const serverA = await import('../server.js');
-  expect(serverA).toBeDefined();
+  serverAModule = await import('../server.js');
+  expect(serverAModule).toBeDefined();
   baseA = `http://127.0.0.1:${portA}`;
   await waitReady(baseA, 90000);
 }, 180000);
@@ -272,6 +273,9 @@ describe('roe routes runtime (clean slot)', () => {
 describe('roe routes runtime (tampered persisted record)', () => {
   beforeAll(async () => {
     pinLoopbackEnv();
+    // Server A's debounced snapshot must land in dirA BEFORE dirB becomes the
+    // state dir, or the delayed write clobbers the tampered fixture.
+    await (serverAModule as { flushPersist?: () => Promise<void> }).flushPersist?.();
     vi.resetModules();
     const portB = await freePort();
     process.env.T3MP3ST_STATE_DIR = dirB;
