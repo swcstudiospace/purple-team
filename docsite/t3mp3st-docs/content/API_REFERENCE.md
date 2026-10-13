@@ -35,11 +35,16 @@ The API is a local operator surface, not a multi-user internet service.
 - Default port: `3333`
 - Override port with `T3MP3ST_PORT`
 - Override bind host with `T3MP3ST_HOST`
+- Non-loopback binds (including Docker's `0.0.0.0`) refuse to start unless
+  `T3MP3ST_BEARER_TOKEN` or `T3MP3ST_BEARER_TOKEN_FILE` is set. `/api/*` then
+  requires `Authorization: Bearer <token>` and is rate-limited (60/minute,
+  burst 120, `429` + `Retry-After`). `/`, `/ui`, and `/health` stay open.
+- Loopback binds do not ask for a token and do not rate-limit.
 - State-changing requests are guarded against foreign browser origins
 - Loopback binds reject non-loopback Host headers to reduce DNS-rebinding risk
 - Active or networked tool use should have a scope/authorization receipt
 
-Do not expose the server on a public interface without adding your own authentication and network controls.
+Do not publish a non-loopback bind beyond the operators who hold the token.
 
 ## Health And Runtime
 
@@ -237,3 +242,89 @@ Repository paths are contained by resolver logic before analysis. Keep that cont
 | `GET` | `/api/bounty/credentials` | Credential readiness |
 | `POST` | `/api/bounty/format` | Format a report |
 | `POST` | `/api/bounty/submit` | Submit through configured platform integration |
+
+## Subscription OAuth (ChatGPT Plan, Claude/Grok Plans)
+
+Plan sign-ins use OAuth on the server; tokens never leave the server. Check
+session state with `GET /api/oauth/status` (per-provider `connected` flags)
+or `GET /api/llm/status` (includes an `oauth` summary).
+
+| Method | Path | Purpose |
+|---|---|---|
+| `POST` | `/api/oauth/openai/start` | Start ChatGPT Plan PKCE flow; returns `{ flowId, authorizeUrl, state }` |
+| `POST` | `/api/oauth/openai/complete` | Complete ChatGPT Plan sign-in; body `{ flowId, code }`, returns `{ ok: true, oauth }` |
+| `POST` | `/api/oauth/openai/logout` | Clear the ChatGPT Plan session |
+| `POST` | `/api/oauth/anthropic/start` | Start Claude Plan PKCE flow; returns `{ flowId, authorizeUrl, state }` |
+| `POST` | `/api/oauth/anthropic/complete` | Complete Claude Plan sign-in; body `{ flowId, code }` |
+| `POST` | `/api/oauth/anthropic/logout` | Clear the Claude Plan session |
+| `POST` | `/api/oauth/xai/start` | Start Grok plan device flow; returns `{ flowId, userCode, verificationUri, expiresIn, interval }` |
+| `POST` | `/api/oauth/xai/poll` | Poll Grok plan authorization; body `{ flowId }` |
+| `POST` | `/api/oauth/xai/logout` | Clear the Grok plan session |
+
+`complete` returns `400` when `flowId`/`code` are missing or invalid, `502`
+from `start` when the provider is unreachable. OAuth runs inside the same
+loopback trust as every other route (see Security Model above).
+
+## Dark Purple Teams
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/teams/tool-grants` | Per-team arsenal grant table (`{ grants: { black, blue, white } }`) |
+| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger |
+| `GET` | `/api/teams/blue/gaps` | Read-only v2 D3FEND coverage report over the findings ledger (`{ gaps }`, per-gap `unresolvedCountermeasures` surfaced) |
+| `GET` | `/api/teams/blue/hardening` | Read-only severity-tiered hardening plan over the findings ledger (`{ items }`) |
+| `GET` | `/api/teams/blue/rules` | Read-only Sigma rule pack from ledger coverage gaps (`{ rules, yaml }`, experimental rules) |
+| `GET` | `/api/teams/black/cover` | Read-only phase-grouped OPSEC review of the active RED plan, the most recently updated mission draft (`{ phases, egressDeclared, egressNotes, itemCount }`; no draft → empty phases) |
+| `GET` | `/api/teams/black/exfil` | Read-only ATT&CK-keyed egress cost report over planned exfil paths (`{ paths, totalVolumeMb, totalCost, budget, within }`; zeroed until a path store exists — drafts carry no channel/volume fields) |
+| `GET` | `/api/teams/black/noise` | Read-only tactic-tier noise budget over the active plan's actions (`{ entries, total, budget, within, tier, violations }`; no draft → total 0, tier `quiet`) |
+| `GET` | `/api/teams/white/roe` | Structured parse of the on-record ROE text plus provenance-stamped verdicts (`{ roe, resolved, unresolved, commentLines, ok, summary, provenance, verdicts }`; `verdicts` appear only when `ok` is `true`, each carrying `roeRevision`, `roeTextHash`, and `roeLines`; no record, corrupt record, hash mismatch, or `ok: false` → honest `200` report with no `verdicts` member) |
+| `PUT` | `/api/teams/white/roe` | Record sanctioned ROE text plus the actions to adjudicate (`{ text, actions }`; `text` capped at 64 KiB utf8 bytes via `Buffer.byteLength`; missing/empty/non-string `text` or non-array `actions` → `400`, oversize text → `413`; stamps monotonic `revision` plus 16-char sha256 `textHash`, answers `200` with `{ revision, textHash, ok, summary }`; replace-latest single slot) |
+| `GET` | `/api/teams/white/evidence` | Read-only replay-chain audit over the receipt ledger (`{ links, intact, broken, summary }`; replayable entries must carry a command/uri hook, duplicate ids break the chain) |
+| `GET` | `/api/teams/white/report-audit` | Read-only findings ↔ evidence coverage audit (`{ findings, reportReady, withGaps, unclaimedEvidence, summary }`; gaps named exactly, unclaimed ledger entries surfaced) |
+
+`POST /api/teams/purple/synthesize` body:
+
+```json
+{
+  "findings": [{ "id": "F-1", "title": "Open admin panel", "severity": "high" }],
+  "detections": [{ "findingId": "F-1", "coverage": "partial" }],
+  "verdicts": [{ "verdict": "allow" }]
+}
+```
+
+All three fields must be arrays (`400` otherwise). Findings whose `id` exists
+in the findings ledger get their stored title/severity merged in read-only.
+Responds `201` with the `DarkPurpleSynthesis` (`coverageMatrix` with
+`findingId`/`detection`/`verdict`/`riskTier`/`residualRisk`, plus `unresolved`
+and `nextMissions`). `riskTier` is the authoritative residual-risk signal: a
+deterministic `f(severity, detection, verdict)` per coverage-matrix row.
+`residualRisk` is a pure derived rendering of `riskTier` — never an
+independent assessment. Vocabulary note: the purple synthesis tier
+(`PurpleRiskTier` in `src/teams/purple.ts`: `critical` `high` `medium` `low`
+`info`) is unrelated to the arsenal approval-gate tier (`RiskTier` in
+`src/types/index.ts`: `local_read` `passive` `active` `intrusive` `credential`
+`dangerous`, gating tool execution); the shared name is coincidence and
+renaming either requires contract sanction. Purple is an orchestrator
+capability, not a spawnable operator archetype — the spawnable teams are
+`black`, `blue`, and `white`.
+
+## Provider IDs And Keyless Semantics
+
+`POST /api/models` takes an optional body `{ provider, apiKey, baseUrl }`
+(body values override server config; missing values fall back to server
+config) and always answers, failing open to the static model list. The
+`provider` field on `/api/models`, `/api/mission/start`, `/api/general/*`,
+and `/api/admiral/*` accepts the `chatgpt` and `cursor` provider ids:
+
+- `chatgpt` — ChatGPT Plan via the Codex backend. Subscription OAuth is the
+  only auth (no API-key path); without a sign-in the route answers with a
+  sign-in-required error, never a silent provider swap.
+- `cursor` — Cursor Plan via the local `cursor-agent` CLI's own login.
+  Keyless like `codex`: no API key or base URL; the selected model rides the
+  `::` separator (e.g. `cursor::composer-1`), with `auto` as the CLI's
+  pick-a-model sentinel.
+
+Other keyless providers: `codex` (local CLI login), `local` (self-hosted
+endpoint, keyless unless the server requires one), `local-agent` (connected
+CLI agent), `mock`. A per-request `baseUrl` is honored only for `local`;
+cloud provider URLs cannot be redirected by a request.
