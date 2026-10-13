@@ -69,6 +69,7 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
   4. Supersession log carries the phase-20 entry; gate table reports the running lint count with no net-new warnings
 
 **Plans**: TBD
+- [x] 23-01-PLAN.md
 
 ### Phase 24: Ops Evidence on This Host
 
@@ -103,6 +104,6 @@ v1.3 closed with six accepted audit debts: phases 15–20 were never validated, 
 |-------|----------------|--------|-----------|
 | 21. Retroactive Validation (Phases 15–20) | 3/3 | Complete    | 2026-10-12 |
 | 22. ROE Text as Server State | 1/1 | Complete    | 2026-10-12 |
-| 23. One Risk Signal | 0/TBD | Not started | - |
+| 23. One Risk Signal | 1/1 | In Progress | - |
 | 24. Ops Evidence on This Host | 0/TBD | Not started | - |
 | 25. Lint Re-baseline & Close-Out | 0/TBD | Not started | - |
