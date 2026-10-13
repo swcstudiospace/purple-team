@@ -15,7 +15,7 @@ docker compose logs -f
 docker compose down
 ```
 
-The API server is available at `http://localhost:3333`.
+The API server is available at `http://127.0.0.1:3333`.
 
 Test endpoints (guarded `/api/*` paths need the bearer; `/health` is the open probe):
 ```bash

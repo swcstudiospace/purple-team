@@ -30,7 +30,7 @@ Zero diff to `docker-compose.yml` (probe already bearer-correct) and zero diff t
 |---|---|
 | image .Id | `sha256:2109efd13d08a9d76ddb4fc2bc87e37825bfa242ef572c5fbf250709768529f4` |
 | image Size | 575736609 bytes (~549 MB) |
-| RepoDigests | `["t3mp3st@sha256:2109efd13d08a9d76ddb4fc2bc87e37825bfa242ef572c5fbf250709768529f4"]` (local manifest ref; image never pushed) |
+| RepoDigests | `["t3mp3st@sha256:2109efd13d08a9d76ddb4fc2bc87e37825bfa242ef572c5fbf250709768529f4"]` (local manifest ref; image never pushed — first-build value observed at build time). Live re-check 2026-10-13 `docker image inspect t3mp3st:ops01 --format '{{json .RepoDigests}} {{.Id}}'` → `["t3mp3st@sha256:55d8c97978e4673f780577caba0679bc8b8b4aac55cf693e3c4fd9aed695f410"] sha256:55d8c97978e4673f780577caba0679bc8b8b4aac55cf693e3c4fd9aed695f410` (docker 29.6.2 containerd image store populates RepoDigests for local builds — 24-RESEARCH.md Pitfall-5 emptiness assumption superseded on this host). Canonical identity pin remains `.Id` + base digest, sufficient either way. |
 | base image pin (Dockerfile:3) | `node:22-alpine@sha256:16e22a550f3863206a3f701448c45f7912c6896a62de43add43bb9c86130c3e2` |
 | image Env | `DOCKER=true` present; `ExposedPorts: 3333/tcp` |
 | HEALTHCHECK (inspected source) | `wget --no-verbose --tries=1 --spider http://localhost:3333/health \|\| exit 1` |
