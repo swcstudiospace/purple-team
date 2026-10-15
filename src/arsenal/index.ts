@@ -365,11 +365,18 @@ export class Arsenal extends EventEmitter<ArsenalEvents> {
   getApprovalController(): ApprovalController | null { return this.approval; }
 
   /**
-   * Execute a tool
+   * Execute a tool.
+   *
+   * `runAllowlist` is the frozen per-run authority set for this call. When
+   * provided (including an empty array), a name outside the set is denied
+   * with a result — the handler never runs. When omitted, enforcement is off
+   * (library/test mode). The set is per-call only and is never stored on the
+   * shared Arsenal instance.
    */
   async execute(
     toolName: string,
-    context: ToolContext
+    context: ToolContext,
+    runAllowlist?: readonly string[]
   ): Promise<ToolResult> {
     const tool = this.tools.get(toolName);
     if (!tool) {
@@ -380,6 +387,18 @@ export class Arsenal extends EventEmitter<ArsenalEvents> {
       );
       this.emit('tool:error', { tool: { name: toolName } as CustomTool, error: err });
       throw err;
+    }
+
+    // Per-run authority gate: a model-requested tool outside the run's frozen
+    // allowlist is denied BEFORE the scope gate and the handler. Unknown names
+    // still throw ToolNotFound above; an empty set denies all.
+    if (runAllowlist !== undefined && !runAllowlist.includes(toolName)) {
+      const denied: ToolResult = {
+        success: false,
+        error: `AUTHORITY DENIED: tool '${toolName}' is outside this run's frozen allowlist — refused before execution.`,
+      };
+      this.emit('tool:error', { tool, error: new ToolError(ToolErrorCategory.ScopeDenied, denied.error!, toolName) });
+      return denied;
     }
 
     // Egress scope gate: deny out-of-scope network targets BEFORE the handler runs. A tool call

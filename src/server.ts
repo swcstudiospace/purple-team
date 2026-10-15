@@ -57,6 +57,8 @@ import { initGrammars } from './recon/ts-grammars.js';
 import { redactCredential } from './evidence/index.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
+import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, ArtifactValidationError } from './teams/contracts.js';
+import type { BoundInlineArtifact } from './types/index.js';
 import { synthesize, type DarkPurpleSynthesis, type PurpleVerdictByFinding } from './teams/purple.js';
 import { hardeningPlan, type DetectionGap } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
@@ -364,14 +366,14 @@ async function initLLM(): Promise<LLMBackbone | null> {
       else if (hasOAuth('openai')) llmConfig = config.getLLMConfig('chatgpt');
     }
     if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
-      console.warn('[T3MP3ST] No API key configured - LLM features disabled');
+      console.warn('[purple-team] No API key configured - LLM features disabled');
       return null;
     }
     const backbone = new LLMBackbone(llmConfig);
-    console.log(`[T3MP3ST] LLM initialized: ${llmConfig.provider}/${llmConfig.model}`);
+    console.log(`[purple-team] LLM initialized: ${llmConfig.provider}/${llmConfig.model}`);
     return backbone;
   } catch (error) {
-    console.error('[T3MP3ST] Failed to initialize LLM:', error);
+    console.error('[purple-team] Failed to initialize LLM:', error);
     return null;
   }
 }
@@ -438,7 +440,7 @@ function createTempestCommandInstance(missionName: string, apiKey: string | unde
     try {
       upsertMissionFindingToLedger(finding as any, tempestCommand?.mission.getActiveMission()?.id);
     } catch (err) {
-      console.error('[T3MP3ST] failed to persist mission finding to ledger:', err instanceof Error ? err.message : err);
+      console.error('[purple-team] failed to persist mission finding to ledger:', err instanceof Error ? err.message : err);
     }
   });
 
@@ -620,7 +622,7 @@ function rejectDuplicateLedgerId<T>(res: Response, ledger: Map<string, T>, id: u
   res.status(409).json({
     error: `${label} already exists`,
     id: id.trim(),
-    next: `Use PATCH ${collectionPath}/${id.trim()} to update an existing record, or omit id to let T3MP3ST mint one.`,
+    next: `Use PATCH ${collectionPath}/${id.trim()} to update an existing record, or omit id to let Purple Team mint one.`,
   });
   return true;
 }
@@ -1230,7 +1232,7 @@ function schedulePersist(reason: string): void {
     if (!persistPending) return;
     persistPending = false;
     void persistState(persistReason).catch(error => {
-      console.warn(`[T3MP3ST] State persistence failed: ${error.message || error}`);
+      console.warn(`[purple-team] State persistence failed: ${error.message || error}`);
     });
   }, PERSIST_DEBOUNCE_MS);
 }
@@ -1273,10 +1275,10 @@ async function loadPersistedState(): Promise<void> {
     replaceMapContents(memoryProposals, state.memoryProposals);
     replaceMapContents(purpleSyntheses, state.purpleSyntheses);
     replaceMapContents(roeRecords, state.roeRecords);
-    console.log(`[T3MP3ST] State restored from ${file}`);
+    console.log(`[purple-team] State restored from ${file}`);
   } catch (error: any) {
     if (error?.code !== 'ENOENT') {
-      console.warn(`[T3MP3ST] State restore skipped: ${error.message || error}`);
+      console.warn(`[purple-team] State restore skipped: ${error.message || error}`);
     }
   }
 }
@@ -1288,6 +1290,16 @@ function normalizeTargetValue(value: unknown): string {
     return String(record.host || record.locator || record.label || record.address || 'local-lab');
   }
   return 'local-lab';
+}
+
+/** Host string for a mission-start target entry (string or { host } record). */
+function missionTargetHost(value: unknown): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (value && typeof value === 'object' && 'host' in value) {
+    const host = value.host;
+    if (typeof host === 'string' && host.trim()) return host.trim();
+  }
+  return String(value);
 }
 
 function hostFromTarget(target: string): string {
@@ -1518,7 +1530,7 @@ function buildRoutePreview(draft: MissionDraft): RoutePreview {
     : ['s3r4ph1m_scope_review'];
   const warnings = draft.scope.length ? [] : ['No explicit target scope supplied; defaulting to local-lab draft mode.'];
   const opsecLevel = draft.opsecPreference === 'overt' ? 'loud' : draft.opsecPreference === 'normal' ? 'covert' : 'silent';
-  const missionName = draft.title || `T3MP3ST ${family.replace(/_/g, ' ')}`;
+  const missionName = draft.title || `Purple Team ${family.replace(/_/g, ' ')}`;
 
   return {
     draftId: draft.id,
@@ -4898,7 +4910,7 @@ function emitContractEvent(type: string, payload: Record<string, unknown>): void
     ...payload,
   });
   void appendStateEvent(type, payload).catch(error => {
-    console.warn(`[T3MP3ST] Event persistence failed: ${error.message || error}`);
+    console.warn(`[purple-team] Event persistence failed: ${error.message || error}`);
   });
   schedulePersist(type);
 }
@@ -5946,7 +5958,7 @@ app.post('/api/mission-drafts', (req: Request, res: Response) => {
   const body = req.body as Partial<MissionDraft> & Record<string, unknown>;
   const draft: MissionDraft = {
     id: typeof body.id === 'string' ? body.id : newId('draft'),
-    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled T3MP3ST Mission',
+    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled Purple Team Mission',
     objective: typeof body.objective === 'string' && body.objective.trim() ? body.objective.trim() : 'Draft an authorized security mission.',
     scope: normalizeStringList(body.scope),
     constraints: typeof body.constraints === 'string' ? body.constraints : '',
@@ -6009,7 +6021,7 @@ app.post('/api/route-preview', (req: Request, res: Response) => {
   const draft = body.draftId ? missionDrafts.get(body.draftId) : undefined;
   const fallbackDraft: MissionDraft = draft || {
     id: newId('draft'),
-    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'T3MP3ST Route Preview',
+    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Purple Team Route Preview',
     objective: typeof body.objective === 'string' && body.objective.trim() ? body.objective.trim() : 'Preview an authorized mission route.',
     scope: normalizeStringList(body.scope),
     constraints: typeof body.constraints === 'string' ? body.constraints : '',
@@ -6840,6 +6852,117 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     }
   }
 
+  // Phase 26 tracer — legacy-versus-structured discriminator: the presence of
+  // roleInputs, family, or targetContext flips the branch. inlineArtifacts
+  // alone never flips it (the hunt form already posts it on ordinary starts).
+  const startBody: Record<string, unknown> = req.body as Record<string, unknown>;
+  const structured = isStructuredStart(startBody);
+
+  // Bounded inline artifact on either branch: validated and hashed server-side
+  // BEFORE any mission state exists. Invalid input ends here with 400/413 and
+  // no mission is created.
+  let stagedArtifact: BoundInlineArtifact | undefined;
+  try {
+    stagedArtifact = bindInlineArtifacts(startBody.inlineArtifacts);
+  } catch (e) {
+    if (e instanceof ArtifactValidationError) { res.status(e.status).json({ error: e.message }); return; }
+    throw e;
+  }
+
+  // Structured role-bound start: validate objective, role membership, and
+  // uniqueness before createTempestCommandInstance; 400 names the role.
+  if (structured) {
+    let start;
+    try {
+      start = validateStructuredStart({
+        objective: startBody.objective,
+        operators: startBody.operators,
+        roleInputs: startBody.roleInputs,
+        targetContext: startBody.targetContext,
+        family: startBody.family,
+      });
+    } catch (e) {
+      if (e instanceof StructuredStartError) { res.status(400).json({ error: e.message }); return; }
+      throw e;
+    }
+
+    const structuredTargets: unknown[] = Array.isArray(targets) ? targets : [];
+    if (!start.artifactOnly && structuredTargets.length === 0) {
+      res.status(400).json({ error: 'At least one target required' });
+      return;
+    }
+    for (const target of structuredTargets) {
+      const targetValue = normalizeTargetValue(target);
+      const guard = guardAction(req.body as Record<string, unknown>, 'mission_execution', targetValue, `Start mission ${name} against ${targetValue}`);
+      if (!guard.allowed) { blockForApproval(res, guard); return; }
+    }
+
+    try {
+      const cmd = createTempestCommandInstance(
+        name,
+        effectiveKey,
+        missionLLMConfig.provider,
+        missionLLMConfig.model,
+        missionLLMConfig.baseUrl,
+      );
+
+      // Artifact-only binds bytes, never targets: no local-lab or pending
+      // targets are inserted and generateTasksForTarget is never called here;
+      // the staged hash is consumed in this same synchronous turn, before the
+      // tick interval arms in cmd.start() below.
+      for (const t of structuredTargets) {
+        const host = missionTargetHost(t);
+        if (host.startsWith('http://') || host.startsWith('https://')) {
+          cmd.targetEnv.addTarget(createTargetFromUrl(host));
+        } else if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+          cmd.targetEnv.addTarget(createTargetFromIP(host));
+        } else {
+          cmd.targetEnv.addTarget(createTargetFromUrl(`http://${host}`));
+        }
+      }
+
+      const spawnedOps: Array<{ id: string; callsign: string; archetype: string }> = [];
+      const unavailable: Array<{ role: string; status: string; runId: string }> = [];
+      for (const role of start.roles) {
+        const callsign = role.charAt(0).toUpperCase() + role.slice(1) + '-1';
+        try {
+          const op = cmd.spawnOperator(callsign, role);
+          spawnedOps.push({ id: op.id, callsign: op.callsign, archetype: role });
+        } catch {
+          // Unregistered hat executor: unavailable with a retained run id —
+          // never model prose as the hat result.
+          unavailable.push({ role, status: 'unavailable', runId: start.runId });
+        }
+      }
+
+      cmd.start();
+
+      broadcastEvent('mission:started', {
+        name,
+        runId: start.runId,
+        targets: structuredTargets.map((t) => missionTargetHost(t)),
+        operators: spawnedOps,
+        timestamp: Date.now(),
+      });
+
+      res.json({
+        success: true,
+        runId: start.runId,
+        missionName: name,
+        objective: start.objective,
+        operators: spawnedOps,
+        ...(unavailable.length > 0 ? { unavailable } : {}),
+        ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
+        targets: cmd.targetEnv.getAllTargets().map(t => ({ id: t.id, address: t.address, type: t.type })),
+        status: cmd.getStatus(),
+      });
+    } catch (error: unknown) {
+      console.error('[purple-team] Structured mission start failed:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to start mission' });
+    }
+    return;
+  }
+
   if (targets.length === 0) {
     res.status(400).json({ error: 'At least one target required' });
     return;
@@ -6858,7 +6981,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     } catch (e) {
       if (e instanceof RepoPathError) { res.status(400).json({ error: `repoPath rejected: ${e.message}` }); return; }
       if (e instanceof RepoCloneError) { res.status(400).json({ error: e.message }); return; }
-      console.error('[T3MP3ST] repo source validation error:', e);
+      console.error('[purple-team] repo source validation error:', e);
       res.status(500).json({ error: 'repo source validation failed' });
       return;
     }
@@ -6898,7 +7021,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
           spawnedOps.push({ id: op.id, callsign: op.callsign, archetype });
         } catch (e: any) {
           // Duplicate callsign — skip
-          console.warn(`[T3MP3ST] Skipping duplicate operator: ${callsign}`);
+          console.warn(`[purple-team] Skipping duplicate operator: ${callsign}`);
         }
       }
     }
@@ -6930,12 +7053,13 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       success: true,
       missionName: name,
       operators: spawnedOps,
+      ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
       targets: cmd.targetEnv.getAllTargets().map(t => ({ id: t.id, address: t.address, type: t.type })),
       status: cmd.getStatus(),
       ...(whitebox ? { whitebox } : {}),
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] Mission start failed:', error);
+    console.error('[purple-team] Mission start failed:', error);
     res.status(500).json({ error: error.message || 'Failed to start mission' });
   } finally {
     repoSource?.cleanup();
@@ -6970,7 +7094,7 @@ app.post('/api/whitebox/analyze', async (req: Request, res: Response): Promise<v
     });
     res.json(result);
   } catch (error: any) {
-    console.error('[T3MP3ST] White-box analysis failed:', error);
+    console.error('[purple-team] White-box analysis failed:', error);
     if (error instanceof RepoPathError || error instanceof RepoCloneError) {
       res.status(400).json({ error: error.message });
       return;
@@ -7503,7 +7627,7 @@ function codexUnavailable(res: Response, error: any): void {
     available: false,
     provider: 'codex',
     error: error?.message || 'Codex CLI unavailable',
-    hint: 'Install/login to Codex CLI, then retry. T3MP3ST does not need your account token.',
+    hint: 'Install/login to Codex CLI, then retry. Purple Team does not need your account token.',
   });
 }
 
@@ -7518,7 +7642,7 @@ app.get('/api/codex/status', async (_req: Request, res: Response): Promise<void>
       available: true,
       provider: 'codex',
       authMode: 'local-codex-account',
-      tokenHandling: 'no token is accepted by or returned from T3MP3ST',
+      tokenHandling: 'no token is accepted by or returned from Purple Team',
       command,
       version: stdout.trim(),
       executionMode: 'codex exec --ephemeral --sandbox read-only',
@@ -7650,7 +7774,7 @@ app.post('/api/llm/local', async (req: Request, res: Response): Promise<void> =>
       choices: [{ message: { role: 'assistant', content: result.content } }],
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] /api/llm/chat failed:', error);
+    console.error('[purple-team] /api/llm/chat failed:', error);
     if (!res.headersSent) res.status(502).json({ error: error?.message || 'Local LLM request failed' });
   }
 });
@@ -7719,7 +7843,7 @@ app.post('/api/general/plan', async (req: Request, res: Response): Promise<void>
       missionGate: plan.missionGate,
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] General planning failed:', error);
+    console.error('[purple-team] General planning failed:', error);
     const message = error.message || 'Planning failed';
     res.status(/API key required|Unknown provider|sign-in required/.test(message) ? 400 : 500).json({ error: message });
   }
@@ -7841,7 +7965,7 @@ app.post('/api/general/execute', async (req: Request, res: Response): Promise<vo
       status: cmd.getStatus(),
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] General execution failed:', error);
+    console.error('[purple-team] General execution failed:', error);
     res.status(500).json({ error: error.message || 'Execution failed' });
   }
 });
@@ -7984,7 +8108,7 @@ app.post('/api/general/auto', async (req: Request, res: Response): Promise<void>
       status: cmd.getStatus(),
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] General auto mode failed:', error);
+    console.error('[purple-team] General auto mode failed:', error);
     res.status(500).json({ error: error.message || 'Auto mode failed' });
   }
 });
@@ -8505,7 +8629,7 @@ app.use('/ui', express.static('docs'));
 // =============================================================================
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[T3MP3ST] Error:', err);
+  console.error('[purple-team] Error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
@@ -8516,24 +8640,24 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // Crash net: a stray rejected promise or thrown error must never take the whole
 // server down mid-mission. Log it and keep the process alive.
 process.on('unhandledRejection', (reason) => {
-  console.error('[T3MP3ST] unhandledRejection (process kept alive):', reason instanceof Error ? reason.stack || reason.message : reason);
+  console.error('[purple-team] unhandledRejection (process kept alive):', reason instanceof Error ? reason.stack || reason.message : reason);
 });
 process.on('uncaughtException', (err) => {
-  console.error('[T3MP3ST] uncaughtException (process kept alive):', err instanceof Error ? err.stack || err.message : err);
+  console.error('[purple-team] uncaughtException (process kept alive):', err instanceof Error ? err.stack || err.message : err);
 });
 
 async function startServer() {
   if (!HOST_IS_LOOPBACK && !bearerLoad.ok) {
     const where = bearerLoad.reason === 'unreadable' && bearerLoad.file ? ` (unreadable file ${bearerLoad.file})` : '';
     console.error(
-      `[T3MP3ST] Refusing to bind non-loopback host "${HOST}" without a bearer token${where}. ` +
+      `[purple-team] Refusing to bind non-loopback host "${HOST}" without a bearer token${where}. ` +
       'Set T3MP3ST_BEARER_TOKEN or T3MP3ST_BEARER_TOKEN_FILE and restart.',
     );
     process.exit(1);
   }
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════════╗');
-  console.log('║                     T3MP3ST API Server v2.0                    ║');
+  console.log('║                  Purple Team API Server v2.0                   ║');
   console.log('║                 Offensive-Security Operations                 ║');
   console.log('╚════════════════════════════════════════════════════════════════╝');
   console.log('');
@@ -8544,11 +8668,11 @@ async function startServer() {
   // BEFORE anything makes outbound calls, so all test/attack fetch() egress is covered.
   const proxyStatus = initProxyFromConfig();
   if (proxyStatus.enabled) {
-    console.log(`[T3MP3ST] Outbound proxy ENABLED → ${proxyStatus.url} (loopback bypassed)`);
+    console.log(`[purple-team] Outbound proxy ENABLED → ${proxyStatus.url} (loopback bypassed)`);
   } else if (proxyStatus.error) {
-    console.warn(`[T3MP3ST] Outbound proxy misconfigured, egress is DIRECT: ${proxyStatus.error}`);
+    console.warn(`[purple-team] Outbound proxy misconfigured, egress is DIRECT: ${proxyStatus.error}`);
   } else {
-    console.log('[T3MP3ST] Outbound proxy disabled — egress from local IP.');
+    console.log('[purple-team] Outbound proxy disabled — egress from local IP.');
   }
 
   llm = await initLLM();
@@ -8567,15 +8691,15 @@ async function startServer() {
   const flushAndExit = (signal: NodeJS.Signals): void => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`[T3MP3ST] ${signal} received — flushing state, shutting down…`);
+    console.log(`[purple-team] ${signal} received — flushing state, shutting down…`);
     void flushPersist().catch(() => { /* best-effort */ }).finally(() => process.exit(0));
   };
   process.once('SIGTERM', flushAndExit);
   process.once('SIGINT', flushAndExit);
 
   app.listen(Number(PORT), HOST, () => {
-    console.log(`[T3MP3ST] Server running at http://${HOST}:${PORT}`);
-    console.log(`[T3MP3ST] Web UI available at http://${HOST}:${PORT}/ui`);
+    console.log(`[purple-team] Server running at http://${HOST}:${PORT}`);
+    console.log(`[purple-team] Web UI available at http://${HOST}:${PORT}/ui`);
     if (!HOST_IS_LOOPBACK) {
       console.warn('');
       console.warn(`  ⚠️  EXPOSURE WARNING: bound to NON-LOOPBACK host "${HOST}". This API executes`);
@@ -8586,7 +8710,7 @@ async function startServer() {
       console.warn('');
     }
     console.log('');
-    console.log('[T3MP3ST] Mission Dispatch (NEW):');
+    console.log('[purple-team] Mission Dispatch (NEW):');
     console.log('  POST /api/mission/start              - Start mission with real operators');
     console.log('  POST /api/mission/stop               - Stop active mission');
     console.log('  POST /api/mission/pause              - Pause mission');
@@ -8604,7 +8728,7 @@ async function startServer() {
     console.log('  POST /api/operators/:id/task         - Dispatch task to operator');
     console.log('  GET  /api/events                     - SSE real-time event stream');
     console.log('');
-    console.log('[T3MP3ST] Op General (Autonomous Orchestrator):');
+    console.log('[purple-team] Op General (Autonomous Orchestrator):');
     console.log('  POST /api/general/plan              - Plan operation from directive');
     console.log('  POST /api/general/execute            - Execute planned operation');
     console.log('  POST /api/general/auto               - Full auto: plan + execute');
@@ -8613,22 +8737,22 @@ async function startServer() {
     console.log('  POST /api/general/sitrep             - Force situation report');
     console.log('  POST /api/general/assess             - Final strategic assessment');
     console.log('');
-    console.log('[T3MP3ST] Attack Graph (recon-generated, one renderer):');
+    console.log('[purple-team] Attack Graph (recon-generated, one renderer):');
     console.log('  POST /api/attack-graph               - Scaffold a graph for a target (varies by family)');
     console.log('  POST /api/attack-graph/ingest        - Validate a recon-supplied graph');
     console.log('');
-    console.log('[T3MP3ST] The Admiral (conversational intake):');
+    console.log('[purple-team] The Admiral (conversational intake):');
     console.log('  POST /api/admiral/converse           - Talk to the Admiral; it drafts the mission brief');
     console.log('  POST /api/admiral/launch             - Hand the brief to Op General (dry-run plans; live executes)');
     console.log('');
-    console.log('[T3MP3ST] Bounty Platforms:');
+    console.log('[purple-team] Bounty Platforms:');
     console.log('  GET  /api/bounty/platforms           - List supported platforms');
     console.log('  POST /api/bounty/format              - Format finding for a platform');
     console.log('  POST /api/bounty/submit              - Submit report (dry-run default)');
     console.log('  GET  /api/bounty/programs/:platform  - Search programs');
     console.log('  GET  /api/bounty/credentials         - Check configured credentials');
     console.log('');
-    console.log('[T3MP3ST] Payload DB: 200+ payloads | Secret Patterns: 15+ | Privesc: 50+ techniques');
+    console.log('[purple-team] Payload DB: 200+ payloads | Secret Patterns: 15+ | Privesc: 50+ techniques');
     console.log('');
   });
 }
