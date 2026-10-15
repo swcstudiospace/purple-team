@@ -40,7 +40,7 @@ ledger — one chain-link verdict per entry:
   `strength`, the platform `verdict`, and the `reason` behind every
   `broken` link — plus the `intact`/`broken` totals and the `summary`).
 
-An aggregate is not sufficient, and is not 100, when a required item is missing, broken, or contradictory. Relay the standing from `aggregateEvidenceStanding` rather than counting accepted rows.
+An aggregate is not sufficient, and is not 100, when a required item is missing, broken, or contradictory. Relay the standing from `aggregateEvidenceStanding` rather than counting accepted rows. There is no published aggregate POST. Read `tempest_white_evidence` or `GET http://127.0.0.1:3333/api/teams/white/evidence`. A missing or broken item stays insufficient. Do not call a route that does not exist.
 
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or

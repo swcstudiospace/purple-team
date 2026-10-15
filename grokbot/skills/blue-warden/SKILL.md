@@ -43,7 +43,7 @@ then read the hardening plan the backend tiers from the same ledger:
   `curl -s http://127.0.0.1:3333/api/teams/blue/gaps`: a finding with
   `coverage: "partial"` is logged but not alerted; name it.
 
-A hardening retest is not proven by a recommendation. Item-linked baseline and retest evidence ids are required before a control is called retested. Relay `insufficient-evidence` when those ids are absent.
+A hardening retest is not proven by a recommendation. Item-linked baseline and retest evidence ids are required before a control is called retested. Relay `insufficient-evidence` when those ids are absent. When an observed artifact is supplied, score it with `tempest_blue_coverage` or `POST http://127.0.0.1:3333/api/teams/blue/coverage` (`runId`, `missionId`, `family`, `artifactIds`, string `artifactBytes`, `findings`, `telemetry`). Empty artifact bytes fail closed as `insufficient-evidence` and are not covered. No published retest POST exists; do not invent one.
 
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
