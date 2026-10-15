@@ -9,6 +9,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { HAT_TOOL_REGISTRY } from '../skills.js';
 
 export type BlueToolHat = 'blue' | 'white' | 'black' | 'red';
 export type BlueStepCondition = 'always' | 'on_findings' | 'on_gaps' | 'on_high_risk';
@@ -118,26 +119,16 @@ export const BLUE_STARTER_TEMPLATES: readonly BlueStarterTemplate[] = [
   },
 ];
 
-const KNOWN_SEQUENCER_TOOL_IDS: ReadonlySet<string> = new Set([
-  'blue-workflow-sequencer',
-  'blue-decision-ledger',
-  'blue-execution-monitor',
-  'white-data-inspector',
-  'white-evidence-collector',
-  'white-gap-analyzer',
-  'black-risk-analyzer',
-  'black-policy-validator',
-  'black-stress-prober',
-  'shared-context-transformer',
-  'shared-artifact-diff',
-  'shared-snapshot-manager',
-  'shared-batch-runner',
-  'red-findings-correlator',
+const LEGACY_SEQUENCER_STAGE_IDS: ReadonlySet<string> = new Set([
   'coverageGaps',
   'recon',
   'hardeningPlan',
   'detectionGaps',
 ]);
+
+function isKnownSequencerToolId(toolId: string): boolean {
+  return LEGACY_SEQUENCER_STAGE_IDS.has(toolId) || HAT_TOOL_REGISTRY.some((t) => t.id === toolId);
+}
 
 function shortSha256(payload: string): string {
   return createHash('sha256').update(payload, 'utf8').digest('hex').slice(0, 16);
@@ -233,10 +224,10 @@ export function runBlueWorkflowSequencer(
       continue;
     }
 
-    if (!toolId || !KNOWN_SEQUENCER_TOOL_IDS.has(toolId) || step.simulateFailure === true) {
+    if (!toolId || !isKnownSequencerToolId(toolId) || step.simulateFailure === true) {
       const errorMessage = !toolId
         ? `Step ${i + 1} is missing a valid toolId`
-        : !KNOWN_SEQUENCER_TOOL_IDS.has(toolId)
+        : !isKnownSequencerToolId(toolId)
           ? `Step ${i + 1} references unknown toolId "${toolId}"`
           : `Step ${i + 1} (${toolId}) reported simulated execution failure`;
       failedStep = {

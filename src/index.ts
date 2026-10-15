@@ -249,6 +249,7 @@ import { LLMBackbone } from './llm/index.js';
 import { getLLMConfig } from './config/index.js';
 import { AgentLoop } from './agent/index.js';
 import { OpGeneral } from './general/index.js';
+import { RED_ARCHETYPES, resolveRunAllowlist } from './teams/contracts.js';
 
 // Stubs for advanced modules
 import {
@@ -1265,6 +1266,26 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     // Attach the agent loop scoped to this archetype's SPECIALIZED role toolkit (defaultTools =
     // the curated per-operator tool allowlist). toolCategories stays as a coarse fallback.
     const profile = ARCHETYPE_PROFILES[archetype];
+    if (!(RED_ARCHETYPES as readonly string[]).includes(archetype)) {
+      let permittedNames: Set<string>;
+      try {
+        permittedNames = new Set(resolveRunAllowlist(archetype, profile.defaultTools));
+      } catch {
+        permittedNames = new Set();
+      }
+      const permittedAdapters = TOOL_ADAPTERS.filter((a) => permittedNames.has(a.id));
+      if (permittedAdapters.length > 0) {
+        const deps = {
+          runSubprocess,
+          isToolAvailable,
+          scopeOk: (target: string) => scopeViolation(this.arsenal.getScope(), { parameters: { target } }) === null,
+          createReportWorkspace: createPrivateReportWorkspace,
+          readToolReport: readPrivateToolReport,
+        };
+        const existing = new Set(this.arsenal.getAllTools().map((t) => t.name));
+        this.arsenal.registerMany(buildAdapterTools(permittedAdapters, deps, existing));
+      }
+    }
     const maxIterations = operatorLLM.getProvider() === 'local-agent'
       ? LOCAL_AGENT_MAX_ITERATIONS
       : DEFAULT_AGENT_MAX_ITERATIONS;

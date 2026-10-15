@@ -433,4 +433,27 @@ describe('discipline map (AC-FH-003)', () => {
       expect(row.lifecycle).toContain('src/index.ts');
     }
   });
+
+  it('spawnOperator registers permitted catalog adapters for warden, auditor, and specter even with T3MP3ST_FULL_ARSENAL unset', async () => {
+    const { TempestCommand } = await import('../index.js');
+    const prevFlag = process.env.T3MP3ST_FULL_ARSENAL;
+    delete process.env.T3MP3ST_FULL_ARSENAL;
+    try {
+      const cmd = new TempestCommand({
+        name: 'Specialist-Tool-Test',
+        llm: { provider: 'mock', model: 'mock' },
+      });
+      for (const role of ['warden', 'auditor', 'specter'] as const) {
+        cmd.spawnOperator(`${role}-op`, role);
+        const allow = resolveRunAllowlist(role);
+        const defs = cmd.arsenal.getToolDefinitions(undefined, allow);
+        expect(defs.length).toBeGreaterThan(0);
+        const defNames = defs.map((d) => d.name);
+        expect(defNames).not.toContain('http_request');
+        expect(defNames).not.toContain('curl_request');
+      }
+    } finally {
+      if (prevFlag !== undefined) process.env.T3MP3ST_FULL_ARSENAL = prevFlag;
+    }
+  });
 });

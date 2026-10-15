@@ -321,6 +321,7 @@
     var filtered = entries.slice();
 
     function renderItems() {
+      var focusedInList = listEl && document.activeElement && listEl.contains(document.activeElement);
       var q = (input && input.value ? input.value : '').trim().toLowerCase();
       filtered = entries.filter(function (item) {
         return !q || item.label.toLowerCase().indexOf(q) !== -1 || item.id.toLowerCase().indexOf(q) !== -1;
@@ -329,6 +330,7 @@
       if (!listEl) return;
       if (!filtered.length) {
         listEl.innerHTML = '<li class="text-secondary">No matching Hat, tool, skill, or page.</li>';
+        if (focusedInList && input) input.focus();
         return;
       }
       listEl.innerHTML = filtered.map(function (item, idx) {
@@ -349,6 +351,11 @@
           }
         });
       });
+      if (focusedInList) {
+        var activeBtn = listEl.querySelector('[data-palette-idx="' + activeIdx + '"]');
+        if (activeBtn) activeBtn.focus();
+        else if (input) input.focus();
+      }
     }
 
     if (input) {

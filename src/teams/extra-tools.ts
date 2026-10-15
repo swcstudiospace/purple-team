@@ -7,6 +7,7 @@
 
 import { createHash } from 'node:crypto';
 import { migrateWorkspaceState, sanitizeInput, type HatDomain, type MigratedWorkspaceState } from './guardrails.js';
+import { HAT_TOOL_REGISTRY } from './skills.js';
 
 function sha256Short(payload: string): string {
   return createHash('sha256').update(payload, 'utf8').digest('hex').slice(0, 16);
@@ -414,22 +415,9 @@ export interface BatchRunnerResult {
   results: readonly BatchJobResult[];
 }
 
-const KNOWN_BATCH_TOOL_IDS: ReadonlySet<string> = new Set([
-  'blue-workflow-sequencer',
-  'blue-decision-ledger',
-  'blue-execution-monitor',
-  'white-data-inspector',
-  'white-evidence-collector',
-  'white-gap-analyzer',
-  'black-risk-analyzer',
-  'black-policy-validator',
-  'black-stress-prober',
-  'shared-context-transformer',
-  'shared-artifact-diff',
-  'shared-snapshot-manager',
-  'shared-batch-runner',
-  'red-findings-correlator',
-]);
+function isKnownBatchToolId(toolId: string): boolean {
+  return HAT_TOOL_REGISTRY.some((t) => t.id === toolId);
+}
 
 /**
  * Extra Tool 4: Cross-Hat Batch Runner (`runBatchRunnerTool`).
@@ -479,12 +467,12 @@ export function runBatchRunnerTool(
       continue;
     }
 
-    if (job.simulateError === true || !rawToolId || !KNOWN_BATCH_TOOL_IDS.has(rawToolId)) {
+    if (job.simulateError === true || !rawToolId || !isKnownBatchToolId(rawToolId)) {
       failedJobs += 1;
       if (stopOnError) halted = true;
       const reason = !rawToolId
         ? 'missing toolId'
-        : !KNOWN_BATCH_TOOL_IDS.has(rawToolId)
+        : !isKnownBatchToolId(rawToolId)
           ? `unknown toolId "${rawToolId}"`
           : 'reported execution failure';
       results.push({

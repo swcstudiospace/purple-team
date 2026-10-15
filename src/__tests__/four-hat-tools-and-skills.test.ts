@@ -461,7 +461,7 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     }
   });
 
-  it('enforces Greptile round-1 hardening across sequencers, snapshots, data validation, gap analysis, policy checks, and purple synthesis', () => {
+  it('enforces Greptile round-1 and round-2 hardening across sequencers, snapshots, data validation, gap analysis, policy checks, and purple synthesis', async () => {
     // 1. Unknown toolId in sequencer & batch runner fails closed with durationMs 0
     const badSeq = runBlueWorkflowSequencer({
       steps: [{ id: 's1', label: 'Unknown', hat: 'blue', toolId: 'nonexistent-tool' }],
@@ -557,6 +557,68 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     expect(exfil.paths[1].channel).toBe('raw-socket');
     expect(exfil.paths[1].volumeCost).toBe(3);
     expect(exfil.totalVolumeMb).toBe(250);
+
+    // 9. Sequencer and Batch Runner accept registered IDs shared-context-transform and red-surface-validator
+    const seqReal = runBlueWorkflowSequencer({
+      steps: [
+        { id: 's1', hat: 'blue', toolId: 'shared-context-transform', label: 'Transform context' },
+        { id: 's2', hat: 'red', toolId: 'red-surface-validator', label: 'Validate surface' },
+      ],
+    });
+    expect(seqReal.state).toBe('success');
+    expect(seqReal.timeline.every(t => t.status === 'completed')).toBe(true);
+
+    const batchReal = runBatchRunnerTool({
+      jobs: [
+        { id: 'b1', hat: 'blue', toolId: 'shared-context-transform', payloadSummary: 'Transform context' },
+        { id: 'b2', hat: 'red', toolId: 'red-surface-validator', payloadSummary: 'Validate surface' },
+      ],
+    });
+    expect(batchReal.state).toBe('success');
+    expect(batchReal.succeededJobs).toBe(2);
+
+    // 10. White Data Inspector reports omittedSchemaFieldsCount when schema exceeds 500 fields
+    const wideRec: Record<string, unknown> = {};
+    for (let i = 0; i < 505; i += 1) {
+      wideRec[`field_${String(i).padStart(4, '0')}`] = i;
+    }
+    const wideResult = runWhiteDataInspector({ rawPayload: [wideRec] });
+    expect(wideResult.state).toBe('error');
+    expect(wideResult.schemaSummary).toHaveLength(500);
+    expect(wideResult.omittedSchemaFieldsCount).toBe(5);
+    expect(wideResult.omittedSchemaFields).toHaveLength(5);
+    expect(wideResult.diagnostics.some(d => d.message.includes('500-field bound'))).toBe(true);
+
+    // 11. Composable Skill keeps uncorroborated imported values unverified and reads all inspector pages (>50 rows)
+    const unverifiedSkill = await runComposableSkill('skill-white-roe-gap-verification', {
+      rawPayload: [{ scope: 'example.com' }],
+      requiredVariables: ['scope'],
+      assumptions: [],
+    });
+    expect(unverifiedSkill.ok).toBe(true);
+    const gapStepOut = unverifiedSkill.data?.stepOutputs[1].output as {
+      knownVerifiedCount?: number;
+      completenessScore?: number;
+      unverifiedVariables?: string[];
+    };
+    expect(gapStepOut.knownVerifiedCount).toBe(0);
+    expect(gapStepOut.completenessScore).toBe(50);
+    expect(gapStepOut.unverifiedVariables).toContain('scope');
+
+    const rows51 = Array.from({ length: 51 }, (_, idx) => ({
+      id: `row-${idx + 1}`,
+      host: '127.0.0.1',
+      severity: 'low',
+    }));
+    const multiPageSkill = await runComposableSkill('skill-white-roe-gap-verification', {
+      rawPayload: rows51,
+    });
+    expect(multiPageSkill.ok).toBe(true);
+    const evStepOut = multiPageSkill.data?.stepOutputs[2].output as {
+      summaryCounts?: { total?: number; unverified?: number };
+    };
+    expect(evStepOut.summaryCounts?.total).toBe(51);
+    expect(evStepOut.summaryCounts?.unverified).toBe(51);
   });
 });
 

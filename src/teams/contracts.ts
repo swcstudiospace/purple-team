@@ -243,6 +243,7 @@ export function bindInlineArtifacts(input: unknown): BoundInlineArtifact | undef
  */
 const CATALOG_TO_ADAPTER_NAMES: Readonly<Record<string, readonly string[]>> = {
   dig: ['dns_lookup'],
+  whois: ['whois_lookup'],
   curl: ['curl_request', 'http_request'],
   nmap: ['port_scanner', 'nmap_scanner'],
 };

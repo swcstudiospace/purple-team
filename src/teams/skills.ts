@@ -695,24 +695,60 @@ export async function runComposableSkill(
         stepsCompleted += 1;
 
         if (step.toolId === 'white-data-inspector' && Array.isArray(stepDataRecord?.records)) {
-          const records = stepDataRecord.records as Array<Record<string, unknown>>;
-          const derivedFacts = records.map((rec, idx) => ({
+          const initialRecords = stepDataRecord.records as Array<Record<string, unknown>>;
+          const totalChunks = typeof stepDataRecord.totalChunks === 'number' ? stepDataRecord.totalChunks : 1;
+          const currentChunkIndex = typeof stepDataRecord.chunkIndex === 'number' ? stepDataRecord.chunkIndex : 0;
+          const allRecords: Array<Record<string, unknown>> = [];
+
+          if (totalChunks > 1) {
+            for (let pageIdx = 0; pageIdx < totalChunks; pageIdx += 1) {
+              if (pageIdx === currentChunkIndex) {
+                allRecords.push(...initialRecords);
+              } else {
+                const pageResult = runWhiteDataInspector({
+                  ...(stepInput as WhiteDataInspectorInput),
+                  chunkIndex: pageIdx,
+                });
+                allRecords.push(...pageResult.records);
+              }
+            }
+          } else {
+            allRecords.push(...initialRecords);
+          }
+
+          const hasRecordEvidence = (rec: Record<string, unknown>): boolean => {
+            const hasArtifact = typeof rec.artifactId === 'string' && rec.artifactId.trim().length > 0;
+            const hasSha = typeof rec.sha256 === 'string' && rec.sha256.trim().length > 0;
+            const hasCorroboration =
+              Array.isArray(rec.corroboratedBy)
+              && rec.corroboratedBy.some((c) => typeof c === 'string' && c.trim().length > 0);
+            return hasArtifact && hasSha && hasCorroboration;
+          };
+
+          const derivedFacts = allRecords.map((rec, idx) => ({
             id: typeof rec.id === 'string' && rec.id.trim() ? rec.id.trim() : `inspected-fact-${idx + 1}`,
-            claim: JSON.stringify(rec),
-            source: 'white-data-inspector',
-            artifactId: `inspector-record-${idx + 1}`,
-            corroboratedBy: ['white-data-inspector'],
+            claim: typeof rec.claim === 'string' && rec.claim.trim() ? rec.claim.trim() : JSON.stringify(rec),
+            source: typeof rec.source === 'string' && rec.source.trim() ? rec.source.trim() : 'white-data-inspector',
+            ...(typeof rec.artifactId === 'string' && rec.artifactId.trim() ? { artifactId: rec.artifactId.trim() } : {}),
+            ...(typeof rec.sha256 === 'string' && rec.sha256.trim() ? { sha256: rec.sha256.trim() } : {}),
+            ...(Array.isArray(rec.corroboratedBy)
+              ? { corroboratedBy: rec.corroboratedBy.filter((c): c is string => typeof c === 'string' && c.trim().length > 0) }
+              : {}),
+            ...(Array.isArray(rec.contradictedBy)
+              ? { contradictedBy: rec.contradictedBy.filter((c): c is string => typeof c === 'string' && c.trim().length > 0) }
+              : {}),
           }));
           const derivedKnownFacts: Array<{ variable: string; value: string; verified: boolean; source: string }> = [];
           const seenVars = new Set<string>();
-          for (const rec of records) {
+          for (const rec of allRecords) {
+            const recordVerified = hasRecordEvidence(rec);
             for (const [k, v] of Object.entries(rec)) {
               if (!seenVars.has(k)) {
                 seenVars.add(k);
                 derivedKnownFacts.push({
                   variable: k,
                   value: typeof v === 'string' ? v : JSON.stringify(v),
-                  verified: v !== null && v !== undefined && v !== '',
+                  verified: recordVerified && v !== null && v !== undefined && v !== '',
                   source: 'white-data-inspector',
                 });
               }
@@ -723,20 +759,17 @@ export async function runComposableSkill(
           }
           if (derivedKnownFacts.length > 0 && callerParams.knownFacts === undefined) {
             carriedContext.knownFacts = derivedKnownFacts;
-            if (callerParams.requiredVariables === undefined) {
-              carriedContext.requiredVariables = [...seenVars];
-            }
           }
-        } else if (step.toolId === 'white-evidence-collector' && Array.isArray(stepDataRecord?.taggedFacts)) {
-          const tagged = stepDataRecord.taggedFacts as Array<Record<string, unknown>>;
-          if (tagged.length > 0 && callerParams.decisions === undefined) {
-            carriedContext.decisions = tagged.map((tf, idx) => ({
+        } else if (step.toolId === 'white-evidence-collector' && Array.isArray(stepDataRecord?.items)) {
+          const items = stepDataRecord.items as Array<Record<string, unknown>>;
+          if (items.length > 0 && callerParams.decisions === undefined) {
+            carriedContext.decisions = items.map((tf, idx) => ({
               id: `dec-ev-${idx + 1}`,
               fromHat: 'white',
               toHat: 'blue',
               summary: typeof tf.claim === 'string' ? tf.claim : `Fact ${idx + 1}`,
-              rationale: `Confidence ${String(tf.confidenceTier ?? 'verified')} (${String(tf.computedSha256 ?? '').slice(0, 16)})`,
-              evidenceRefs: typeof tf.computedSha256 === 'string' ? [tf.computedSha256.slice(0, 16)] : ['ev-ref'],
+              rationale: `Confidence ${String(tf.confidenceLevel ?? 'unverified')} (${String(tf.sha256 ?? '').slice(0, 16)})`,
+              evidenceRefs: typeof tf.sha256 === 'string' ? [tf.sha256.slice(0, 16)] : ['ev-ref'],
             }));
           }
         } else if (step.toolId === 'black-policy-validator' && Array.isArray(stepDataRecord?.checks)) {

@@ -48,6 +48,8 @@ export interface WhiteDataInspectorResult {
   totalChunks: number;
   records: ReadonlyArray<Record<string, unknown>>;
   schemaSummary: readonly WhiteFieldSchemaSummary[];
+  omittedSchemaFieldsCount?: number;
+  omittedSchemaFields?: readonly string[];
   diagnostics: readonly WhiteParseDiagnostic[];
   rawInputPreserved?: string;
   payloadSha256: string;
@@ -81,20 +83,33 @@ function parseKvLine(line: string): Record<string, unknown> | null {
 
 const MAX_SCHEMA_FIELDS = 500;
 
+interface SchemaSummaryBuildResult {
+  summaries: WhiteFieldSchemaSummary[];
+  omittedSchemaFields: string[];
+}
+
 function buildSchemaSummary(
   records: ReadonlyArray<Record<string, unknown>>,
   requiredFields: readonly string[],
-): WhiteFieldSchemaSummary[] {
+): SchemaSummaryBuildResult {
   const requiredSet = new Set<string>(requiredFields);
   const statsMap = new Map<string, { presentCount: number; nullCount: number; typeSet: Set<string> }>();
+  const omittedFields = new Set<string>();
   for (const reqField of requiredFields) {
+    if (statsMap.size >= MAX_SCHEMA_FIELDS) {
+      omittedFields.add(reqField);
+      continue;
+    }
     statsMap.set(reqField, { presentCount: 0, nullCount: 0, typeSet: new Set<string>() });
   }
   for (const rec of records) {
     for (const [field, val] of Object.entries(rec)) {
       let stat = statsMap.get(field);
       if (!stat) {
-        if (statsMap.size >= MAX_SCHEMA_FIELDS) continue;
+        if (statsMap.size >= MAX_SCHEMA_FIELDS) {
+          omittedFields.add(field);
+          continue;
+        }
         stat = { presentCount: 0, nullCount: 0, typeSet: new Set<string>() };
         statsMap.set(field, stat);
       }
@@ -119,7 +134,10 @@ function buildSchemaSummary(
       missingCount,
     });
   }
-  return summaries;
+  return {
+    summaries,
+    omittedSchemaFields: [...omittedFields].sort(),
+  };
 }
 
 /**
@@ -270,7 +288,8 @@ export function runWhiteDataInspector(
       })
     : allRecords;
 
-  const schemaSummary = buildSchemaSummary(filtered, requiredFields);
+  const { summaries: schemaSummary, omittedSchemaFields } = buildSchemaSummary(filtered, requiredFields);
+  const omittedSchemaFieldsCount = omittedSchemaFields.length;
   let hasRequiredFieldViolation = false;
   for (const fieldStat of schemaSummary) {
     if (fieldStat.required && fieldStat.missingCount > 0) {
@@ -283,6 +302,14 @@ export function runWhiteDataInspector(
       });
     }
   }
+  if (omittedSchemaFieldsCount > 0) {
+    diagnostics.push({
+      line: 1,
+      column: 1,
+      message: `Schema exceeded the ${MAX_SCHEMA_FIELDS}-field bound; ${omittedSchemaFieldsCount} field(s) omitted from schemaSummary`,
+      rawSnippet: omittedSchemaFields.slice(0, 10).join(', '),
+    });
+  }
 
   const totalChunks = filtered.length === 0 ? 0 : Math.ceil(filtered.length / chunkSize);
   const safeChunkIndex = totalChunks === 0 ? 0 : Math.min(chunkIndex, totalChunks - 1);
@@ -290,7 +317,7 @@ export function runWhiteDataInspector(
   const pageRecords = filtered.slice(start, start + chunkSize);
 
   const hasParseFailure = diagnostics.some(d => d.message.startsWith('Malformed') || d.message.startsWith('Unrecognized') || d.message.includes('JSON'));
-  const state: 'empty' | 'error' | 'success' = (hasParseFailure || hasRequiredFieldViolation) ? 'error' : 'success';
+  const state: 'empty' | 'error' | 'success' = (hasParseFailure || hasRequiredFieldViolation || omittedSchemaFieldsCount > 0) ? 'error' : 'success';
 
   return {
     state,
@@ -302,6 +329,7 @@ export function runWhiteDataInspector(
     totalChunks,
     records: pageRecords,
     schemaSummary,
+    ...(omittedSchemaFieldsCount > 0 ? { omittedSchemaFieldsCount, omittedSchemaFields } : {}),
     diagnostics,
     ...(diagnostics.length > 0 ? { rawInputPreserved: rawString } : {}),
     payloadSha256: sha256Hex(rawString),
