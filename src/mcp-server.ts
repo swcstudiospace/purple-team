@@ -231,6 +231,48 @@ Requires: Target hostname or IP.`,
     inputSchema: { type: 'object', properties: {} }
   },
   {
+    name: 'tempest_blue_coverage',
+    description: `Blue artifact-bound coverage (POST /api/teams/blue/coverage). Missing artifacts fail closed and are not covered. Use when: the operator supplies findings plus artifact ids or bytes.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        runId: { type: 'string' },
+        missionId: { type: 'string' },
+        family: { type: 'string' },
+        artifactIds: { type: 'array' },
+        artifactBytes: { type: 'string' },
+        findings: { type: 'array' }
+      },
+      required: ['runId', 'missionId', 'family', 'findings']
+    }
+  },
+  {
+    name: 'tempest_black_workflow',
+    description: `Black staged plan review (POST /api/teams/black/workflow). An empty plan is insufficient, not a clean bill. Refusals have zero effects. Use when: the operator supplies actions and paths.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        actions: { type: 'array' },
+        paths: { type: 'array' },
+        egress: { type: 'array' },
+        requestKind: { type: 'string' }
+      }
+    }
+  },
+  {
+    name: 'tempest_white_stage',
+    description: `White staged ROE audit (POST /api/teams/white/stage). An empty allow-list is out of scope. approved true without an evidence id is not a receipt. Use when: the operator supplies ROE text and actions.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        roeText: { type: 'string' },
+        actions: { type: 'array' },
+        meta: { type: 'object' }
+      },
+      required: ['roeText', 'actions']
+    }
+  },
+  {
     name: 'tempest_black_cover',
     description: `Black opsec cover review of the active red plan (GET /api/teams/black/cover). Use when: the operator asks which doctrine phases a red plan trips, what each matched action leaves behind, or whether the cover holds.`,
     inputSchema: { type: 'object', properties: {} }
@@ -437,6 +479,15 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     case 'tempest_blue_gaps': {
       return tempestGet('/api/teams/blue/gaps');
     }
+    case 'tempest_blue_coverage':
+      return tempestPost('/api/teams/blue/coverage', args);
+
+    case 'tempest_black_workflow':
+      return tempestPost('/api/teams/black/workflow', args);
+
+    case 'tempest_white_stage':
+      return tempestPost('/api/teams/white/stage', args);
+
 
     case 'tempest_black_cover': {
       return tempestGet('/api/teams/black/cover');
