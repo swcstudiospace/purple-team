@@ -3,6 +3,16 @@ import { noiseBudget, coverAudit } from '../teams/black.js';
 import { detectionGaps, hardeningPlan } from '../teams/blue.js';
 import { roeAudit, adjudicateEvidence } from '../teams/white.js';
 import { synthesize, type PurpleRiskTier } from '../teams/purple.js';
+import {
+  isStructuredStart,
+  validateStructuredStart,
+  StructuredStartError,
+  bindInlineArtifact,
+  bindInlineArtifacts,
+  artifactHash,
+  ArtifactValidationError,
+  INLINE_ARTIFACT_MAX_BYTES,
+} from '../teams/contracts.js';
 
 describe('black team: noiseBudget', () => {
   it('scores a quiet, bounded, routed plan at 100 with no violations', () => {
@@ -357,4 +367,134 @@ describe('purple synthesis', () => {
     expect(empty.coverageMatrix[0].residualRisk).toBe('low residual risk — t-empty sits at a low tier; confirm its matrix row before declaring the posture acceptable');
   });
 
+});
+
+describe('structured start branch (AC-FH-005)', () => {
+  it('legacy target-only body with empty operators stays on the legacy branch', () => {
+    expect(isStructuredStart({ targets: [{ host: 't.example' }], operators: [] })).toBe(false);
+    expect(isStructuredStart({ targets: [], operators: [] })).toBe(false);
+  });
+
+  it('inlineArtifacts alone never flips the branch', () => {
+    expect(isStructuredStart({
+      targets: [{ host: 't.example' }],
+      inlineArtifacts: [{ id: 'draft-1', mediaType: 'text/plain', encoding: 'utf8', data: 'x' }],
+    })).toBe(false);
+  });
+
+  it('roleInputs, family, or targetContext flips the branch', () => {
+    expect(isStructuredStart({ roleInputs: [{ archetype: 'recon' }] })).toBe(true);
+    expect(isStructuredStart({ family: 'web_api' })).toBe(true);
+    expect(isStructuredStart({ targetContext: { kind: 'artifacts' } })).toBe(true);
+  });
+
+  it('unknown explicit role fails naming the role', () => {
+    expect(() => validateStructuredStart({ objective: 'q1', operators: ['recon', 'ninja'] }))
+      .toThrowError(StructuredStartError);
+    try {
+      validateStructuredStart({ objective: 'q1', operators: ['recon', 'ninja'] });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as Error).message).toContain('"ninja"');
+    }
+  });
+
+  it('duplicate explicit role fails naming the role', () => {
+    try {
+      validateStructuredStart({ objective: 'q1', roleInputs: [{ archetype: 'recon' }, { archetype: 'recon' }] });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as Error).message).toContain('"recon"');
+      expect((e as Error).message).toMatch(/duplicate/);
+    }
+  });
+
+  it('missing objective or empty operators fail before any mission work', () => {
+    expect(() => validateStructuredStart({ operators: ['recon'] })).toThrow(/objective/);
+    expect(() => validateStructuredStart({ objective: '  ', operators: ['recon'] })).toThrow(/objective/);
+    expect(() => validateStructuredStart({ objective: 'q1', operators: [] })).toThrow(/nonempty operators/);
+  });
+
+  it('artifact-only targetContext validates without targets', () => {
+    const start = validateStructuredStart({
+      objective: 'q1 artifact run',
+      operators: ['analyst'],
+      targetContext: { kind: 'artifacts' },
+    });
+    expect(start.artifactOnly).toBe(true);
+    expect(start.roles).toEqual(['analyst']);
+  });
+});
+
+describe('structured dispatch identity (AC-FH-006)', () => {
+  it('dispatch of a structured objective returns a task/run id', () => {
+    const start = validateStructuredStart({ objective: 'q1', operators: ['recon', 'analyst'] });
+    expect(typeof start.runId).toBe('string');
+    expect(start.runId.length).toBeGreaterThan(0);
+    expect(start.roles).toEqual(['recon', 'analyst']);
+  });
+
+  it('two dispatches mint distinct run ids', () => {
+    const a = validateStructuredStart({ objective: 'q1', operators: ['recon'] });
+    const b = validateStructuredStart({ objective: 'q1', operators: ['recon'] });
+    expect(a.runId).not.toBe(b.runId);
+  });
+
+  it('spawn alone is not success: the validated start carries no success flag', () => {
+    const start = validateStructuredStart({ objective: 'q1', operators: ['recon'] });
+    expect('success' in start).toBe(false);
+  });
+});
+
+describe('inline artifact binding (T-26-02)', () => {
+  const good = { id: 'draft-1', mediaType: 'text/plain', encoding: 'utf8', data: 'hello artifact' };
+
+  it('binds a server-issued id and keeps the caller id as a label only', () => {
+    const bound = bindInlineArtifact(good);
+    expect(bound.artifactId).not.toBe('draft-1');
+    expect(bound.label).toBe('draft-1');
+    expect(bound.mediaType).toBe('text/plain');
+    expect(bound.encoding).toBe('utf8');
+    expect(bound.byteLength).toBe(Buffer.byteLength('hello artifact', 'utf8'));
+  });
+
+  it('server hash is four 16-hex groups, never a bare 64-char hex string', () => {
+    const bound = bindInlineArtifact(good);
+    expect(bound.hash).toMatch(/^[0-9a-f]{16}-[0-9a-f]{16}-[0-9a-f]{16}-[0-9a-f]{16}$/);
+    expect(bound.hash.replace(/-/g, '')).toHaveLength(64);
+    expect(artifactHash('hello artifact')).toBe(bound.hash);
+  });
+
+  it('rejects wrong media type, wrong encoding, and empty data with 400', () => {
+    for (const input of [
+      { ...good, mediaType: 'application/json' },
+      { ...good, encoding: 'base64' },
+      { ...good, data: '' },
+    ]) {
+      try {
+        bindInlineArtifact(input);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ArtifactValidationError);
+        expect((e as ArtifactValidationError).status).toBe(400);
+      }
+    }
+  });
+
+  it('rejects over-cap bytes with 413', () => {
+    try {
+      bindInlineArtifact({ ...good, data: 'x'.repeat(INLINE_ARTIFACT_MAX_BYTES + 1) });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as ArtifactValidationError).status).toBe(413);
+    }
+  });
+
+  it('envelope accepts at most one element and undefined means absent', () => {
+    expect(bindInlineArtifacts(undefined)).toBeUndefined();
+    expect(bindInlineArtifacts([])).toBeUndefined();
+    expect(bindInlineArtifacts([good])?.label).toBe('draft-1');
+    expect(() => bindInlineArtifacts([good, good])).toThrow(/at most 1 element/);
+    expect(() => bindInlineArtifacts(good)).toThrow(/must be an array/);
+  });
 });

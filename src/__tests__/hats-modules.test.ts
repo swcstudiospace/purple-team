@@ -1,4 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { Arsenal } from '../arsenal/index.js';
+import { createAgentLoop } from '../agent/index.js';
+import type { LLMBackbone } from '../llm/index.js';
+import type { CustomTool, LLMResponse, LLMToolCall, Task, ToolContext } from '../types/index.js';
+import { KillChainPhase } from '../types/index.js';
+import {
+  validateStructuredStart,
+  resolveRunAllowlist,
+  RED_WORKFLOW_INVENTORY,
+} from '../teams/contracts.js';
 import { noiseBudget, coverAudit } from '../teams/black.js';
 import { detectionGaps, hardeningPlan } from '../teams/blue.js';
 import { roeAudit, adjudicateEvidence } from '../teams/white.js';
@@ -261,5 +271,149 @@ describe('auditor: auditorScore', () => {
     const result = auditorScore([{ id: 'r1', type: 'receipt' }, { id: 'u1' }]);
     expect(result.scores[0].confidence).toBe('high');
     expect(result.scores[1].confidence).toBe('very-low');
+  });
+});
+
+describe('role denial gate (AC-FH-009, NFR-FH-SEC-01)', () => {
+  function probe(name: string): CustomTool & { ran: () => boolean; calls: () => number } {
+    let calls = 0;
+    const tool: CustomTool = {
+      name, description: 'q1 probe', category: 'recon', parameters: [],
+      handler: async () => { calls += 1; return { success: true, output: 'DID_RUN' }; },
+    };
+    return Object.assign(tool, { ran: () => calls > 0, calls: () => calls });
+  }
+
+  const ctx = (parameters: Record<string, unknown> = {}): ToolContext => ({ parameters });
+
+  it('forbidden model-requested tool outside the frozen allowlist is denied with zero handler calls', async () => {
+    const ars = new Arsenal();
+    const allowed = probe('dns_lookup');
+    const forbidden = probe('metasploit_module');
+    ars.registerMany([allowed, forbidden]);
+    const res = await ars.execute('metasploit_module', ctx(), ['dns_lookup']);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/AUTHORITY DENIED/);
+    expect(forbidden.calls()).toBe(0);
+    expect(allowed.calls()).toBe(0);
+  });
+
+  it('unknown tool name still throws ToolNotFound even with an allowlist present', async () => {
+    const ars = new Arsenal();
+    ars.register(probe('dns_lookup'));
+    await expect(ars.execute('hallucinated_tool', ctx(), ['dns_lookup'])).rejects.toThrow(/not found/);
+  });
+
+  it('omitted allowlist preserves library/test mode: the same tool runs', async () => {
+    const ars = new Arsenal();
+    const t = probe('dns_lookup');
+    ars.register(t);
+    const res = await ars.execute('dns_lookup', ctx());
+    expect(res.success).toBe(true);
+    expect(t.calls()).toBe(1);
+  });
+
+  it('AgentLoop with a frozen role denies the forbidden tool end-to-end with zero handler calls', async () => {
+    const ars = new Arsenal();
+    const forbidden = probe('metasploit_module');
+    ars.register(forbidden);
+    const forbiddenCall: LLMToolCall = { id: 'c1', name: 'metasploit_module', arguments: {} };
+    const finalResponse: LLMResponse = {
+      content: 'FINAL: no callable tool fits; standing down.',
+      model: 'q1-mock', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const first: LLMResponse = {
+      content: 'trying a forbidden tool', model: 'q1-mock', toolCalls: [forbiddenCall],
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const llm = {
+      getProvider: vi.fn().mockReturnValue('mock'),
+      chat: vi.fn().mockImplementation(async () => finalResponse),
+      chatWithTools: vi.fn()
+        .mockImplementationOnce(async () => first)
+        .mockImplementation(async () => finalResponse),
+    } as unknown as LLMBackbone;
+    const loop = createAgentLoop(llm, ars, { role: 'sentinel', maxIterations: 3 });
+    const task: Task = {
+      id: 'q1-task', missionId: 'q1-mission', name: 'Q1 denial probe',
+      description: 'forbidden tool must never reach its handler',
+      phase: KillChainPhase.RECON, operatorType: 'sentinel', status: 'in_progress',
+      priority: 5, dependencies: [], createdAt: Date.now(),
+    };
+    const result = await loop.run(task, 'q1 system prompt');
+    expect(forbidden.calls()).toBe(0);
+    const denials = result.steps.filter((s) => s.toolResult && s.toolResult.success === false);
+    expect(denials.length).toBeGreaterThan(0);
+  });
+});
+
+describe('grant isolation (AC-FH-012)', () => {
+  function probe(name: string): CustomTool & { calls: () => number } {
+    let calls = 0;
+    const tool: CustomTool = {
+      name, description: 'q1 probe', category: 'recon', parameters: [],
+      handler: async () => { calls += 1; return { success: true, output: 'DID_RUN' }; },
+    };
+    return Object.assign(tool, { calls: () => calls });
+  }
+
+  it('empty grant denies all', async () => {
+    const ars = new Arsenal();
+    const t = probe('dns_lookup');
+    ars.register(t);
+    const res = await ars.execute('dns_lookup', { parameters: {} }, []);
+    expect(res.success).toBe(false);
+    expect(t.calls()).toBe(0);
+  });
+
+  it('two runs with different grants do not share authority on one Arsenal', async () => {
+    const ars = new Arsenal();
+    const a = probe('tool_a');
+    const b = probe('tool_b');
+    ars.registerMany([a, b]);
+    expect((await ars.execute('tool_a', { parameters: {} }, ['tool_a'])).success).toBe(true);
+    expect((await ars.execute('tool_b', { parameters: {} }, ['tool_a'])).success).toBe(false);
+    expect((await ars.execute('tool_b', { parameters: {} }, ['tool_b'])).success).toBe(true);
+    expect((await ars.execute('tool_a', { parameters: {} }, ['tool_b'])).success).toBe(false);
+    expect(a.calls()).toBe(1);
+    expect(b.calls()).toBe(1);
+  });
+
+  it('unknown grant role resolves to deny-all, never to a shared default', () => {
+    expect(() => resolveRunAllowlist('purple' as never)).toThrow();
+    expect(() => resolveRunAllowlist('ninja' as never)).toThrow();
+  });
+
+  it('blue, white, and their hats never freeze probe-grade defaultTools', () => {
+    for (const role of ['blue', 'white', 'sentinel', 'warden', 'arbiter', 'auditor'] as const) {
+      const frozen = resolveRunAllowlist(role);
+      expect(frozen).not.toContain('http_request');
+      expect(frozen).not.toContain('curl_request');
+    }
+  });
+});
+
+describe('discipline map (AC-FH-003)', () => {
+  it('six specialists keep their parents', () => {
+    expect(hatTeam).toEqual({
+      specter: 'black', wraith: 'black',
+      sentinel: 'blue', warden: 'blue',
+      arbiter: 'white', auditor: 'white',
+    });
+    expect(HAT_ARCHETYPES).toEqual(['specter', 'wraith', 'sentinel', 'warden', 'arbiter', 'auditor']);
+  });
+
+  it('purple spawn is rejected where roles are validated', () => {
+    expect(() => validateStructuredStart({ objective: 'q1', operators: ['purple'] })).toThrow(/unknown role "purple"/);
+    expect(() => resolveRunAllowlist('purple' as never)).toThrow(/purple never spawns/);
+  });
+
+  it('only Red Blue Black White are disciplines across the eight-row inventory', () => {
+    expect(RED_WORKFLOW_INVENTORY).toHaveLength(8);
+    for (const row of RED_WORKFLOW_INVENTORY) {
+      expect(row.operatorProfile).toContain('src/operators/index.ts');
+      expect(row.api).toContain('src/server.ts');
+      expect(row.lifecycle).toContain('src/index.ts');
+    }
   });
 });
