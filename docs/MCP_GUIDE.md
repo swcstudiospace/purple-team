@@ -86,6 +86,9 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (detection-coverage gaps over the whole findings ledger) |
 | `tempest_black_cover` | `GET /api/teams/black/cover` (phase-grouped opsec review of the active red plan) |
 | `tempest_white_roe` | `GET /api/teams/white/roe` (on-record ROE parse plus provenance-stamped verdicts when ROE text is on record: `ok`, `resolved`, `unresolved`, `verdicts` with `roeRevision`/`roeTextHash`/`roeLines`; recording happens via the operator `PUT /api/teams/white/roe` — no MCP mutation tool) |
+| `tempest_blue_coverage` | `POST /api/teams/blue/coverage`. Missing artifact bytes fail closed as insufficient-evidence. Not a mission-start step. |
+| `tempest_black_workflow` | `POST /api/teams/black/workflow`. An empty plan is insufficient, not a clean bill. Not a mission-start step. |
+| `tempest_white_stage` | `POST /api/teams/white/stage`. An empty allow-list is out of scope (`roe-scope-empty`). An approved flag alone is not a receipt. Not a mission-start step. |
 
 Loopback guard: with no bearer set, the proxy refuses any `T3MP3ST_URL`
 whose host is not exactly `localhost`, `::1`, or a full dotted quad in

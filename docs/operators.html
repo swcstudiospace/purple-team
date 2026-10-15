@@ -74,6 +74,35 @@
 </div>
 </section>
 
+<section class="card" aria-labelledby="opStageTitle">
+<h2 class="card__title" id="opStageTitle">Stage review</h2>
+<p class="text-secondary">Submit the same staged contracts the server already exposes. A missing artifact, an empty plan, and an empty allow-list stay fail-closed.</p>
+<form class="form-row" id="opBlueStage" aria-label="Stage a blue coverage review">
+<div><label class="flabel" for="opBlueFinding">Finding id</label><input class="form-input" id="opBlueFinding" name="findingId" autocomplete="off" required aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueArtifact">Artifact id</label><input class="form-input" id="opBlueArtifact" name="artifactId" autocomplete="off" required aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueFamily">Family</label><input class="form-input" id="opBlueFamily" name="family" value="web_api" autocomplete="off" aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueBytes">Artifact bytes (optional; empty fails closed)</label><input class="form-input" id="opBlueBytes" name="artifactBytes" autocomplete="off" aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueStageSubmit">Score</label><button class="btn btn--sm btn--primary" id="opBlueStageSubmit" type="submit" aria-label="Score">Score artifact</button></div>
+<div><label class="flabel" for="opBlueStageRetry">Retry</label><button class="btn btn--sm" id="opBlueStageRetry" type="button">Retry</button></div>
+</form>
+<p id="opBlueStageResult" class="text-secondary" role="status" aria-live="polite"></p>
+<form class="form-row" id="opBlackReview" aria-label="Review a supplied black plan">
+<div><label class="flabel" for="opBlackActions">Actions</label><input class="form-input" id="opBlackActions" name="actions" autocomplete="off" aria-describedby="opBlackReviewResult"></div>
+<div><label class="flabel" for="opBlackPaths">Paths</label><input class="form-input" id="opBlackPaths" name="paths" autocomplete="off" aria-describedby="opBlackReviewResult"></div>
+<div><label class="flabel" for="opBlackReviewSubmit">Review</label><button class="btn btn--sm btn--primary" id="opBlackReviewSubmit" type="submit">Review plan</button></div>
+<div><label class="flabel" for="opBlackReviewRetry">Retry</label><button class="btn btn--sm" id="opBlackReviewRetry" type="button">Retry</button></div>
+</form>
+<p id="opBlackReviewResult" role="status" aria-live="polite" class="text-secondary"></p>
+<form class="form-row" id="opWhiteStage" aria-label="Stage ROE text and one action">
+<div><label class="flabel" for="opWhiteRoe">ROE text</label><input class="form-input" id="opWhiteRoe" name="roeText" autocomplete="off" required aria-describedby="opWhiteStageResult"></div>
+<div><label class="flabel" for="opWhiteAction">Action</label><input class="form-input" id="opWhiteAction" name="action" autocomplete="off" required aria-describedby="opWhiteStageResult"></div>
+<div><label class="flabel" for="opWhiteTarget">Target</label><input class="form-input" id="opWhiteTarget" name="target" autocomplete="off" aria-describedby="opWhiteStageResult"></div>
+<div><label class="flabel" for="opWhiteStageSubmit">Stage</label><button class="btn btn--sm btn--primary" id="opWhiteStageSubmit" type="submit">Stage ROE</button></div>
+<div><label class="flabel" for="opWhiteStageRetry">Retry</label><button class="btn btn--sm" id="opWhiteStageRetry" type="button">Retry</button></div>
+</form>
+<p id="opWhiteStageResult" role="status" aria-live="polite" class="text-secondary"></p>
+</section>
+
 <section class="card" aria-labelledby="purpleTitle">
 <h2 class="card__title" id="purpleTitle">Dark Purple synthesis</h2>
 <p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections, <span class="mono">verdict</span> for ROE verdicts.</p>
@@ -107,6 +136,101 @@
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 <script src="assets/shell.js"></script>
+<script>
+(function () {
+  function splitLines(value) {
+    return String(value || '').split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+
+  var blueForm = document.getElementById('opBlueStage');
+  async function submitBlue() {
+    var result = document.getElementById('opBlueStageResult');
+    var findingId = document.getElementById('opBlueFinding').value.trim();
+    var artifactId = document.getElementById('opBlueArtifact').value.trim();
+    var family = document.getElementById('opBlueFamily').value.trim() || 'web_api';
+    var bytes = document.getElementById('opBlueBytes').value;
+    result.textContent = 'Scoring…';
+    try {
+      var scored = await Shell.apiPost('/api/teams/blue/coverage', {
+        runId: 'ui-' + Date.now(),
+        missionId: 'ui-operators',
+        family: family,
+        artifactIds: artifactId ? [artifactId] : [],
+        artifactBytes: bytes,
+        findings: [{ id: findingId }],
+        telemetry: []
+      });
+      var status = (scored && scored.status) || 'insufficient-evidence';
+      var limits = scored && Array.isArray(scored.limitations) ? scored.limitations.join(' ') : '';
+      var note = status === 'insufficient-evidence'
+        ? 'fail-closed: ' + (limits || 'missing artifact fails closed')
+        : status + (limits ? '. ' + limits : '');
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/blue/coverage: ' + note);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/blue/coverage: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (blueForm) {
+    blueForm.addEventListener('submit', function (event) { event.preventDefault(); submitBlue(); });
+    var blueRetry = document.getElementById('opBlueStageRetry');
+    if (blueRetry) blueRetry.addEventListener('click', function () { submitBlue(); });
+  }
+
+  var blackForm = document.getElementById('opBlackReview');
+  async function submitBlack() {
+    var result = document.getElementById('opBlackReviewResult');
+    result.textContent = 'Reviewing…';
+    try {
+      var reviewed = await Shell.apiPost('/api/teams/black/workflow', {
+        actions: splitLines(document.getElementById('opBlackActions').value),
+        paths: splitLines(document.getElementById('opBlackPaths').value),
+        egress: []
+      });
+      var outcome = (reviewed && reviewed.outcome) || 'unknown';
+      var effects = (reviewed && reviewed.effects) || [];
+      var text = 'Origin POST /api/teams/black/workflow: ' + outcome + '. Effects: ' + effects.length + '.';
+      if (outcome === 'insufficient') {
+        text += ' ' + ((reviewed && reviewed.reason) || 'missing plan fails closed') + '. not a clean bill.';
+      }
+      result.innerHTML = Shell.escHtml(text);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/black/workflow: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (blackForm) {
+    blackForm.addEventListener('submit', function (event) { event.preventDefault(); submitBlack(); });
+    var blackRetry = document.getElementById('opBlackReviewRetry');
+    if (blackRetry) blackRetry.addEventListener('click', function () { submitBlack(); });
+  }
+
+  var whiteForm = document.getElementById('opWhiteStage');
+  async function submitWhite() {
+    var result = document.getElementById('opWhiteStageResult');
+    result.textContent = 'Staging…';
+    try {
+      var staged = await Shell.apiPost('/api/teams/white/stage', {
+        roeText: document.getElementById('opWhiteRoe').value,
+        actions: [{ command: document.getElementById('opWhiteAction').value, target: document.getElementById('opWhiteTarget').value }]
+      });
+      var verdict = (staged && staged.verdicts && staged.verdicts[0] && staged.verdicts[0].verdict)
+        || (staged && staged.verdict)
+        || (staged && staged.ok === false ? 'refused' : 'unknown');
+      var text = 'Origin POST /api/teams/white/stage: ' + verdict + '. An approved flag alone is not a receipt.';
+      if (staged && staged.ok === false && staged.reason === 'roe-scope-empty') {
+        text += ' out of scope.';
+      }
+      result.innerHTML = Shell.escHtml(text);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/white/stage: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (whiteForm) {
+    whiteForm.addEventListener('submit', function (event) { event.preventDefault(); submitWhite(); });
+    var whiteRetry = document.getElementById('opWhiteStageRetry');
+    if (whiteRetry) whiteRetry.addEventListener('click', function () { submitWhite(); });
+  }
+})();
+</script>
 <script>
 // Operators page: roster (GET /api/operators/prompts), grants, Dark Purple synthesis.
 var TEAM_IDS = ['black', 'blue', 'white'];

@@ -69,12 +69,58 @@
 <div data-state="data" hidden><ul class="feed" id="approvalsList"></ul></div>
 </div>
 </section>
+<section class="card" aria-labelledby="arsenalCoverageTitle">
+<h2 class="card__title" id="arsenalCoverageTitle">Score coverage</h2>
+<p class="text-secondary">Score the selected family against one finding and artifact. Empty artifact bytes fail closed.</p>
+<form id="arsenalCoverage" aria-label="Score blue coverage for the selected family" class="form-row">
+<div><label class="flabel" for="arsenalCoverageFinding">Finding id</label><input class="form-input" id="arsenalCoverageFinding" name="findingId" autocomplete="off" required aria-describedby="arsenalCoverageResult"></div>
+<div><label class="flabel" for="arsenalCoverageArtifact">Artifact id</label><input class="form-input" id="arsenalCoverageArtifact" name="artifactId" autocomplete="off" required aria-describedby="arsenalCoverageResult"></div>
+<div><label class="flabel" for="arsenalCoverageBytes">Artifact bytes</label><input class="form-input" id="arsenalCoverageBytes" name="artifactBytes" autocomplete="off" aria-describedby="arsenalCoverageResult"></div>
+<div><label class="flabel" for="arsenalCoverageSubmit">Score</label><button class="btn btn--sm btn--primary" id="arsenalCoverageSubmit" type="submit">Score artifact</button></div>
+<div><label class="flabel" for="arsenalCoverageRetry">Retry</label><button class="btn btn--sm" id="arsenalCoverageRetry" type="button">Retry</button></div>
+</form>
+<p id="arsenalCoverageResult" class="text-secondary" role="status" aria-live="polite"></p>
+</section>
 </main>
 <footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
 </div>
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 <script src="assets/shell.js"></script>
+<script>
+(function () {
+  var form = document.getElementById('arsenalCoverage');
+  if (!form) return;
+  async function submitCoverage(event) {
+    if (event) event.preventDefault();
+    var result = document.getElementById('arsenalCoverageResult');
+    var findingId = document.getElementById('arsenalCoverageFinding').value.trim();
+    var artifactId = document.getElementById('arsenalCoverageArtifact').value.trim();
+    var bytes = document.getElementById('arsenalCoverageBytes').value;
+    var family = (document.getElementById('familySel').value || 'web_api');
+    result.textContent = 'Scoring…';
+    try {
+      var scored = await Shell.apiPost('/api/teams/blue/coverage', {
+        runId: 'ui-' + Date.now(),
+        missionId: 'ui-arsenal',
+        family: family,
+        artifactIds: artifactId ? [artifactId] : [],
+        artifactBytes: String(bytes),
+        findings: [{ id: findingId }],
+        telemetry: []
+      });
+      var limitation = (scored && scored.status) === 'insufficient-evidence'
+        ? 'fail-closed and never covered'
+        : ((scored && (scored.limitation || scored.reason)) || '');
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/blue/coverage: ' + (scored.status || 'unknown') + '. ' + limitation);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/blue/coverage: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  form.addEventListener('submit', submitCoverage);
+  document.getElementById('arsenalCoverageRetry').addEventListener('click', function () { submitCoverage(); });
+})();
+</script>
 <script>
 // Arsenal page: /api/arsenal/status, /api/arsenal/plan, /api/arsenal/activation, approvals.
 async function loadArsenalStatus() {
