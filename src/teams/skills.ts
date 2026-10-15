@@ -772,11 +772,10 @@ export async function runComposableSkill(
               const corroboratedBy = Array.isArray(tf.corroboratedBy)
                 ? tf.corroboratedBy.filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
                 : [];
-              const evidenceRefs: string[] = [];
-              if (artifactId) evidenceRefs.push(artifactId);
-              for (const ref of corroboratedBy) {
-                if (!evidenceRefs.includes(ref)) evidenceRefs.push(ref);
-              }
+              const evidenceRefs: string[] = Array.from(
+                new Set(artifactId ? [artifactId, ...corroboratedBy] : corroboratedBy),
+              );
+              const evidenceHash = typeof tf.sha256 === 'string' && tf.sha256.trim() ? tf.sha256.trim() : undefined;
               return {
                 id: `dec-ev-${idx + 1}`,
                 fromHat: 'white',
@@ -784,6 +783,7 @@ export async function runComposableSkill(
                 summary: typeof tf.claim === 'string' ? tf.claim : `Fact ${idx + 1}`,
                 rationale: `Confidence ${confidence} (${String(tf.sha256 ?? '').slice(0, 16)})`,
                 evidenceRefs,
+                ...(evidenceHash ? { evidenceHash } : {}),
                 status,
               };
             });

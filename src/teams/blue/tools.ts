@@ -331,6 +331,7 @@ export interface BlueDecisionEntryInput {
   summary: string;
   rationale: string;
   evidenceRefs?: readonly string[];
+  evidenceHash?: string;
   status?: 'accepted' | 'deferred' | 'rejected';
 }
 
@@ -404,6 +405,7 @@ export function runBlueDecisionLedger(
     const summary = (d.summary ?? '').trim();
     const rationale = (d.rationale ?? '').trim() || 'No explicit rationale provided';
     const evidenceRefs = (d.evidenceRefs ?? []).map(r => r.trim()).filter(Boolean);
+    const evidenceHash = (d.evidenceHash ?? '').trim();
     const status = d.status ?? 'accepted';
 
     if (!summary) {
@@ -428,7 +430,7 @@ export function runBlueDecisionLedger(
       unbackedDecisionCount += 1;
     }
 
-    const entryHash = `sha256-${shortSha256(`${sessionId}:${i}:${d.fromHat}:${d.toHat}:${summary}:${evidenceRefs.join(',')}`)}`;
+    const entryHash = `sha256-${shortSha256(`${sessionId}:${i}:${d.fromHat}:${d.toHat}:${summary}:${rationale}:${status}:${evidenceRefs.join(',')}:${evidenceHash}`)}`;
     entries.push({
       index: i,
       id,

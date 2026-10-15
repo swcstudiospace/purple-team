@@ -630,7 +630,8 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     });
     expect(disputedIncident.ok).toBe(true);
     const ledgerOut = disputedIncident.data?.stepOutputs[3].output as {
-      entries?: Array<{ status: string; evidenceRefs: string[] }>;
+      ledgerDigest?: string;
+      entries?: Array<{ status: string; evidenceRefs: string[]; entryHash: string }>;
     };
     expect(ledgerOut.entries?.[0].status).toBe('deferred');
     expect(ledgerOut.entries?.[0].evidenceRefs).toEqual([]);
@@ -638,6 +639,34 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     expect(ledgerOut.entries?.[1].evidenceRefs).toEqual([]);
     expect(ledgerOut.entries?.[2].status).toBe('accepted');
     expect(ledgerOut.entries?.[2].evidenceRefs).toEqual(['art-ssh-1', 'siem-rule-1']);
+
+    // 13. Changed evidence sha256 produces a distinct entryHash and ledgerDigest
+    const disputedIncidentChangedSha = await runComposableSkill('skill-blue-incident-sequencer', {
+      facts: [
+        { id: 'f-unverified', claim: 'Unverified lateral movement rumor', source: 'chat' },
+        { id: 'f-contradicted', claim: 'Contradicted root compromise', source: 'rumor', contradictedBy: ['edr-host-log'] },
+        { id: 'f-verified', claim: 'Verified SSH brute force', source: 'auth.log', artifactId: 'art-ssh-1', sha256: 'sha256-9988776655443322', corroboratedBy: ['siem-rule-1'] },
+      ],
+    });
+    const ledgerOutChanged = disputedIncidentChangedSha.data?.stepOutputs[3].output as {
+      ledgerDigest?: string;
+      entries?: Array<{ entryHash: string }>;
+    };
+    expect(ledgerOutChanged.entries?.[2].entryHash).not.toBe(ledgerOut.entries?.[2].entryHash);
+    expect(ledgerOutChanged.ledgerDigest).not.toBe(ledgerOut.ledgerDigest);
+
+    // 14. 60-record ~1.2 MB dataset completes skill-white-roe-gap-verification without OUTPUT_CAP_EXCEEDED
+    const pad20k = 'x'.repeat(19_800);
+    const rows60 = Array.from({ length: 60 }, (_, idx) => ({
+      id: `rec-${idx + 1}`,
+      claim: `Fact claim ${idx + 1}`,
+      blob: pad20k,
+    }));
+    const largeMultiPageSkill = await runComposableSkill('skill-white-roe-gap-verification', {
+      rawPayload: rows60,
+    });
+    expect(largeMultiPageSkill.ok).toBe(true);
+    expect(largeMultiPageSkill.data?.state).toBe('success');
   });
 });
 

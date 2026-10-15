@@ -321,7 +321,7 @@ export function runWhiteDataInspector(
   const hasParseFailure = diagnostics.some(d => d.message.startsWith('Malformed') || d.message.startsWith('Unrecognized') || d.message.includes('JSON'));
   const state: 'empty' | 'error' | 'success' = (hasParseFailure || hasRequiredFieldViolation || omittedSchemaFieldsCount > 0) ? 'error' : 'success';
 
-  return {
+  const result: WhiteDataInspectorResult = {
     state,
     detectedFormat,
     totalRecords: allRecords.length,
@@ -330,13 +330,23 @@ export function runWhiteDataInspector(
     chunkSize,
     totalChunks,
     records: pageRecords,
-    ...(input.includeAllRecords === true ? { allFilteredRecords: filtered } : {}),
     schemaSummary,
     ...(omittedSchemaFieldsCount > 0 ? { omittedSchemaFieldsCount, omittedSchemaFields } : {}),
     diagnostics,
     ...(diagnostics.length > 0 ? { rawInputPreserved: rawString } : {}),
     payloadSha256: sha256Hex(rawString),
   };
+
+  if (input.includeAllRecords === true) {
+    Object.defineProperty(result, 'allFilteredRecords', {
+      value: filtered,
+      enumerable: false,
+      configurable: true,
+      writable: true,
+    });
+  }
+
+  return result;
 }
 
 // =============================================================================
