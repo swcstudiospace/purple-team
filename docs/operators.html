@@ -76,6 +76,7 @@
 
 <section class="card" aria-labelledby="opStageTitle">
 <h2 class="card__title" id="opStageTitle">Stage review</h2>
+<style>#opBlueStage :focus-visible,#opBlackReview :focus-visible,#opWhiteStage :focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>
 <p class="text-secondary">Submit the same staged contracts the server already exposes. A missing artifact, an empty plan, and an empty allow-list stay fail-closed.</p>
 <form class="form-row" id="opBlueStage" aria-label="Stage a blue coverage review">
 <div><label class="flabel" for="opBlueFinding">Finding id</label><input class="form-input" id="opBlueFinding" name="findingId" autocomplete="off" required aria-describedby="opBlueStageResult"></div>

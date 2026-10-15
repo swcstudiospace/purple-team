@@ -25,6 +25,7 @@
 
 <section class="card" aria-labelledby="coverageTitle">
 <h2 class="card__title" id="coverageTitle">Detection coverage (blue)</h2>
+<style>#coverageBind :focus-visible,#blackReview :focus-visible,#whiteStage :focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>
 <p class="text-secondary">D3FEND-keyed gap matrix over the findings ledger — <span class="mono">GET /api/teams/blue/gaps</span>. Countermeasure ids absent from the vendored ontology are shown as unresolved, never dropped.</p>
 <div class="form-row">
 <div><label class="flabel" for="coverageSel">Coverage</label><select class="form-input" id="coverageSel"><option value="all">all</option><option value="none">none</option><option value="partial">partial</option><option value="covered">covered</option></select></div>

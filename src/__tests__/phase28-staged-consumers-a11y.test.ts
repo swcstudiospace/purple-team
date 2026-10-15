@@ -47,6 +47,11 @@ describe('staged consumer accessibility', () => {
       expect(html, `${form.page} submit`).toContain(`id="${form.submitId}"`);
       expect(html, `${form.page} button`).toContain('type="submit"');
     }
+    expect(pages.operators).toContain('#opBlueStage :focus-visible');
+    expect(pages.mission).toContain('#missionBlackReview :focus-visible');
+    expect(pages.arsenal).toContain('#arsenalCoverage :focus-visible');
+    expect(pages.overview).toContain('#overviewStage :focus-visible');
+    expect(pages.defend).toContain('#coverageBind :focus-visible');
     expect(pages.operators).toContain('id="opBlueStageRetry"');
     expect(pages.operators).toContain('type="button"');
     expect(pages.overview).toContain('Origin POST');
