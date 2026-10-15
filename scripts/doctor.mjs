@@ -142,13 +142,48 @@ async function main() {
 
   const eslintConfig = await readFile('eslint.config.js', 'utf8').catch(() => '');
   const lintAnchors = [
+    'js.configs.recommended,',
+    '...tseslint.configs.recommended,',
     "'@typescript-eslint/no-unused-vars': ['warn', {",
     "'@typescript-eslint/no-explicit-any': 'warn',",
     "'@typescript-eslint/no-non-null-assertion': 'warn',",
+    "'prefer-const': 'error',",
+    "'no-var': 'error',",
+    "'eqeqeq': ['error', 'always'],",
     "'curly': ['warn', 'multi-line'],",
     "ignores: ['dist/**', 'node_modules/**', '*.js', '*.mjs'],",
   ];
   const missingAnchors = lintAnchors.filter(anchor => !eslintConfig.includes(anchor));
+  try {
+    const { pathToFileURL } = await import('node:url');
+    const { resolve } = await import('node:path');
+    const mod = await import(pathToFileURL(resolve('eslint.config.js')).href);
+    const blocks = Array.isArray(mod.default) ? mod.default : [];
+    const effectiveRules = {};
+    for (const block of blocks) {
+      if (block && typeof block === 'object' && block.rules && typeof block.rules === 'object') {
+        Object.assign(effectiveRules, block.rules);
+      }
+    }
+    const requiredActiveRules = [
+      '@typescript-eslint/no-unused-vars',
+      '@typescript-eslint/no-explicit-any',
+      '@typescript-eslint/no-non-null-assertion',
+      'prefer-const',
+      'no-var',
+      'eqeqeq',
+      'curly',
+    ];
+    for (const ruleName of requiredActiveRules) {
+      const val = effectiveRules[ruleName];
+      const level = Array.isArray(val) ? val[0] : val;
+      if (level !== 'warn' && level !== 'error' && level !== 1 && level !== 2) {
+        missingAnchors.push(`effective rule disabled: ${ruleName}=${JSON.stringify(val)}`);
+      }
+    }
+  } catch (err) {
+    missingAnchors.push(`eslint.config.js import failed: ${err && err.message ? err.message : String(err)}`);
+  }
   check('Lint hygiene: eslint config not loosened', missingAnchors.length === 0, missingAnchors.length ? `missing/weakened: ${missingAnchors.join(' | ')}` : 'all rule + ignores anchors intact', 'block');
 
   const blocks = checks.filter(item => !item.passed && item.severity === 'block');
