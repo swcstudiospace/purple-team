@@ -3,6 +3,10 @@ status: human_needed
 phase: 29-integrated-acceptance-and-governed-closure
 verified: 2026-10-15
 score: 1/5 success criteria have a local evidence record; 4 need the owner
+audit_acknowledged:
+  milestone: v1.5
+  at: 2026-10-15
+  status: human_needed
 ---
 
 # Phase 29 Verification

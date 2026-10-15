@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Four-Hat Runtime Parity
-current_phase: 29
-current_phase_name: Integrated Acceptance and Governed Closure
-status: planning
+status: Awaiting next milestone
 stopped_at: Phase 28 complete, ready to plan Phase 29
-last_updated: "2026-10-15T17:55:10.509Z"
+last_updated: "2026-10-15T19:37:08.404Z"
 last_activity: 2026-10-15
-last_activity_desc: Phase 28 complete, transitioned to Phase 29
-state_head: ddbe61e55ce9fddb17a54b85c6738f9e582b6ab2
+last_activity_desc: Milestone v1.5 completed and archived
+state_head: 858443cdfce9950500460f6b4e6ef27546392308
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 12
   completed_plans: 12
   percent: 75
+current_phase: 29
+current_phase_name: Integrated Acceptance and Governed Closure
 ---
 
 # Project State
@@ -29,11 +29,10 @@ See: .planning/PROJECT.md (updated 2026-10-13), .planning/ROADMAP.md and .planni
 
 ## Current Position
 
-Phase: 29 of 26 (Integrated Acceptance and Governed Closure)
-Plan: Not started
-Status: Ready to plan
-Last activity: 2026-10-15 — Phase 28 complete, transitioned to Phase 29
-Progress: [████████░░] 75% (0/4 new phases complete; all 72 requirements Pending)
+Phase: Milestone v1.5 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-15 — Milestone v1.5 completed and archived
 
 ## Completed Context
 
@@ -90,5 +89,4 @@ Current v1.5: zero completed phases/plans; plan counts TBD. Historical metrics r
 
 ## Operator Next Steps
 
-- Continue actual normal controller dispatch in the legitimate private runtime workspace, verify/generate/integrate green repair, then load the fixed operation through the supported host lifecycle and perform actual signed contract correction/input-dependency pinning before phase26. No repeated consent request: owner authorization is already explicit. Preserve original product correlation/history/signer/gates and all full-scope acceptance; no product completion or premature ship.
-- Source pins supplied by parent: A03 `.planning/v1.5-RUNTIME-CONTRACTS.md` digest `69cefa9626dc0b1b111de671234c35fd0d82432bc5157e41e79de619974b07c1`; A04 `.planning/v1.5-UI-CONTRACT.md` digest `9750d3c9a574a6dd2bc7101a2de4dc00d707888f03d79df98f97a801d203249b`; independent advisory review `artifact://57`. These unamended proposals are not product/gate acceptance. This assignment skipped ALL tests/build/lint/formatters/gates/commits; parent owns later projection/traceability validation and real implementation verification.
+- Start the next milestone with /gsd-new-milestone
