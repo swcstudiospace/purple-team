@@ -1,12 +1,33 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v1.5",
-  "phases": [],
+  "milestone": "v1.5 — Four-Hat Runtime Parity",
+  "phases": [
+    {
+      "number": "26",
+      "name": "Runtime Authority, Bound Inputs and Retained Execution",
+      "status": "complete"
+    },
+    {
+      "number": "27",
+      "name": "Blue, Black and White Substantive Capability Parity",
+      "status": "complete"
+    },
+    {
+      "number": "28",
+      "name": "Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis",
+      "status": "complete"
+    },
+    {
+      "number": "29",
+      "name": "Integrated Acceptance and Governed Closure",
+      "status": "pending"
+    }
+  ],
   "next": {
-    "command": "/gsd:discuss-phase",
-    "label": "Discuss the first phase",
-    "reason": "Project initialized — plan your first phase"
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 29)",
+    "reason": "Phase 29 of 4 — needs a plan"
   },
-  "updated_at": "2026-10-13T22:50:51.386Z"
+  "updated_at": "2026-10-15T17:55:10.520Z"
 }

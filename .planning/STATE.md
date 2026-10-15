@@ -2,20 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Four-Hat Runtime Parity
-current_phase: 28
-current_phase_name: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis
+current_phase: 29
+current_phase_name: Integrated Acceptance and Governed Closure
 status: planning
-stopped_at: Phase 27 complete, ready to plan Phase 28
-last_updated: "2026-10-15T16:57:17.339Z"
+stopped_at: Phase 28 complete, ready to plan Phase 29
+last_updated: "2026-10-15T17:55:10.509Z"
 last_activity: 2026-10-15
-last_activity_desc: Phase 27 complete, transitioned to Phase 28
-state_head: 4003b6d003e412ed5dd6991dd01faa876f094757
+last_activity_desc: Phase 28 complete, transitioned to Phase 29
+state_head: ddbe61e55ce9fddb17a54b85c6738f9e582b6ab2
 progress:
   total_phases: 4
-  completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
-  percent: 50
+  completed_phases: 3
+  total_plans: 12
+  completed_plans: 12
+  percent: 75
 ---
 
 # Project State
@@ -29,11 +29,11 @@ See: .planning/PROJECT.md (updated 2026-10-13), .planning/ROADMAP.md and .planni
 
 ## Current Position
 
-Phase: 28 of 26 (Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis)
+Phase: 29 of 26 (Integrated Acceptance and Governed Closure)
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-10-15 — Phase 27 complete, transitioned to Phase 28
-Progress: [█████░░░░░] 50% (0/4 new phases complete; all 72 requirements Pending)
+Last activity: 2026-10-15 — Phase 28 complete, transitioned to Phase 29
+Progress: [████████░░] 75% (0/4 new phases complete; all 72 requirements Pending)
 
 ## Completed Context
 
@@ -65,7 +65,7 @@ Progress: [█████░░░░░] 50% (0/4 new phases complete; all 72 
 ## Session Continuity
 
 Last session: 2026-10-14
-Stopped at: Phase 27 complete, ready to plan Phase 28
+Stopped at: Phase 28 complete, ready to plan Phase 29
 Resume file: .planning/.continue-here.md (existing handoff retained; this STATE/ROADMAP supersede its earlier roadmap-pending position)
 
 ## Performance Metrics

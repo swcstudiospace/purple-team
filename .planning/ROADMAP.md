@@ -47,7 +47,7 @@ These are source-backed contract/transport defects, not unanswered hat semantics
 
 - [x] **Phase 26: Runtime Authority, Bound Inputs and Retained Execution** — Operators can submit authorized, identity-bound work and retrieve truthful retained outcomes without changing legacy Red behavior. (completed 2026-10-15)
 - [x] **Phase 27: Blue, Black and White Substantive Capability Parity** — Real role-specific tools, engines, prompts and corpus guidance deliver evidence-bound defensive, tradecraft and governance outcomes. (completed 2026-10-15)
-- [ ] **Phase 28: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis** — Existing product surfaces consume the same real role-bound contracts, lifecycle and explicit correlated synthesis.
+- [x] **Phase 28: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis** — Existing product surfaces consume the same real role-bound contracts, lifecycle and explicit correlated synthesis. (completed 2026-10-15)
 - [ ] **Phase 29: Integrated Acceptance and Governed Closure** — The owner can assess all requirements against actual integrated evidence before authentic gates and milestone closure.
 
 ## Phase Details
@@ -154,7 +154,7 @@ Execution order after mandatory adoption/prerequisites: 26 → 27 → 28 → 29.
 |---|---|---|---|
 | 26. Runtime Authority, Bound Inputs and Retained Execution | 2/2 | Complete    | 2026-10-15 |
 | 27. Blue, Black and White Substantive Capability Parity | 5/5 | Complete    | 2026-10-15 |
-| 28. Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis | 0/TBD | Not started | - |
+| 28. Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis | 5/5 | Complete    | 2026-10-15 |
 | 29. Integrated Acceptance and Governed Closure | 0/TBD | Not started | - |
 
 **Primary traceability:** Phase 26: 13 AC + 3 NFR = 16; Phase 27: 20 AC + 1 NFR = 21; Phase 28: 21 AC + 1 NFR = 22; Phase 29: 10 AC + 3 NFR = 13. Total: 64 AC + 8 NFR = **72/72 mapped exactly once**, zero orphans/duplicate primary assignments; all Pending. Cross-phase integration/check notes are dependencies, not duplicate requirement completion. Canonical row mapping is the GSD Traceability section of REQUIREMENTS.md; the signed A02 source above it is unchanged. Coverage is proposal coverage, not acceptance or an exercised validation result.
