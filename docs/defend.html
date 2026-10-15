@@ -49,6 +49,12 @@
 <section class="card" aria-labelledby="noiseTitle">
 <h2 class="card__title" id="noiseTitle">Noise budget (black)</h2>
 <p class="text-secondary">Structured noise ledger over the most recent RED plan draft — <span class="mono">GET /api/teams/black/noise</span>. No active draft is an empty, quiet ledger, not an error.</p>
+<form class="form-row" id="blackReview" aria-label="Review a supplied black plan">
+<div><label class="flabel" for="blackActions">Actions</label><input class="form-input" id="blackActions" name="actions" autocomplete="off" placeholder="one action"></div>
+<div><label class="flabel" for="blackPaths">Paths</label><input class="form-input" id="blackPaths" name="paths" autocomplete="off" placeholder="path id"></div>
+<div><label class="flabel" for="blackReviewSubmit">Review</label><button class="btn btn--sm btn--primary" id="blackReviewSubmit" type="submit">Review plan</button></div>
+</form>
+<p id="blackReviewResult" class="text-secondary" role="status" aria-live="polite"></p>
 <div class="card__row" id="noiseSummary" hidden></div>
 <div class="st-warn-box" id="noiseViolations" hidden><p><strong>Doctrine violations.</strong></p><ul class="feed" id="noiseViolationList"></ul></div>
 <div data-state-root id="noiseState">
@@ -63,6 +69,13 @@
 <section class="card" aria-labelledby="chainTitle">
 <h2 class="card__title" id="chainTitle">Evidence chain (white)</h2>
 <p class="text-secondary">Replay-chain audit over the evidence ledger — <span class="mono">GET /api/teams/white/evidence</span>. A link is intact only at tool-grade provenance or better with a replay hook attached.</p>
+<form class="form-row" id="whiteStage" aria-label="Stage ROE text and one action">
+<div><label class="flabel" for="whiteRoe">ROE text</label><input class="form-input" id="whiteRoe" name="roeText" autocomplete="off" required></div>
+<div><label class="flabel" for="whiteAction">Action</label><input class="form-input" id="whiteAction" name="action" autocomplete="off" required></div>
+<div><label class="flabel" for="whiteTarget">Target</label><input class="form-input" id="whiteTarget" name="target" autocomplete="off"></div>
+<div><label class="flabel" for="whiteStageSubmit">Stage</label><button class="btn btn--sm btn--primary" id="whiteStageSubmit" type="submit">Stage ROE</button></div>
+</form>
+<p id="whiteStageResult" class="text-secondary" role="status" aria-live="polite"></p>
 <div class="card__row" id="chainSummary" hidden></div>
 <div data-state-root id="chainState">
 <div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
@@ -186,6 +199,36 @@ document.getElementById('coverageBind').addEventListener('submit', async functio
       : 'No row returned for ' + findingId + '.';
   } catch (err) {
     result.textContent = err && err.message ? err.message : 'Coverage request failed.';
+  }
+});
+
+document.getElementById('blackReview').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var result = document.getElementById('blackReviewResult');
+  var actions = document.getElementById('blackActions').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  var paths = document.getElementById('blackPaths').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  result.textContent = 'Reviewing…';
+  try {
+    var reviewed = await Shell.apiPost('/api/teams/black/workflow', { actions: actions, paths: paths, egress: [] });
+    result.textContent = 'Black outcome: ' + (reviewed.outcome || 'unknown') + '. Effects: ' + ((reviewed.effects || []).length) + '.';
+  } catch (err) {
+    result.textContent = err && err.message ? err.message : 'Black review failed.';
+  }
+});
+
+document.getElementById('whiteStage').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var result = document.getElementById('whiteStageResult');
+  result.textContent = 'Staging…';
+  try {
+    var staged = await Shell.apiPost('/api/teams/white/stage', {
+      roeText: document.getElementById('whiteRoe').value,
+      actions: [{ command: document.getElementById('whiteAction').value, target: document.getElementById('whiteTarget').value }]
+    });
+    var verdict = staged && staged.verdicts && staged.verdicts[0] ? staged.verdicts[0].verdict : (staged.ok === false ? 'refused' : 'unknown');
+    result.textContent = 'White standing: ' + verdict + '. An approved flag alone is not a receipt.';
+  } catch (err) {
+    result.textContent = err && err.message ? err.message : 'White stage failed.';
   }
 });
 
