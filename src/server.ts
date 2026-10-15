@@ -64,13 +64,16 @@ import { hardeningPlan, type DetectionGap } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
 import { sigmaRulepack } from './teams/blue/rulepacks.js';
 import { registryTelemetry } from './teams/blue/telemetry.js';
+import { runBlueCoverageStage } from './teams/blue/workflow.js';
 import { opsecReview } from './teams/black/checklist.js';
 import { exfilCostModel } from './teams/black/exfil.js';
 import { structuredNoiseBudget } from './teams/black/noise.js';
+import { runBlackWorkflow } from './teams/black/workflow.js';
 import { parseRoe } from './teams/white/roe-parser.js';
 import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
 import { roeAudit, type AuditedAction, type RoeVerdict } from './teams/white.js';
+import { stageRoeAudit } from './teams/white/workflow.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -6818,6 +6821,33 @@ app.get('/api/teams/white/report-audit', (_req: Request, res: Response): void =>
   const findings = [...findingsLedger.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const entries = [...evidenceLedger.values()];
   res.json(redactSecrets(auditReport(findings, entries)));
+});
+
+// POST /api/teams/blue/coverage — artifact-bound coverage stage for one family
+// (teams/blue/workflow.ts runBlueCoverageStage). The body passes straight
+// through: missing artifacts fail closed inside the workflow as
+// insufficient-evidence, never covered. Validation throws answer 400.
+app.post('/api/teams/blue/coverage', (req: Request, res: Response): void => {
+  try {
+    res.json(redactSecrets(runBlueCoverageStage(req.body)));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// POST /api/teams/black/workflow — analysis-only staged workflow
+// (teams/black/workflow.ts runBlackWorkflow). The body IS the workflow input;
+// caller-supplied paths pass through untouched (never defaulted to []).
+app.post('/api/teams/black/workflow', (req: Request, res: Response): void => {
+  res.json(redactSecrets(runBlackWorkflow((req.body ?? {}) as Parameters<typeof runBlackWorkflow>[0])));
+});
+
+// POST /api/teams/white/stage — stage an ROE audit without minting a receipt
+// (teams/white/workflow.ts stageRoeAudit). Body: { roeText, actions, meta }.
+// No receipt-mint route lives here: stamps are echoed from caller meta only.
+app.post('/api/teams/white/stage', (req: Request, res: Response): void => {
+  const body = (req.body ?? {}) as { roeText: string; actions: Parameters<typeof stageRoeAudit>[1]; meta?: Parameters<typeof stageRoeAudit>[2] };
+  res.json(redactSecrets(stageRoeAudit(body.roeText, body.actions, body.meta)));
 });
 
 // POST /api/models — live model list for the Universal API Config panel (#90).
