@@ -11,7 +11,7 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 // ARSENAL COUNT HONESTY — the "advertised = real, and nothing is silently dead".
 //
-// The arsenal advertises "120 tools". verify-claims defends that number by counting
+// The arsenal advertises "139 tools". verify-claims defends that number by counting
 // `id:`/`name:` source lines — a SOURCE-LINE count, which would keep passing even if
 // an entry became uncallable. This test locks the number to the REAL registered arrays
 // and, more importantly, pins the invariant that makes the count honest:
@@ -36,16 +36,16 @@ const isGated = (a: ToolAdapter) =>
   a.execution === 'catalog_only' || a.execution === 'import_only';
 
 describe('arsenal count honesty (advertised = real registered surface)', () => {
-  it('the advertised "120 tools" is the real registered surface, not a source-line count', () => {
+  it('the advertised "139 tools" is the real registered surface, not a source-line count', () => {
     const total = TOOL_ADAPTERS.length + BUILTIN_TOOLS.length + EXTERNAL_TOOLS.length;
     // Locks the headline to code. If the arsenal grows/shrinks, update this AND the
     // README / verify-claims headline together — that is the point of the lock.
     expect(
       total,
-      `arsenal size drifted from the advertised 120 (adapters=${TOOL_ADAPTERS.length}, ` +
+      `arsenal size drifted from the advertised 139 (adapters=${TOOL_ADAPTERS.length}, ` +
         `built-ins=${BUILTIN_TOOLS.length}, externals=${EXTERNAL_TOOLS.length}) — ` +
         'update the README / verify-claims headline to match',
-    ).toBe(120);
+    ).toBe(139);
     expect(total).toBeGreaterThanOrEqual(80); // stays consistent with verify-claims' `>= 80` gate
   });
 
@@ -71,11 +71,15 @@ describe('arsenal count honesty (advertised = real registered surface)', () => {
     // run here); osquery/velociraptor/suricata are catalog_only pending scoped telemetry runners;
     // attack-navigator is import_only (layer/STIX data imported, never executed) and caldera is
     // catalog_only (emulation plans parsed for analysis; the platform is never operated);
-    // nist-800-115/ptes/osstmm are import_only governance catalogs (framework section/phase/module
-    // data vendored for adjudication, never executed).
+    // nist-800-115/ptes/osstmm plus the white adjudication packs are import_only governance catalogs;
+    // the black tradecraft packs are import_only analysis references, never live probes.
     expect(gated.map((a) => a.id).sort()).toEqual([
-      'atomic-red-team', 'attack-navigator', 'bloodhound', 'caldera', 'd3fend', 'frida', 'hydra',
-      'metasploit', 'nist-800-115', 'osquery', 'osstmm', 'pacu', 'ptes', 'suricata', 'velociraptor',
+      'atomic-red-team', 'attack-flow', 'attack-navigator', 'beacon-cadence', 'bloodhound', 'caldera',
+      'callback-budget', 'channel-cost-table', 'cis-controls', 'cover-story', 'cvss', 'cwe', 'd3fend',
+      'dns-tunnel-model', 'egress-ledger', 'exfil-path-pack', 'frida', 'hydra', 'ja3-catalog',
+      'metasploit', 'mitre-atlas', 'nist-800-115', 'nist-csf', 'noise-vocabulary', 'opsec-checklist-pack',
+      'osquery', 'osstmm', 'owasp-asvs', 'owasp-wstg', 'pacu', 'ptes', 'stealth-route-pack', 'suricata',
+      'velociraptor',
     ]);
     expect(TOOL_ADAPTERS.find((a) => a.id === 'bloodhound')?.execution).toBe('import_only');
     // Every gated adapter is genuinely off the generic surface.

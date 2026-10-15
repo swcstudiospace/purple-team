@@ -15,6 +15,39 @@ const TOKEN_RE =
 
 const SEATS = ['commander', 'red', 'black', 'blue', 'white'];
 const SKILLS = [
+  'black-anti-forensics-refusal',
+  'black-attack-mapper',
+  'black-beacon-cadence',
+  'black-channel-costing',
+  'black-cover-audit',
+  'black-evasion-review',
+  'black-low-noise-recon',
+  'black-noise-ledger',
+  'black-phase-gate',
+  'black-probe-cadence',
+  'black-stealth-router',
+  'black-third-party-surface',
+  'blue-coverage-matrix',
+  'blue-deception-plan',
+  'blue-evict-plan',
+  'blue-harden-map',
+  'blue-hunt-plan',
+  'blue-keyless-triage',
+  'blue-logsource',
+  'blue-ontology-drift',
+  'blue-severity-check',
+  'blue-sigma-pack',
+  'blue-telemetry-deploy',
+  'white-active-classifier',
+  'white-approval-receipt',
+  'white-custody-trail',
+  'white-orphan-evidence',
+  'white-report-coverage',
+  'white-retest-criteria',
+  'white-roe-parse',
+  'white-scope-match',
+  'white-severity-replay',
+  'white-verdict-stamp',
   'tempest-bootstrap',
   'tempest-run',
   'tempest-mission',
@@ -121,7 +154,7 @@ describe('grokbot skills registry', () => {
 });
 
 describe('grokbot marketplace', () => {
-  it('mirrors the plugin shape with the fourteen skill refs', () => {
+  it('mirrors the plugin shape with the full skill ref list', () => {
     const plugin = JSON.parse(
       readFileSync(join(ROOT, 'marketplace', 'plugin.json'), 'utf8'),
     ) as { name: string; description: string; skills: string[] };

@@ -44,7 +44,7 @@ describe('hat archetypes', () => {
 
   it('specter prompt carries the covert tradecraft doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.specter;
-    expect(prompt).toContain('T3MP3ST Specter');
+    expect(prompt).toContain('Purple Team Specter');
     expect(prompt).toContain('<specter-doctrine>');
     expect(prompt).toContain('covert tradecraft');
     expect(prompt).toContain("adversary's eyes");
@@ -54,7 +54,7 @@ describe('hat archetypes', () => {
 
   it('wraith prompt carries the exfil-simulation doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.wraith;
-    expect(prompt).toContain('T3MP3ST Wraith');
+    expect(prompt).toContain('Purple Team Wraith');
     expect(prompt).toContain('<wraith-doctrine>');
     expect(prompt).toContain('Exfil-simulation');
     expect(prompt).toContain('noise budget');
@@ -63,7 +63,7 @@ describe('hat archetypes', () => {
 
   it('sentinel prompt carries the detection-engineering doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.sentinel;
-    expect(prompt).toContain('T3MP3ST Sentinel');
+    expect(prompt).toContain('Purple Team Sentinel');
     expect(prompt).toContain('<sentinel-doctrine>');
     expect(prompt).toContain('detection-engineering');
     expect(prompt).toContain('detector recommendation');
@@ -72,7 +72,7 @@ describe('hat archetypes', () => {
 
   it('warden prompt carries the hardening-audit doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.warden;
-    expect(prompt).toContain('T3MP3ST Warden');
+    expect(prompt).toContain('Purple Team Warden');
     expect(prompt).toContain('<warden-doctrine>');
     expect(prompt).toContain('Control verification');
     expect(prompt).toContain('isconfiguration');
@@ -81,7 +81,7 @@ describe('hat archetypes', () => {
 
   it('arbiter prompt carries the ROE-adjudication doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.arbiter;
-    expect(prompt).toContain('T3MP3ST Arbiter');
+    expect(prompt).toContain('Purple Team Arbiter');
     expect(prompt).toContain('<arbiter-doctrine>');
     expect(prompt).toContain('OE adjudication');
     expect(prompt).toContain('compliant / violation / needs_approval');
@@ -91,7 +91,7 @@ describe('hat archetypes', () => {
 
   it('auditor prompt carries the evidence-scoring doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.auditor;
-    expect(prompt).toContain('T3MP3ST Auditor');
+    expect(prompt).toContain('Purple Team Auditor');
     expect(prompt).toContain('<auditor-doctrine>');
     expect(prompt).toContain('replayable > tool > context > weak');
     expect(prompt).toContain('confidence');

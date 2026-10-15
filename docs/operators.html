@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>T3MP3ST — Operatives</title>
+<title>Purple Team — Operatives</title>
 <link rel="stylesheet" href="assets/tokens.css">
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
 <div class="shell__sidebar" id="sidebar">
-<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">P</span><a class="shell__brand-name" href="overview.html">Purple Team</a></div>
 <button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
 <nav data-shell-nav aria-label="Primary"></nav>
 </div>
@@ -106,14 +106,15 @@
 
 <section class="card" aria-labelledby="purpleTitle">
 <h2 class="card__title" id="purpleTitle">Dark Purple synthesis</h2>
-<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections, <span class="mono">verdict</span> for ROE verdicts.</p>
+<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections. Verdicts are either <span class="mono">verdict | rationale</span> (positional) or <span class="mono">findingId | verdict | rationale</span> (id join). Do not mix the two.</p>
 <div class="grid grid--3">
 <div><label class="flabel" for="purpleFindings">Findings</label><textarea class="form-input" id="purpleFindings" placeholder="F-001 | Exposed admin panel | high"></textarea></div>
 <div><label class="flabel" for="purpleDetections">Detections</label><textarea class="form-input" id="purpleDetections" placeholder="F-001 | partial"></textarea></div>
-<div><label class="flabel" for="purpleVerdicts">Verdicts</label><textarea class="form-input" id="purpleVerdicts" placeholder="allow"></textarea></div>
+<div><label class="flabel" for="purpleVerdicts">Verdicts</label><textarea class="form-input" id="purpleVerdicts" placeholder="F-001 | violation | target outside scope"></textarea></div>
 </div>
 <div class="card__row" style="margin-top:8px">
-<button class="btn btn--sm" id="purpleLoad" type="button">Load finding ids from ledger</button>
+<button class="btn btn--sm" id="purpleLoad" type="button">Load ledgers</button>
+<button class="btn btn--sm" id="purpleLatest" type="button">Reload latest</button>
 <button class="btn btn--sm btn--primary" id="purpleRun" type="button">Synthesize</button>
 </div>
 <div data-state-root id="purpleState">
@@ -122,8 +123,9 @@
 <div data-state="error" class="st-error" hidden><p><strong>Synthesis failed.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
 <div data-state="success" class="st-success" hidden><p><strong>Synthesis recorded.</strong> <span data-ok></span></p></div>
 <div data-state="data" hidden>
+<p id="purpleSummary" class="text-secondary"></p>
 <h3 class="card__title">Coverage matrix</h3>
-<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Tier</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
+<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Rationale</th><th>Tier</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
 <h3 class="card__title">Unresolved</h3>
 <ul class="feed" id="unresolvedList"></ul>
 <h3 class="card__title">Next missions</h3>
@@ -132,7 +134,7 @@
 </div>
 </section>
 </main>
-<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+<footer class="shell__footer"><span>Purple Team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
 </div>
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
@@ -365,6 +367,52 @@ function parseTriple(text) {
   }).filter(function (e) { return e.id; });
 }
 
+function paintSynthesis(synthesis) {
+  var root = document.getElementById('purpleState');
+  var tbody = document.getElementById('coverageTable').querySelector('tbody');
+  if (tbody) {
+    tbody.innerHTML = (synthesis.coverageMatrix || []).map(function (row) {
+      return '<tr><td class="mono">' + Shell.escHtml(row.findingId) + '</td>'
+        + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.detection || 'none') + '</span></td>'
+        + '<td>' + Shell.escHtml(row.verdict || '—') + '</td>'
+        + '<td>' + Shell.escHtml(row.rationale || '—') + '</td>'
+        + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.riskTier || '—') + '</span></td>'
+        + '<td>' + Shell.escHtml(row.residualRisk || '') + '</td></tr>';
+    }).join('');
+  }
+  var ul = document.getElementById('unresolvedList');
+  if (ul) ul.innerHTML = (synthesis.unresolved || []).map(function (id) { return '<li>' + Shell.escHtml(id) + '</li>'; }).join('') || '<li>None — posture holds.</li>';
+  var nm = document.getElementById('nextMissions');
+  if (nm) nm.innerHTML = (synthesis.nextMissions || []).map(function (m) { return '<li>' + Shell.escHtml(m) + '</li>'; }).join('');
+  Shell.showState(root, 'data');
+  var summary = (synthesis.correlation === 'id' ? 'id join' : 'positional join')
+    + ' · ' + (synthesis.unresolved || []).length + ' unresolved · ' + (synthesis.nextMissions || []).length + ' follow-up mission(s).'
+    + ((synthesis.recordedAt || synthesis.createdAt) ? ' · recorded ' + (synthesis.recordedAt || synthesis.createdAt) : '')
+    + (synthesis.evidenceId ? ' · receipt ' + synthesis.evidenceId : '');
+  var summaryEl = document.getElementById('purpleSummary');
+  if (summaryEl) summaryEl.textContent = summary;
+  var okEl = root.querySelector('[data-ok]');
+  if (okEl) okEl.textContent = summary;
+}
+
+async function loadLatestSynthesis() {
+  var root = document.getElementById('purpleState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/teams/purple/synthesize');
+    if (!d.synthesis) {
+      Shell.showState(root, 'empty');
+      return;
+    }
+    d.synthesis.recordedAt = d.createdAt;
+    paintSynthesis(d.synthesis);
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
 async function runPurple() {
   var root = document.getElementById('purpleState');
   Shell.showState(root, 'loading');
@@ -378,27 +426,33 @@ async function runPurple() {
     var detections = parseTriple(document.getElementById('purpleDetections').value).map(function (e) {
       return { findingId: e.id, coverage: e.title || 'none' };
     });
-    var verdicts = String(document.getElementById('purpleVerdicts').value || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (v) {
-      return { verdict: v };
+    var verdictLines = String(document.getElementById('purpleVerdicts').value || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (ln) {
+      var parts = ln.split('|').map(function (p) { return p.trim(); });
+      var known = { compliant: true, violation: true, needs_approval: true };
+      if (parts.length >= 2 && known[parts[1]]) return { findingId: parts[0], verdict: parts[1], rationale: parts.slice(2).join(' | ') };
+      if (known[parts[0]]) return { verdict: parts[0], rationale: parts.slice(1).join(' | ') };
+      return { verdict: parts[0] };
     });
-    var synthesis = await Shell.apiPost('/api/teams/purple/synthesize', { findings: findings, detections: detections, verdicts: verdicts });
-    var tbody = document.getElementById('coverageTable').querySelector('tbody');
-    if (tbody) {
-      tbody.innerHTML = (synthesis.coverageMatrix || []).map(function (row) {
-        return '<tr><td class="mono">' + Shell.escHtml(row.findingId) + '</td>'
-          + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.detection || 'none') + '</span></td>'
-          + '<td>' + Shell.escHtml(row.verdict || '—') + '</td>'
-          + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.riskTier || '—') + '</span></td>'
-          + '<td>' + Shell.escHtml(row.residualRisk || '') + '</td></tr>';
-      }).join('');
+    var keyedCount = verdictLines.filter(function (v) { return v.findingId; }).length;
+    if (keyedCount && keyedCount !== verdictLines.length) {
+      Shell.toast('Verdict lines must all be positional or all be findingId | verdict', 'error');
+      Shell.showState(root, 'empty');
+      return;
     }
-    var ul = document.getElementById('unresolvedList');
-    if (ul) ul.innerHTML = (synthesis.unresolved || []).map(function (id) { return '<li>' + Shell.escHtml(id) + '</li>'; }).join('') || '<li>None — posture holds.</li>';
-    var nm = document.getElementById('nextMissions');
-    if (nm) nm.innerHTML = (synthesis.nextMissions || []).map(function (m) { return '<li>' + Shell.escHtml(m) + '</li>'; }).join('');
-    Shell.showState(root, 'data');
-    var okEl = root.querySelector('[data-ok]');
-    if (okEl) okEl.textContent = (synthesis.unresolved || []).length + ' unresolved · ' + (synthesis.nextMissions || []).length + ' follow-up mission(s).';
+    var verdicts = verdictLines.map(function (v) {
+      var out = { verdict: v.verdict };
+      if (v.rationale) out.rationale = v.rationale;
+      return out;
+    });
+    var body = { findings: findings, detections: detections, verdicts: verdicts };
+    if (keyedCount) {
+      body.verdictsByFinding = {};
+      verdictLines.forEach(function (v) {
+        body.verdictsByFinding[v.findingId] = v.rationale ? { verdict: v.verdict, rationale: v.rationale } : { verdict: v.verdict };
+      });
+    }
+    var synthesis = await Shell.apiPost('/api/teams/purple/synthesize', body);
+    paintSynthesis(synthesis);
     Shell.toast('Synthesis recorded', 'success');
   } catch (e) {
     var errEl = root.querySelector('[data-err]');
@@ -428,18 +482,48 @@ async function runPurple() {
   document.getElementById('editorReset').addEventListener('click', resetEditor);
   document.getElementById('editorClose').addEventListener('click', function () { document.getElementById('editorCard').hidden = true; });
   document.getElementById('purpleRun').addEventListener('click', runPurple);
+  document.getElementById('purpleLatest').addEventListener('click', loadLatestSynthesis);
+  loadLatestSynthesis();
   document.getElementById('purpleLoad').addEventListener('click', async function () {
+    var notes = [];
     try {
       var d = await Shell.apiGet('/api/findings');
       var arr = Array.isArray(d) ? d : (d.findings || []);
       document.getElementById('purpleFindings').value = arr.map(function (f) { return (f.id || '') + ' | ' + (f.title || '') + ' | ' + (f.severity || ''); }).join('\n');
-      Shell.toast('Loaded ' + arr.length + ' finding(s) from the ledger', 'success');
+      notes.push(arr.length + ' finding(s)');
     } catch (e) {
-      Shell.toast('Ledger load failed: ' + (e.message || e), 'error');
+      Shell.toast('Findings load failed: ' + (e.message || e), 'error');
     }
+    try {
+      var gaps = await Shell.apiGet('/api/teams/blue/gaps');
+      var rows = Array.isArray(gaps.gaps) ? gaps.gaps : [];
+      document.getElementById('purpleDetections').value = rows.map(function (g) { return (g.findingId || '') + ' | ' + (g.coverage || 'none'); }).join('\n');
+      notes.push(rows.length + ' detection(s)');
+    } catch (e) {
+      Shell.toast('Coverage load failed: ' + (e.message || e), 'error');
+    }
+    try {
+      var roe = await Shell.apiGet('/api/teams/white/roe');
+      var verdicts = Array.isArray(roe.verdicts) ? roe.verdicts : [];
+      document.getElementById('purpleVerdicts').value = verdicts.map(function (v) {
+        if (!v.verdict) return '';
+        return v.rationale ? v.verdict + ' | ' + v.rationale : v.verdict;
+      }).filter(Boolean).join('\n');
+      notes.push(verdicts.length + ' verdict(s)');
+    } catch (e) {
+      Shell.toast('ROE load failed: ' + (e.message || e), 'error');
+    }
+    if (notes.length) Shell.toast('Loaded ' + notes.join(', '), 'success');
   });
-  document.querySelectorAll('#rosterState [data-retry], #grantsState [data-retry], #purpleState [data-retry]').forEach(function (b) {
+  document.querySelectorAll('#rosterState [data-retry], #grantsState [data-retry]').forEach(function (b) {
     b.addEventListener('click', function () { loadRoster(); loadGrants(); });
+  });
+  document.querySelectorAll('#purpleState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var state = b.closest('[data-state]');
+      if (state && state.getAttribute('data-state') === 'error') loadLatestSynthesis();
+      else document.getElementById('purpleLoad').click();
+    });
   });
   Shell.params.onRestore(function () {
     var nq = Shell.params.get();

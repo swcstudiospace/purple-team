@@ -1,4 +1,4 @@
-# T3MP3ST API Reference
+# Purple Team API Reference
 
 The API server is implemented in `src/server.ts`.
 
@@ -259,7 +259,8 @@ loopback trust as every other route (see Security Model above).
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/teams/tool-grants` | Per-team arsenal grant table (`{ grants: { black, blue, white } }`) |
-| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger |
+| `GET` | `/api/teams/purple/synthesize` | Latest stored synthesis (`{ synthesis, createdAt }`; none stored → `{ synthesis: null }`). Does not write a receipt |
+| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger and write an observed `purple.synthesize` receipt (`evidenceId`) |
 | `GET` | `/api/teams/blue/gaps` | Read-only v2 D3FEND coverage report over the findings ledger (`{ gaps }`, per-gap `unresolvedCountermeasures` surfaced) |
 | `GET` | `/api/teams/blue/hardening` | Read-only severity-tiered hardening plan over the findings ledger (`{ items }`) |
 | `GET` | `/api/teams/blue/rules` | Read-only Sigma rule pack from ledger coverage gaps (`{ rules, yaml }`, experimental rules) |
@@ -273,6 +274,11 @@ loopback trust as every other route (see Security Model above).
 | `POST` | `/api/teams/blue/coverage` | Artifact-bound coverage stage. Body requires string `runId`, string `missionId`, family, string `artifactBytes`, string array `artifactIds`, array `findings`, and array `telemetry`. Empty artifact ids or empty `artifactBytes` returns `200` with `status: insufficient-evidence` and does not mark a finding covered. A non-string `artifactBytes` or a non-array `findings` or `telemetry` returns `400`. Does not mint a receipt. |
 | `POST` | `/api/teams/black/workflow` | Analysis-only staged review. Body arrays `actions`, `paths`, and `egress`. Empty actions and empty paths return `200` with `outcome: insufficient` and `effects: []`, not a clean bill. Destructive concealment, an unapproved live probe, and live bulk exfil return `outcome: refused` with `effects: []`. Does not mint a receipt. |
 | `POST` | `/api/teams/white/stage` | Stage an ROE audit without storing a receipt. Body `roeText`, `actions`, optional `meta`. An empty allow-list returns `200` with `ok: false` and `reason: roe-scope-empty` (out of scope). `approved: true` without `approvalEvidenceId` is not a receipt and is not compliant. Does not mint a receipt. |
+| `POST` | `/api/teams/blue/gaps`, `/api/teams/blue/rules`, `/api/teams/blue/hardening` | Score optional `findings` (`id`, optional `title`, `severity`, `countermeasures`). Omitted `findings` uses the ledger. Writes an observed receipt. Does not mutate the ledger. `400` on a bad body |
+| `POST` | `/api/teams/black/cover`, `/api/teams/black/noise` | Score optional `actions` and `egress` string arrays. Both omitted uses the latest RED draft. Writes an observed receipt. Does not store the plan. `400` on a bad body |
+| `POST` | `/api/teams/black/exfil` | Cost optional `paths` (`id`, optional `channel`, `volumeMb`, `encrypted`) and `egress` strings. Empty paths cost zero. Does not store paths. `400` on a bad body |
+| `POST` | `/api/teams/white/evidence` | Audit optional `entries`. Submitted rows are forced to context-strength notes; caller strength and type are ignored (`dryRun: true`). Omitted `entries` audits the ledger. Does not store the draft |
+| `POST` | `/api/teams/white/report-audit` | Audit optional `findings` against the stored evidence ledger only (`dryRun: true`). Omitted `findings` audits the findings ledger. Does not store the draft |
 
 `POST /api/teams/purple/synthesize` body:
 

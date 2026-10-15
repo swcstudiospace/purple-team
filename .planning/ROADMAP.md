@@ -1,4 +1,4 @@
-# Roadmap: T3MP3ST — Red Team AI
+# Roadmap: Purple Team — 4-Hat Vulnerability AI
 
 ## Milestones
 
@@ -8,12 +8,18 @@
 - ✅ **v1.3 Color Team Suites at Red Parity** — Phases 15-20 (shipped 2026-10-10)
 - ✅ **v1.4 Hardening & Validation** — Phases 21-25 (shipped 2026-10-13)
 - ✅ **v1.5 Four-Hat Runtime Parity** — Phases 26-29 (archived 2026-10-15, override closeout)
+- ✅ **v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization** — Phases 30-33 (completed 2026-10-15)
 
 Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREMENTS.md`, phase dirs in `v*-phases/`).
 
 ## Current Milestone
 
-None. Bootstrap the next one with `/gsd:new-milestone`.
+✅ **v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization (Phases 30-33)** — Completed 2026-10-15 (`SPE-14018`..`SPE-14024`)
+
+- [x] Phase 30: Four-Hat Architecture Audit & Milestone Alignment (`SPE-14018`, `SPE-14023`) — completed 2026-10-15
+- [x] Phase 31: Unified 4-Hat Tool Registry, Blue/White/Black Tools, Extra Utilities & Composable Skills (`SPE-14019`, `SPE-14022`) — completed 2026-10-15
+- [x] Phase 32: Upgraded 4-Hat UI Shell, WCAG 2.1 AA Hat Theming, Command Palette & Interactive Workspace (`SPE-14020`) — completed 2026-10-15
+- [x] Phase 33: Desktop Multi-Pane & Native Mobile / PWA Ergonomics + Automated Verification (`SPE-14021`, `SPE-14024`) — completed 2026-10-15
 
 <details>
 <summary>✅ v1.5 Four-Hat Runtime Parity (Phases 26-29) — archived 2026-10-15, override closeout</summary>

@@ -48,12 +48,12 @@ export const hatTeam: Record<HatArchetype, 'black' | 'blue' | 'white'> = {
 // (see src/teams/index.ts BLACK_TOOLS / BLUE_TOOLS / WHITE_TOOLS). Subsets only;
 // never invent an id here, and never take one from another team.
 // Black slices stay disjoint from blue/white because the black set itself is.
-const SPECTER_TOOLS = ['host', 'subfinder', 'dnsx', 'waybackurls', 'wafw00f'] as const;
-const WRAITH_TOOLS = ['host', 'amass', 'dnsx', 'curl', 'httpx'] as const;
-const SENTINEL_TOOLS = ['file', 'yara', 'strings', 'semgrep', 'dig', 'whois'] as const;
-const WARDEN_TOOLS = ['file', 'exiftool', 'openssl', 'gitleaks', 'trivy', 'grype', 'osv-scanner', 'checkov'] as const;
-const ARBITER_TOOLS = ['file', 'strings', 'openssl', 'gitleaks', 'dig', 'whois'] as const;
-const AUDITOR_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl'] as const;
+const SPECTER_TOOLS = ['host', 'subfinder', 'dnsx', 'waybackurls', 'wafw00f', 'attack-navigator', 'attack-flow', 'cover-story', 'noise-vocabulary', 'ja3-catalog', 'beacon-cadence', 'stealth-route-pack'] as const;
+const WRAITH_TOOLS = ['host', 'amass', 'dnsx', 'curl', 'httpx', 'caldera', 'dns-tunnel-model', 'egress-ledger', 'channel-cost-table', 'opsec-checklist-pack', 'callback-budget', 'exfil-path-pack'] as const;
+const SENTINEL_TOOLS = ['file', 'yara', 'strings', 'semgrep', 'dig', 'whois', 'sigma', 'd3fend', 'atomic-red-team', 'osquery', 'suricata', 'velociraptor', 'gitleaks', 'trufflehog', 'checksec', 'openssl'] as const;
+const WARDEN_TOOLS = ['file', 'exiftool', 'openssl', 'gitleaks', 'trivy', 'grype', 'osv-scanner', 'checkov', 'syft', 'semgrep', 'checksec', 'slither', 'solhint', 'mobsfscan', 'apkleaks', 'jadx'] as const;
+const ARBITER_TOOLS = ['file', 'strings', 'openssl', 'gitleaks', 'dig', 'whois', 'nist-800-115', 'ptes', 'osstmm', 'owasp-asvs', 'owasp-wstg', 'cis-controls', 'cwe', 'cvss'] as const;
+const AUDITOR_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'radare2', 'objdump', 'readelf', 'jadx', 'ghidra', 'checksec', 'nist-csf', 'mitre-atlas'] as const;
 
 /**
  * Tool grants per hat. Unknown hats throw — grants only exist for the six

@@ -40,7 +40,7 @@ import { LLMBackbone } from './llm/index.js';
 
 function showBanner(): void {
   try {
-    const text = figlet.textSync('T3MP3ST', {
+    const text = figlet.textSync('PURPLE TEAM', {
       font: 'ANSI Shadow',
       horizontalLayout: 'default',
     });
@@ -48,7 +48,7 @@ function showBanner(): void {
   } catch {
     console.log(chalk.cyan(getBanner()));
   }
-  console.log(chalk.gray('  Tactical Execution Multi-agent Platform for Elite Security Testing\n'));
+  console.log(chalk.gray('  Purple Team: a four-hat educational vulnerability AI (Red, Blue, White, Black)\n'));
 }
 
 function showBox(title: string, content: string, borderColor: string = 'cyan'): void {
@@ -197,7 +197,7 @@ ${chalk.gray('OPENROUTER_API_KEY=your-key-here')}`,
 
   // Welcome message
   showBox(
-    'Welcome to T3MP3ST',
+    'Welcome to Purple Team',
     `Configured providers: ${providers.map(p => chalk.cyan(p)).join(', ')}
 Default: ${chalk.cyan(config.get('defaultProvider'))} / ${chalk.cyan(config.get('defaultModel'))}`,
     'cyan'
@@ -606,7 +606,7 @@ const program = new Command();
 
 program
   .name('t3mp3st')
-  .description('T3MP3ST - Tactical Execution Multi-agent Platform for Elite Security Testing')
+  .description('Purple Team: a four-hat educational vulnerability AI (Red, Blue, White, Black)')
   .version('1.0.0');
 
 program

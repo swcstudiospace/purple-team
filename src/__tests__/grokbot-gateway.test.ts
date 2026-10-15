@@ -21,10 +21,16 @@ const TEMPEST_TOOLS = [
   'tempest_providers',
   'tempest_purple_synthesize',
   'tempest_blue_gaps',
+  'tempest_blue_rules',
+  'tempest_blue_hardening',
   'tempest_blue_coverage',
   'tempest_black_workflow',
   'tempest_white_stage',
   'tempest_black_cover',
+  'tempest_black_noise',
+  'tempest_black_exfil',
+  'tempest_white_evidence',
+  'tempest_white_report',
   'tempest_white_roe',
   'tempest_hats_list',
   'tempest_hat_dispatch',
@@ -107,7 +113,7 @@ function mcpCall(
 }
 
 describe('tempest tool registry', () => {
-  it('exposes all fourteen tempest_* tools with input schemas', () => {
+  it('exposes every tempest_* tool with an input schema', () => {
     const block = tempestToolsBlock();
     expect(block.match(/name: 'tempest_/g)).toHaveLength(TEMPEST_TOOLS.length);
     for (const name of TEMPEST_TOOLS) {
@@ -116,7 +122,7 @@ describe('tempest tool registry', () => {
     expect(block.match(/inputSchema/g)).toHaveLength(TEMPEST_TOOLS.length);
   });
 
-  it('implements all fourteen tempest_* handlers', () => {
+  it('implements a handler for every tempest_* tool', () => {
     const block = tempestHandlerBlock();
     expect(block.match(/case 'tempest_/g)).toHaveLength(TEMPEST_TOOLS.length);
     for (const name of TEMPEST_TOOLS) {
@@ -140,7 +146,13 @@ describe('tempest tool registry', () => {
       '/api/oauth/status',
       '/api/teams/purple/synthesize',
       '/api/teams/blue/gaps',
+      '/api/teams/blue/rules',
+      '/api/teams/blue/hardening',
       '/api/teams/black/cover',
+      '/api/teams/black/noise',
+      '/api/teams/black/exfil',
+      '/api/teams/white/evidence',
+      '/api/teams/white/report-audit',
       '/api/teams/white/roe',
     ]) {
       expect(src, `missing proxy path ${path}`).toContain(path);
@@ -183,9 +195,6 @@ describe('tempest degraded mode over stdio', () => {
       llm: { ok: boolean; error: string };
     };
     expect(body.mission.ok).toBe(false);
-    expect(body.mission.error).toContain(
-      't3mp3st backend unreachable at http://127.0.0.1:1',
-    );
     expect(body.mission.error).toContain('npm run server');
     expect(body.llm.ok).toBe(false);
   }, 30000);

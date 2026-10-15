@@ -548,8 +548,8 @@ async function runSetup(): Promise<void> {
   showBanner();
 
   showBox(
-    'Welcome to T3MP3ST Setup',
-    `This wizard will help you configure T3MP3ST for first use.
+    'Welcome to Purple Team Setup',
+    `This wizard will help you configure Purple Team for first use.
 
 You can use a local model with no API key, or add a key from one of these providers:
 • ${chalk.cyan('Local')} - Ollama / LM Studio / vLLM via TEMPEST_LOCAL_BASE_URL
@@ -626,14 +626,14 @@ The setup will guide you through:
   console.log('');
   showBox(
     'Setup Complete!',
-    `T3MP3ST is now configured and ready to use.
+    `Purple Team is now configured and ready to use.
 
 Quick start:
 ${chalk.cyan('npx t3mp3st')}        Start the interactive CLI
 ${chalk.cyan('npx t3mp3st --help')} View all commands
 
 Or use in your code:
-${chalk.gray(`import { createTempest } from 't3mp3st';
+${chalk.gray(`import { createTempest } from 'purple-team';
 const tempest = createTempest({ name: 'My Operation' });`)}`,
     'green'
   );

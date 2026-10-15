@@ -1,4 +1,4 @@
-# T3MP3ST Integrity Ledger
+# Purple Team Integrity Ledger
 
 A transparent log of every contamination found, retracted, or methodology-corrected. The point of this file is that *we audit ourselves before anyone else does* — every claimed solve we publish has been gated through this ledger.
 
@@ -413,7 +413,7 @@ Findings (web search + arxiv fetch, 2026-05-30):
 
 **Corrected comparison basis going forward:**
 - Published Cybench SOTA (paper, unguided): **17.5%** (Claude 3.5 Sonnet).
-- T3MP3ST (Opus 4.8, hint-free, live-exploit-verified): **18/31 addressable
+- Purple Team (Opus 4.8, hint-free, live-exploit-verified): **18/31 addressable
   = 58.1%**, **11/18 service-required**, **7/13 standalone**.
 - HONEST CAVEAT: our 58.1% is over the **31 addressable** tasks (we don't yet
   run the 9 LosFuzzys submodule tasks). A like-for-like full-40 number is
@@ -443,7 +443,7 @@ paper** number. Modern published numbers are dramatically higher:
 retry). These are NOT comparable — pass@10 is structurally much higher.
 
 **Corrected, defensible position:**
-- T3MP3ST is **NOT the Cybench raw-score record.** Anthropic publishes higher.
+- Purple Team is **NOT the Cybench raw-score record.** Anthropic publishes higher.
 - Our result (Opus 4.8, 23/40 = 58% hint-free, jailed pass@1) is notable for
   *measurement integrity*, not peak score:
   - hint-free prompt (no recipes/CVE-tables/few-shot)

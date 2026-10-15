@@ -4,9 +4,9 @@
   "cases": 10,
   "score": {
     "coverage": {
-      "hits": 24,
+      "hits": 12,
       "total": 24,
-      "rate": 1
+      "rate": 0.5
     },
     "discrimination": {
       "decoyFindings": 2,
@@ -15,26 +15,53 @@
     "penalty": {
       "perDecoy": 5,
       "applied": 0,
-      "penalizedHits": 24
+      "penalizedHits": 12
     },
     "perCase": [
       {
         "id": "case-lateral-movement-endpoint",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-BEACON-C2-IMPLANT",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "case-identity-attack-spray",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-OAUTH-CONSENT-PHISH",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "case-web-exploitation",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-SQLI-UNION-INJECT",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          },
+          {
+            "findingId": "RT-XSS-STORED",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "case-greenfield-no-telemetry",
@@ -45,26 +72,78 @@
       {
         "id": "case-deception-grid",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-CANARY-CRED-USE",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "case-legacy-direct-finding-coverage",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-CRON-JOB-PERSISTENCE",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          },
+          {
+            "findingId": "RT-LEGACY-AGENT-CHECK",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "case-full-stack-detection",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-WEB-SHELL-DROP",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          },
+          {
+            "findingId": "RT-DGA-BEACON-LOOKUPS",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          },
+          {
+            "findingId": "RT-BYOV-DRIFT-UNKNOWN-CM",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "case-email-phishing",
         "decoy": false,
-        "ok": true,
-        "misses": []
+        "ok": false,
+        "misses": [
+          {
+            "findingId": "RT-SPEARPHISH-ATTACHMENT",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          },
+          {
+            "findingId": "RT-PHISHING-KIT-INFRA",
+            "reasons": [
+              "coverage 'partial' != expected 'covered'"
+            ]
+          }
+        ]
       },
       {
         "id": "decoy-invented-ids",

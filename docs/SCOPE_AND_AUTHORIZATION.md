@@ -1,6 +1,6 @@
 # Scope And Authorization Model
 
-T3MP3ST is built for authorized security research, owned assets, labs, bug bounty scopes, internal red-team work, and evidence-backed defensive reporting.
+Purple Team is built for authorized security research, owned assets, labs, bug bounty scopes, internal red-team work, and evidence-backed defensive reporting.
 
 The core rule is simple: a mission can be imaginative, aggressive, and adversarial, but the system must preserve scope, evidence, and operator accountability.
 

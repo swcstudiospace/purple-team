@@ -61,7 +61,7 @@ budget with the `within` standing, and the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this
+> Purple Team backend unreachable — start it with npm run server; this
 > simulation is parked under its mission id and resumes when the backend
 > answers.
 

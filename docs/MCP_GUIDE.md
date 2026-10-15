@@ -1,6 +1,6 @@
 # MCP Guide
 
-T3MP3ST includes a Model Context Protocol stdio server in `src/mcp-server.ts`.
+Purple Team includes a Model Context Protocol stdio server in `src/mcp-server.ts`.
 
 ## Start The Server
 
@@ -64,9 +64,9 @@ Only use this tool against systems inside your authorized scope.
 
 The response is JSON text containing DNS records, nmap output, command summaries, and suggested next steps.
 
-## Tempest Bot Proxy Tools (`tempest_*`)
+## Purple Team Bot Proxy Tools (`tempest_*`)
 
-Twelve tools proxy the local t3mp3st HTTP API over `T3MP3ST_URL` (default
+Twelve tools proxy the local Purple Team HTTP API over `T3MP3ST_URL` (default
 `http://127.0.0.1:3333`). Reads use GET, state changes use POST; no shells,
 no child processes. Every failure degrades to `{ ok: false, error }` instead
 of throwing — an unreachable backend answers with a "start it with
@@ -82,10 +82,16 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_operator_task` | `POST /api/operators/:id/task` (`operatorId`, `taskName`, `taskDescription`) |
 | `tempest_findings` | `GET /api/findings` (optional `missionId` filter) |
 | `tempest_providers` | `GET /api/llm/status` + `GET /api/oauth/status` |
-| `tempest_purple_synthesize` | `POST /api/teams/purple/synthesize` (`findings`, `detections`) |
-| `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (detection-coverage gaps over the whole findings ledger) |
-| `tempest_black_cover` | `GET /api/teams/black/cover` (phase-grouped opsec review of the active red plan) |
-| `tempest_white_roe` | `GET /api/teams/white/roe` (on-record ROE parse plus provenance-stamped verdicts when ROE text is on record: `ok`, `resolved`, `unresolved`, `verdicts` with `roeRevision`/`roeTextHash`/`roeLines`; recording happens via the operator `PUT /api/teams/white/roe` — no MCP mutation tool) |
+| `tempest_purple_synthesize` | `GET /api/teams/purple/synthesize` when no inputs are supplied; otherwise `POST` with `findings`, `detections`, `verdicts`, and optional `verdictsByFinding` |
+| `tempest_blue_gaps` | `GET /api/teams/blue/gaps`, or `POST` when `findings` is supplied (not stored) |
+| `tempest_blue_rules` | `GET /api/teams/blue/rules`, or `POST` when `findings` is supplied (not stored) |
+| `tempest_blue_hardening` | `GET /api/teams/blue/hardening`, or `POST` when `findings` is supplied (not stored) |
+| `tempest_black_cover` | `GET /api/teams/black/cover`, or `POST` when `actions` or `egress` is supplied (not stored) |
+| `tempest_black_noise` | `GET /api/teams/black/noise`, or `POST` when `actions` or `egress` is supplied (not stored) |
+| `tempest_black_exfil` | `GET /api/teams/black/exfil`, or `POST` when `paths` or `egress` is supplied (not stored) |
+| `tempest_white_evidence` | `GET /api/teams/white/evidence`, or `POST` when `entries` is supplied (context-strength dry run, not stored) |
+| `tempest_white_report` | `GET /api/teams/white/report-audit`, or `POST` when `findings` is supplied (checked against stored evidence, not stored) |
+| `tempest_white_roe` | `GET /api/teams/white/roe`, or `PUT` when both `text` and `actions` are supplied. A successful parse writes an observed receipt; a failed parse stores the text and does not |
 | `tempest_blue_coverage` | `POST /api/teams/blue/coverage`. Missing artifact bytes fail closed as insufficient-evidence. Not a mission-start step. |
 | `tempest_black_workflow` | `POST /api/teams/black/workflow`. An empty plan is insufficient, not a clean bill. Not a mission-start step. |
 | `tempest_white_stage` | `POST /api/teams/white/stage`. An empty allow-list is out of scope (`roe-scope-empty`). An approved flag alone is not a receipt. Not a mission-start step. |

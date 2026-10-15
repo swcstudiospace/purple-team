@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "T3MP3ST",
+  "productName": "Purple Team",
   "version": "1.0.0",
   "identifier": "com.t3mp3st.app",
   "build": {
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "T3MP3ST",
+        "title": "Purple Team",
         "width": 1280,
         "height": 800,
         "minWidth": 360,
@@ -30,7 +30,7 @@
     "targets": ["deb", "appimage", "msi", "nsis", "app", "dmg"],
     "icon": ["icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"],
     "category": "Utility",
-    "longDescription": "T3MP3ST — single-operator localhost red-team console. Desktop shell over the loopback API server.",
+    "longDescription": "Purple Team — single-operator localhost console. Desktop shell over the loopback API server.",
     "externalBin": ["binaries/t3mp3st-server"],
     "resources": {
       "../docs/": "docs/"

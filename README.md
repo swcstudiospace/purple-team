@@ -1,17 +1,14 @@
-# 🌩️ T3MP3ST 🌩️
+# 🌩️ Purple Team 🌩️
 
 <!-- ⊰ sharp eye on the raw source. there's a flag for the curious: T3MP3ST{r3c31pt5_n0t_v1b3z} — the one that counts, you earn: run `npm run verify-claims`. LOVE PLINY ⊱ -->
 
 ```
- ▄▄▄█████▓▓█████  ███▄ ▄███▓ ██▓███  ▓█████   ██████ ▄▄▄█████▓
- ▓  ██▒ ▓▒▓█   ▀ ▓██▒▀█▀ ██▒▓██░  ██▒▓█   ▀ ▒██    ▒ ▓  ██▒ ▓▒
- ▒ ▓██░ ▒░▒███   ▓██    ▓██░▓██░ ██▓▒▒███   ░ ▓██▄   ▒ ▓██░ ▒░
- ░ ▓██▓ ░ ▒▓█  ▄ ▒██    ▒██ ▒██▄█▓▒ ▒▒▓█  ▄   ▒   ██▒░ ▓██▓ ░
-   ▒██▒ ░ ░▒████▒▒██▒   ░██▒▒██▒ ░  ░░▒████▒▒██████▒▒  ▒██▒ ░
-   ▒ ░░   ░░ ▒░ ░░ ▒░   ░  ░▒▓▒░ ░  ░░░ ▒░ ░▒ ▒▓▒ ▒ ░  ▒ ░░
-     ░     ░ ░  ░░  ░      ░░▒ ░      ░ ░  ░░ ░▒  ░ ░    ░
-   ░         ░   ░      ░   ░░          ░   ░  ░  ░    ░
-             ░  ░       ░               ░  ░      ░
+██████╗ ██╗   ██╗██████╗ ██████╗ ██╗     ███████╗    ████████╗███████╗ █████╗ ███╗   ███╗
+██╔══██╗██║   ██║██╔══██╗██╔══██╗██║     ██╔════╝    ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║
+██████╔╝██║   ██║██████╔╝██████╔╝██║     █████╗         ██║   █████╗  ███████║██╔████╔██║
+██╔═══╝ ██║   ██║██╔══██╗██╔═══╝ ██║     ██╔══╝         ██║   ██╔══╝  ██╔══██║██║╚██╔╝██║
+██║     ╚██████╔╝██║  ██║██║     ███████╗███████╗       ██║   ███████╗██║  ██║██║ ╚═╝ ██║
+╚═╝      ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚══════╝╚══════╝       ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝
 ```
 
 <div align="center">
@@ -22,9 +19,9 @@
 
 </div>
 
-**Your AI coding agent is already a hacker — T3MP3ST hands it an arsenal.**
+**Your AI coding agent is already a hacker — Purple Team hands it an arsenal.**
 
-Point it at an authorized target and the kill chain runs itself: **recon → exploit → report**, from a browser War Room or the CLI, driven by the agent you're *already* signed into — Claude Code, Codex, Hermes, OpenCode, Oh My Pi — or a model you run **fully offline** (Ollama, LM Studio, vLLM). No new API keys, no cloud tenant, no second bill. Your agent is the brain; T3MP3ST is the war machine bolted around it. **Self-hosted storm. Keyless warfare.** ⚡
+Point it at an authorized target and the kill chain runs itself: **recon → exploit → report**, from a browser War Room or the CLI, driven by the agent you're *already* signed into — Claude Code, Codex, Hermes, OpenCode, Oh My Pi — or a model you run **fully offline** (Ollama, LM Studio, vLLM). No new API keys, no cloud tenant, no second bill. Your agent is the brain; Purple Team is the war machine bolted around it. **Self-hosted storm. Keyless warfare.** ⚡
 
 And it won't ask you to take its word for it. On **XBOW's own 104-challenge suite it scores 90.1% pass@1** — above XBOW's self-reported 85% — alongside hint-free CTF solves and a **cold hunt on real, post-cutoff CVEs the model had never seen**. Every number in this README recomputes from committed data with one command (`npm run verify-claims`). Loud about the mission, honest about the build — the [status table](#what-ships-today) says exactly what's live, what's scaffolding, and what's still roadmap; full receipts in [Benchmarks](#benchmarks).
 
@@ -38,13 +35,13 @@ Three things set it apart:
 
 ## ⚠️ Authorized use only
 
-T3MP3ST is an **offensive** security tool, built for **authorized** testing, research, and education. Point it **only** at systems you own or have **explicit, written permission** to test. Unauthorized access to computers, networks, or data is illegal in most jurisdictions — **you alone are responsible** for how you use this software and for staying inside the law and your rules of engagement. Bring the storm to *your* targets, not someone else's.
+Purple Team is an **offensive** security tool, built for **authorized** testing, research, and education. Point it **only** at systems you own or have **explicit, written permission** to test. Unauthorized access to computers, networks, or data is illegal in most jurisdictions — **you alone are responsible** for how you use this software and for staying inside the law and your rules of engagement. Bring the storm to *your* targets, not someone else's.
 
-T3MP3ST is provided **as-is under the MIT license, with no warranty and no liability** for any damage, loss, or misuse. The authors do not endorse, support, or condone unauthorized activity. Get permission. Stay in scope. Don't be a menace. 🫡
+Purple Team is provided **as-is under the MIT license, with no warranty and no liability** for any damage, loss, or misuse. The authors do not endorse, support, or condone unauthorized activity. Get permission. Stay in scope. Don't be a menace. 🫡
 
 ## Why it exists
 
-Offensive security sits behind years of practice and expensive tooling. The bet behind T3MP3ST is that a coordinated agent swarm puts real bug-hunting in reach of people who never got the invite, across web apps, CTFs, smart contracts, source code, and embedded/robotics OSS. That is an ambitious bet, and the sections below are careful to separate what already works from what is still a bet.
+Offensive security sits behind years of practice and expensive tooling. The bet behind Purple Team is that a coordinated agent swarm puts real bug-hunting in reach of people who never got the invite, across web apps, CTFs, smart contracts, source code, and embedded/robotics OSS. That is an ambitious bet, and the sections below are careful to separate what already works from what is still a bet.
 
 ## What it hunts
 
@@ -83,7 +80,7 @@ model id, prompts/context, generated output, and request metadata to Novita;
 your API key authenticates those requests. Review Novita's current
 [privacy policy](https://novita.ai/legal/privacy-policy) and
 [terms](https://novita.ai/legal/terms-of-service) before using sensitive target
-data. T3MP3ST does not claim independent assurance for sensitive workloads.
+data. Purple Team does not claim independent assurance for sensitive workloads.
 
 Slow local agents can be given more room with `T3MP3ST_LOCAL_AGENT_TIMEOUT_MS`
 for each CLI call, `T3MP3ST_TASK_TIMEOUT_MS` for mission tasks, and
@@ -118,7 +115,7 @@ Step-by-step operator usage lives in [Getting Started](docs/GETTING_STARTED.md).
 
 ### Docker
 
-Run T3MP3ST API server in a container (localhost only, not exposed externally):
+Run Purple Team API server in a container (localhost only, not exposed externally):
 
 ```bash
 cp .env.example .env       # configure API keys
@@ -206,7 +203,7 @@ The framework is an 8-operator kill chain, and this table won't blow smoke about
 | Re-derivable measurement (`verify-claims`) | ✅ Stable | every headline recomputes from committed artifacts |
 | Recon engine | ✅ Stable | drives nmap / DNS / HTTP / fingerprinting; every finding traces to real tool output |
 | Mission engine + War Room + Op Admiral | ✅ Stable | keyless through a connected local agent |
-| Arsenal, MCP server, HTTP API | ✅ Stable | 36 built-in tools by default; 120 with the opt-in `T3MP3ST_FULL_ARSENAL` (+84 adapters, with dangerous/catalog-only drivers — metasploit, hydra, pacu, frida — behind narrow approved paths rather than generic execution) — both counts re-derive via `verify-claims`. `security_recon` over MCP |
+| Arsenal, MCP server, HTTP API | ✅ Stable | 36 built-in tools by default; 139 with the opt-in `T3MP3ST_FULL_ARSENAL` (+103 adapters, with dangerous/catalog-only drivers — metasploit, hydra, pacu, frida — behind narrow approved paths rather than generic execution) — both counts re-derive via `verify-claims`. `security_recon` over MCP |
 | Egress-scope containment | ✅ Stable (on by default) | once a mission target is set, built-in networked tools refuse off-scope public hosts — not the target/subdomains, not loopback/private (`SCOPE DENIED`) — a tightened default, not a bare tool runner |
 | Coordinated-disclosure pipeline | ✅ Stable | OSV novelty + live PoC + refuter panel + CVSS; drafts only, a human sends |
 | White-box source analysis | ⚠️ Experimental | Multi-language ingest via web-tree-sitter (Python/JS/TS/Go/Java/C/C++); Python retains its regex parser, while other languages fail open to no extracted blocks; multi-model decomposition costs more tokens, not fewer |
@@ -285,7 +282,7 @@ Deeper reading: [WALL_FORENSICS](docs/WALL_FORENSICS.md) (per-challenge misses),
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        T3MP3ST COMMAND                          │
+│                        PURPLE TEAM COMMAND                      │
 ├─────────────────────────────────────────────────────────────────┤
 │   MISSION CONTROL  ◄──  TARGET MODEL  ──►  ARSENAL (TOOLS)       │
 │                          ▲                                       │

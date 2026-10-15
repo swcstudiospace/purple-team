@@ -131,9 +131,9 @@ export const RED_WORKFLOW_INVENTORY: readonly RedWorkflowInventoryRow[] = [
 // =============================================================================
 
 /** Single inline artifact element: text/plain, utf8, one element, 64 KiB cap. */
-export const INLINE_ARTIFACT_MEDIA_TYPE: 'text/plain' = 'text/plain';
-export const INLINE_ARTIFACT_ENCODING: 'utf8' = 'utf8';
-export const INLINE_ARTIFACT_MAX_ITEMS: 1 = 1;
+export const INLINE_ARTIFACT_MEDIA_TYPE = 'text/plain' as const;
+export const INLINE_ARTIFACT_ENCODING = 'utf8' as const;
+export const INLINE_ARTIFACT_MAX_ITEMS = 1 as const;
 export const INLINE_ARTIFACT_MAX_BYTES: number = 64 * 1024;
 
 export interface InlineArtifactInput {

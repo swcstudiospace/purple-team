@@ -4,7 +4,7 @@ description: >-
   Use when the operator starts, parks, resumes, pauses, or stops a mission:
   owns mission ids and the parked/resumable lifecycle.
 ---
-# Tempest mission
+# Purple Team mission
 
 Missions are the per-user session: the mission id is carried in skill text,
 so no separate session store exists. Every reply that names a mission quotes

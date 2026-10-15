@@ -4,7 +4,7 @@ description: >-
   Use when the operator types /tempest-report: exports the engagement report
   for a mission id.
 ---
-# Tempest report
+# Purple Team report
 
 ## /tempest-report — export
 

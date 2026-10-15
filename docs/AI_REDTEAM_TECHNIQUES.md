@@ -1,6 +1,6 @@
 # AI Red-Team Technique Arsenal — L1B3RT4S + P4RS3LT0NGV3
 
-> The operational jailbreak / prompt-injection technique reference the `t3mp3st` `ai_red_team`
+> The operational jailbreak / prompt-injection technique reference the Purple Team `ai_red_team`
 > specialist fights with (drives `garak` + `promptfoo`). Distilled from Pliny the Prompter's
 > public corpus — **L1B3RT4S** (39 vendor files + the technique primitives) and **P4RS3LT0NGV3**
 > (the 79-transform encoder/stego/fuzzer). This is offensive capability, written to *land*, not
@@ -337,7 +337,7 @@ image pipelines.
 **Operationalization.** *garak:* an agent-probe feeding the reconstructed DSL/objective slot or an
 OCR'd image; check whether the agent emits attacker-directed commands or auto-executes. *promptfoo:*
 model each surface/tool as a provider, run the same suite, assert **non-parity is a finding**; stand
-up a fixture RAG page with the injection and confirm the agent adopts it. Wire into the t3mp3st agent
+up a fixture RAG page with the injection and confirm the agent adopts it. Wire into the Purple Team agent
 loop that mediates tool grants.
 
 **Evade.** Bypasses the chat moderator entirely by entering through a surface it doesn't gate; this is
@@ -496,7 +496,7 @@ on the raw byte stream before the model sees it. Kept separate because their *in
 
 ---
 
-## 4. How the `t3mp3st` `ai_red_team` specialist wields this
+## 4. How the Purple Team `ai_red_team` specialist wields this
 
 The `ai_red_team` family (`src/arsenal/catalog.ts`) drives **garak** (`garak --model_type rest
 --model_name scoped-model`) and **promptfoo** (`promptfoo eval`), with this runtime playbook loaded
@@ -516,7 +516,7 @@ from `src/resources/ai-redteam-playbook.ts` (served at `GET /api/ai-redteam/play
   **ablate each layer** for a per-target sensitivity profile, and feed surviving fuzz variants back as
   seeds. Parseltongue's Mutation Lab is the deterministic fuzzer.
 - **Agent loop:** for tool/RAG targets, script end-to-end fetch→ingest→act scenarios (the canonical
-  indirect-injection test, §2.13), wired into the t3mp3st tool-grant loop.
+  indirect-injection test, §2.13), wired into the Purple Team tool-grant loop.
 
 Every run executes within `docs/SCOPE_AND_AUTHORIZATION.md`.
 

@@ -4,7 +4,7 @@ description: >-
   Use when the operator types /tempest-agents or tasks a seat: lists operators
   and dispatches work to one operator id.
 ---
-# Tempest operators
+# Purple Team operators
 
 ## /tempest-agents — list
 

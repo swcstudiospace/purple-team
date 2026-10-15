@@ -1,33 +1,33 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v1.5 — Four-Hat Runtime Parity",
+  "milestone": "v1.6 — Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization",
   "phases": [
     {
-      "number": "26",
-      "name": "Runtime Authority, Bound Inputs and Retained Execution",
+      "number": "30",
+      "name": "Four-Hat Architecture Audit & Milestone Alignment",
       "status": "complete"
     },
     {
-      "number": "27",
-      "name": "Blue, Black and White Substantive Capability Parity",
+      "number": "31",
+      "name": "Unified 4-Hat Tool Registry, Blue/White/Black Tools, Extra Utilities & Composable Skills",
       "status": "complete"
     },
     {
-      "number": "28",
-      "name": "Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis",
+      "number": "32",
+      "name": "Upgraded 4-Hat UI Shell, WCAG 2.1 AA Hat Theming, Command Palette & Interactive Workspace",
       "status": "complete"
     },
     {
-      "number": "29",
-      "name": "Integrated Acceptance and Governed Closure",
-      "status": "pending"
+      "number": "33",
+      "name": "Desktop Multi-Pane & Native Mobile / PWA Ergonomics + Automated Verification",
+      "status": "complete"
     }
   ],
   "next": {
-    "command": "/gsd:progress --next",
-    "label": "Advance to the next step (plan phase 29)",
-    "reason": "Phase 29 of 4 — needs a plan"
+    "command": "/gsd:progress",
+    "label": "Show progress",
+    "reason": "Milestone v1.6 complete"
   },
-  "updated_at": "2026-10-15T17:55:10.520Z"
+  "updated_at": "2026-10-15T21:40:00.000Z"
 }

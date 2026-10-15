@@ -74,6 +74,13 @@ import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
 import { roeAudit, type AuditedAction, type RoeVerdict } from './teams/white.js';
 import { stageRoeAudit } from './teams/white/workflow.js';
+import {
+  listRegisteredHatTools,
+  executeRegisteredHatTool,
+  listComposableSkills,
+  runComposableSkill,
+} from './teams/skills.js';
+import { type ToolHatScope, type HatDomain } from './teams/guardrails.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -6850,6 +6857,53 @@ app.post('/api/teams/white/stage', (req: Request, res: Response): void => {
   res.json(redactSecrets(stageRoeAudit(body.roeText, body.actions, body.meta)));
 });
 
+// GET /api/teams/tools — catalog of registered 4-Hat and shared utility tools
+app.get('/api/teams/tools', (req: Request, res: Response): void => {
+  const hatParam = typeof req.query.hat === 'string' ? req.query.hat.trim() : '';
+  const validHat: ToolHatScope | undefined =
+    hatParam === 'red' || hatParam === 'blue' || hatParam === 'black' || hatParam === 'white' || hatParam === 'shared'
+      ? hatParam
+      : undefined;
+  res.json(redactSecrets({ tools: listRegisteredHatTools(validHat) }));
+});
+
+// POST /api/teams/tools/run — execute a registered 4-Hat or shared utility tool inside runGuardedTool
+app.post('/api/teams/tools/run', async (req: Request, res: Response): Promise<void> => {
+  const body = (req.body ?? {}) as { toolId?: unknown; input?: unknown };
+  const toolId = typeof body.toolId === 'string' ? body.toolId.trim() : '';
+  if (!toolId) {
+    res.status(400).json({ error: 'toolId is required' });
+    return;
+  }
+  const envelope = await executeRegisteredHatTool(toolId, body.input ?? {});
+  res.status(envelope.error?.code === 'PAYLOAD_CAP_EXCEEDED' ? 413 : 200).json(redactSecrets(envelope));
+});
+
+// GET /api/teams/skills — catalog of composable multi-Hat skills
+app.get('/api/teams/skills', (req: Request, res: Response): void => {
+  const hatParam = typeof req.query.hat === 'string' ? req.query.hat.trim() : '';
+  const validHat: HatDomain | undefined =
+    hatParam === 'red' || hatParam === 'blue' || hatParam === 'black' || hatParam === 'white'
+      ? hatParam
+      : undefined;
+  res.json(redactSecrets({ skills: listComposableSkills(validHat) }));
+});
+
+// POST /api/teams/skills/run — execute a composable multi-Hat skill pipeline
+app.post('/api/teams/skills/run', async (req: Request, res: Response): Promise<void> => {
+  const body = (req.body ?? {}) as { skillId?: unknown; params?: unknown };
+  const skillId = typeof body.skillId === 'string' ? body.skillId.trim() : '';
+  if (!skillId) {
+    res.status(400).json({ error: 'skillId is required' });
+    return;
+  }
+  const params = typeof body.params === 'object' && body.params !== null
+    ? (body.params as Record<string, unknown>)
+    : {};
+  const envelope = await runComposableSkill(skillId, params);
+  res.json(redactSecrets(envelope));
+});
+
 // POST /api/models — live model list for the Universal API Config panel (#90).
 // POST (not GET) so the browser can pass its own localStorage-held key/baseUrl in the body — the
 // standalone UI holds the key, not the server (consistent with the existing per-request mission key,
@@ -8806,7 +8860,7 @@ async function startServer() {
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════════╗');
   console.log('║                  Purple Team API Server v2.0                   ║');
-  console.log('║                 Offensive-Security Operations                 ║');
+  console.log('║       Four-hat educational vulnerability AI                    ║');
   console.log('╚════════════════════════════════════════════════════════════════╝');
   console.log('');
 

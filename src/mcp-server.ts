@@ -87,22 +87,22 @@ async function tempestGet(path: string): Promise<string> {
     const res = await fetch(checked.base + path, { headers: tempestHeaders() });
     return JSON.stringify({ ok: res.ok, status: res.status, data: await tempestReadBody(res) });
   } catch {
-    return JSON.stringify({ ok: false, error: `t3mp3st backend unreachable at ${checked.base} — start it with npm run server` });
+    return JSON.stringify({ ok: false, error: `Purple Team backend unreachable at ${checked.base} — start it with npm run server` });
   }
 }
 
-async function tempestPost(path: string, body: unknown): Promise<string> {
+async function tempestPost(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST'): Promise<string> {
   const checked = tempestBaseOrError();
   if (!checked.base) return JSON.stringify({ ok: false, error: checked.error });
   try {
     const res = await fetch(checked.base + path, {
-      method: 'POST',
+      method,
       headers: tempestHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(body ?? {}),
     });
     return JSON.stringify({ ok: res.ok, status: res.status, data: await tempestReadBody(res) });
   } catch {
-    return JSON.stringify({ ok: false, error: `t3mp3st backend unreachable at ${checked.base} — start it with npm run server` });
+    return JSON.stringify({ ok: false, error: `Purple Team backend unreachable at ${checked.base} — start it with npm run server` });
   }
 }
 
@@ -215,20 +215,49 @@ Requires: Target hostname or IP.`,
   },
   {
     name: 'tempest_purple_synthesize',
-    description: `Purple posture synthesis from red findings + blue detection gaps (POST /api/teams/purple/synthesize). Use when: the operator asks for the combined posture view.`,
+    description: `Purple posture synthesis (GET /api/teams/purple/synthesize when no inputs are supplied, or POST when any of findings, detections, verdicts, or verdictsByFinding is supplied). The GET returns the stored synthesis and does not write a receipt. Use when: the operator asks for the combined posture view or the last recorded one.`,
     inputSchema: {
       type: 'object',
       properties: {
         findings: { type: 'array', description: 'Findings, e.g. [{ "id": "...", "title": "...", "severity": "high" }]' },
-        detections: { type: 'array', description: 'Detection gaps paired with the findings' }
+        detections: { type: 'array', description: 'Detection gaps paired with the findings' },
+        verdicts: { type: 'array', description: 'Positional ROE verdicts, e.g. [{ "verdict": "violation", "rationale": "..." }]' },
+        verdictsByFinding: { type: 'object', description: 'Id-keyed verdicts. When present, the positional verdicts array is ignored' }
       }
     }
   }
   ,
   {
     name: 'tempest_blue_gaps',
-    description: `Blue detection-coverage gaps for the whole findings ledger (GET /api/teams/blue/gaps). Use when: the operator asks which findings lack telemetry coverage or which detectors to build.`,
-    inputSchema: { type: 'object', properties: {} }
+    description: `Blue detection-coverage gaps (GET /api/teams/blue/gaps, or POST when findings are supplied). Supplied findings are scored and not written to the ledger. Use when: the operator asks which findings lack telemetry coverage or which detectors to build.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        findings: { type: 'array', description: 'Optional findings to score. Omit to read the ledger.' },
+        telemetry: { type: 'array', description: 'Optional telemetry sources ({ source, countermeasures?, coveredIds? }). Replaces the installed registry for this score.' }
+      }
+    }
+  },
+  {
+    name: 'tempest_blue_rules',
+    description: `Blue experimental Sigma pack (GET /api/teams/blue/rules, or POST when findings are supplied). Supplied findings are not written to the ledger. Use when: the operator asks for detection rules from uncovered gaps.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        findings: { type: 'array', description: 'Optional findings to score. Omit to read the ledger.' },
+        telemetry: { type: 'array', description: 'Optional telemetry sources ({ source, countermeasures?, coveredIds? }). Replaces the installed registry for this pack.' }
+      }
+    }
+  },
+  {
+    name: 'tempest_blue_hardening',
+    description: `Blue severity-tiered hardening plan (GET /api/teams/blue/hardening, or POST when findings are supplied). Supplied findings are not written to the ledger. Use when: the operator asks for the hardening work items.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        findings: { type: 'array', description: 'Optional findings to score. Omit to read the ledger.' }
+      }
+    }
   },
   {
     name: 'tempest_blue_coverage',
@@ -274,13 +303,39 @@ Requires: Target hostname or IP.`,
   },
   {
     name: 'tempest_black_cover',
-    description: `Black opsec cover review of the active red plan (GET /api/teams/black/cover). Use when: the operator asks which doctrine phases a red plan trips, what each matched action leaves behind, or whether the cover holds.`,
+    description: `Black opsec cover review (GET /api/teams/black/cover). Reads the latest mission draft; supplied lines are not accepted. Use when: the operator asks which doctrine phases a red plan trips, what each matched action leaves behind, or whether the cover holds.`,
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'tempest_black_noise',
+    description: `Black noise budget (GET /api/teams/black/noise). Reads the latest mission draft; supplied lines are not accepted. Use when: the operator asks what noise a plan costs.`,
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'tempest_black_exfil',
+    description: `Black exfil cost (GET /api/teams/black/exfil). Reads the stored exfil report, which currently holds no paths. Use when: the operator asks what a planned egress path costs.`,
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'tempest_white_evidence',
+    description: `White evidence-chain audit (GET /api/teams/white/evidence). Audits the stored evidence ledger; supplied entries are not accepted. Use when: the operator asks whether the evidence chain is intact.`,
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'tempest_white_report',
+    description: `White findings-to-evidence report audit (GET /api/teams/white/report-audit). Audits the stored findings ledger against stored evidence; supplied findings are not accepted. Use when: the operator asks whether a finding is report-ready.`,
     inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'tempest_white_roe',
-    description: `White ROE adjudication state on record (GET /api/teams/white/roe): the parsed spec plus provenance-stamped verdicts (revision, text hash, source lines) when ROE text is on record. Recording happens via the operator PUT /api/teams/white/roe — there is no MCP mutation tool. Use when: the operator asks what the rules of engagement currently allow or deny, which ROE lines failed to parse and why, or the verdict on record for an action.`,
-    inputSchema: { type: 'object', properties: {} }
+    description: `White ROE adjudication (GET /api/teams/white/roe, or PUT when text and actions are both supplied). A successful parse writes an observed receipt. A failed parse stores the text and does not. Use when: the operator asks what the rules currently allow, or records sanctioned ROE text.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'ROE text to store. Required together with actions.' },
+        actions: { type: 'array', description: 'Action objects to adjudicate. Required together with text.' }
+      }
+    }
   },
   {
     name: 'tempest_hats_list',
@@ -472,12 +527,45 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
     }
 
     case 'tempest_purple_synthesize': {
-      const { findings, detections } = args as { findings?: unknown; detections?: unknown };
-      return tempestPost('/api/teams/purple/synthesize', { findings: findings ?? [], detections: detections ?? [] });
+      const { findings, detections, verdicts, verdictsByFinding } = args as {
+        findings?: unknown; detections?: unknown; verdicts?: unknown; verdictsByFinding?: unknown;
+      };
+      if (findings === undefined && detections === undefined && verdicts === undefined && verdictsByFinding === undefined) {
+        return tempestGet('/api/teams/purple/synthesize');
+      }
+      return tempestPost('/api/teams/purple/synthesize', {
+        findings: findings ?? [],
+        detections: detections ?? [],
+        verdicts: verdicts ?? [],
+        ...(verdictsByFinding !== undefined ? { verdictsByFinding } : {}),
+      });
     }
 
     case 'tempest_blue_gaps': {
-      return tempestGet('/api/teams/blue/gaps');
+      const { findings, telemetry } = args as { findings?: unknown; telemetry?: unknown };
+      return findings === undefined && telemetry === undefined
+        ? tempestGet('/api/teams/blue/gaps')
+        : tempestPost('/api/teams/blue/gaps', {
+          ...(findings !== undefined ? { findings } : {}),
+          ...(telemetry !== undefined ? { telemetry } : {}),
+        });
+    }
+
+    case 'tempest_blue_rules': {
+      const { findings, telemetry } = args as { findings?: unknown; telemetry?: unknown };
+      return findings === undefined && telemetry === undefined
+        ? tempestGet('/api/teams/blue/rules')
+        : tempestPost('/api/teams/blue/rules', {
+          ...(findings !== undefined ? { findings } : {}),
+          ...(telemetry !== undefined ? { telemetry } : {}),
+        });
+    }
+
+    case 'tempest_blue_hardening': {
+      const { findings } = args as { findings?: unknown };
+      return findings === undefined
+        ? tempestGet('/api/teams/blue/hardening')
+        : tempestPost('/api/teams/blue/hardening', { findings });
     }
     case 'tempest_blue_coverage':
       return tempestPost('/api/teams/blue/coverage', args);
@@ -489,12 +577,28 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       return tempestPost('/api/teams/white/stage', args);
 
 
-    case 'tempest_black_cover': {
+    case 'tempest_black_cover':
       return tempestGet('/api/teams/black/cover');
-    }
+
+    case 'tempest_black_noise':
+      return tempestGet('/api/teams/black/noise');
+
+    case 'tempest_black_exfil':
+      return tempestGet('/api/teams/black/exfil');
+
+    case 'tempest_white_evidence':
+      return tempestGet('/api/teams/white/evidence');
+
+    case 'tempest_white_report':
+      return tempestGet('/api/teams/white/report-audit');
 
     case 'tempest_white_roe': {
-      return tempestGet('/api/teams/white/roe');
+      const { text, actions } = args as { text?: unknown; actions?: unknown };
+      if (text === undefined && actions === undefined) return tempestGet('/api/teams/white/roe');
+      if (typeof text !== 'string' || !Array.isArray(actions)) {
+        return JSON.stringify({ ok: false, error: 'text and actions are both required to record ROE' });
+      }
+      return tempestPost('/api/teams/white/roe', { text, actions }, 'PUT');
     }
 
     case 'tempest_hats_list': {
@@ -589,7 +693,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[T3MP3ST MCP] server running — security_recon (nmap/DNS recon) + tempest_* (loopback API proxy)');
+  console.error('[purple-team MCP] server running — security_recon (nmap/DNS recon) + tempest_* (loopback API proxy)');
 }
 
 main().catch(console.error);
