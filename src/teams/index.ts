@@ -49,8 +49,8 @@ export const TEAM_ARCHETYPES: readonly ['black', 'blue', 'white'] = ['black', 'b
 // dig/whois are granted ONLY to the inspector teams (blue/white); black does its
 // resolver-pinned DNS work through host/dnsx so black stays disjoint from both.
 const BLACK_TOOLS = ['host', 'subfinder', 'amass', 'dnsx', 'waybackurls', 'wafw00f', 'curl', 'httpx', 'attack-navigator', 'caldera'] as const;
-const BLUE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'checksec', 'openssl', 'gitleaks', 'trufflehog', 'trivy', 'syft', 'grype', 'osv-scanner', 'checkov', 'semgrep', 'dig', 'whois', 'sigma', 'atomic-red-team', 'osquery', 'suricata', 'd3fend'] as const;
-const WHITE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'gitleaks', 'dig', 'whois', 'nist-800-115', 'ptes', 'osstmm'] as const;
+const BLUE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'checksec', 'openssl', 'gitleaks', 'trufflehog', 'trivy', 'syft', 'grype', 'osv-scanner', 'checkov', 'semgrep', 'dig', 'whois', 'sigma', 'osquery', 'suricata', 'd3fend'] as const;
+const WHITE_TOOLS = ['file', 'yara', 'exiftool', 'strings', 'binwalk', 'openssl', 'gitleaks', 'dig', 'whois', 'nist-800-115', 'ptes', 'osstmm', 'checksec', 'semgrep', 'trivy'] as const;
 
 /**
  * Tool grants per team archetype. Unknown archetypes (including 'purple', which is
@@ -74,7 +74,7 @@ export function teamToolGrants(archetype: OperatorArchetype): string[] {
  */
 export const FAMILY_TEAM_MAPPING: Record<TeamArchetype, MissionFamily[]> = {
   black: ['web_api', 'cloud_infra', 'ai_red_team', 'agent_warfare'],
-  blue: ['web_api', 'cloud_infra', 'code_supply_chain', 'crypto_secrets', 'reporting_remediation'],
+  blue: ['web_api', 'cloud_infra', 'code_supply_chain', 'crypto_secrets', 'reporting_remediation', 'ai_red_team', 'agent_warfare'],
   white: ['web_api', 'ai_red_team', 'cloud_infra', 'smart_contract', 'code_supply_chain', 'crypto_secrets', 'reverse_binary', 'agent_warfare', 'social_osint', 'reporting_remediation'],
 };
 

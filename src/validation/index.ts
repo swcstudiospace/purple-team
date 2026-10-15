@@ -348,3 +348,52 @@ function formatExpected(error: any): string { // eslint-disable-line @typescript
   }
   return error.message || 'valid value';
 }
+
+// =============================================================================
+// BOUNDED INLINE ARTIFACT FIELD CHECKS (Phase 26)
+// =============================================================================
+
+/**
+ * Bounded field-level checks for an inline artifact element that cannot live
+ * in contracts.ts: envelope shape (array, at most one element) plus per-field
+ * bounds expressed through the shared validateToolArgs path. The authoritative
+ * bind (server-issued id, server-computed hash) stays in
+ * src/teams/contracts.ts bindInlineArtifact; this helper only reports
+ * field errors without minting anything. No per-tool condition chains.
+ */
+export const BOUND_ARTIFACT_MEDIA_TYPES: readonly string[] = ['text/plain'] as const;
+export const BOUND_ARTIFACT_ENCODINGS: readonly string[] = ['utf8'] as const;
+export const BOUND_ARTIFACT_MAX_ITEMS = 1;
+export const BOUND_ARTIFACT_MAX_BYTES = 64 * 1024;
+
+const BOUND_ARTIFACT_SCHEMA: ToolParameter[] = [
+  { name: 'mediaType', type: 'string', required: true, description: 'Inline artifact media type' },
+  { name: 'encoding', type: 'string', required: true, description: 'Inline artifact encoding' },
+  { name: 'data', type: 'string', required: true, description: 'Inline artifact bytes as text' },
+];
+
+export function validateBoundArtifactFields(input: unknown): ToolValidationError[] {
+  if (input === undefined) return [];
+  if (!Array.isArray(input)) {
+    return [{ field: 'inlineArtifacts', message: 'inlineArtifacts must be an array', received: typeof input, expected: 'array' }];
+  }
+  if (input.length > BOUND_ARTIFACT_MAX_ITEMS) {
+    return [{ field: 'inlineArtifacts', message: `inlineArtifacts accepts at most ${BOUND_ARTIFACT_MAX_ITEMS} element`, received: input.length, expected: `<= ${BOUND_ARTIFACT_MAX_ITEMS} elements` }];
+  }
+  if (input.length === 0) return [];
+  const element = input[0] as Record<string, unknown>;
+  if (!element || typeof element !== 'object' || Array.isArray(element)) {
+    return [{ field: 'inlineArtifacts[0]', message: 'inline artifact must be an object', received: typeof input[0], expected: 'object' }];
+  }
+  const errors = validateToolArgs('inline-artifact', element as Record<string, unknown>, BOUND_ARTIFACT_SCHEMA);
+  if (typeof element.mediaType === 'string' && !BOUND_ARTIFACT_MEDIA_TYPES.includes(element.mediaType)) {
+    errors.push({ field: 'mediaType', message: `mediaType must be one of: ${BOUND_ARTIFACT_MEDIA_TYPES.join(', ')}`, received: element.mediaType, expected: BOUND_ARTIFACT_MEDIA_TYPES.join(', ') });
+  }
+  if (typeof element.encoding === 'string' && !BOUND_ARTIFACT_ENCODINGS.includes(element.encoding)) {
+    errors.push({ field: 'encoding', message: `encoding must be one of: ${BOUND_ARTIFACT_ENCODINGS.join(', ')}`, received: element.encoding, expected: BOUND_ARTIFACT_ENCODINGS.join(', ') });
+  }
+  if (typeof element.data === 'string' && Buffer.byteLength(element.data, 'utf8') > BOUND_ARTIFACT_MAX_BYTES) {
+    errors.push({ field: 'data', message: `inline artifact exceeds the ${BOUND_ARTIFACT_MAX_BYTES / 1024} KiB cap`, received: Buffer.byteLength(element.data, 'utf8'), expected: `<= ${BOUND_ARTIFACT_MAX_BYTES} bytes` });
+  }
+  return errors;
+}
