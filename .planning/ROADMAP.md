@@ -45,7 +45,7 @@ These are source-backed contract/transport defects, not unanswered hat semantics
 
 </details>
 
-- [ ] **Phase 26: Runtime Authority, Bound Inputs and Retained Execution** — Operators can submit authorized, identity-bound work and retrieve truthful retained outcomes without changing legacy Red behavior.
+- [x] **Phase 26: Runtime Authority, Bound Inputs and Retained Execution** — Operators can submit authorized, identity-bound work and retrieve truthful retained outcomes without changing legacy Red behavior. (completed 2026-10-15)
 - [ ] **Phase 27: Blue, Black and White Substantive Capability Parity** — Real role-specific tools, engines, prompts and corpus guidance deliver evidence-bound defensive, tradecraft and governance outcomes.
 - [ ] **Phase 28: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis** — Existing product surfaces consume the same real role-bound contracts, lifecycle and explicit correlated synthesis.
 - [ ] **Phase 29: Integrated Acceptance and Governed Closure** — The owner can assess all requirements against actual integrated evidence before authentic gates and milestone closure.
@@ -53,6 +53,7 @@ These are source-backed contract/transport defects, not unanswered hat semantics
 ## Phase Details
 
 ### Phase 26: Runtime Authority, Bound Inputs and Retained Execution
+
 **Goal**: Operators can submit scoped, role-authorized mission/task inputs, receive immutable origin-bound identities and retrieve retained real outcomes while existing Red starts and execution remain usable.
 **Depends on**: Phase 25 historical completion; owner-approved roadmap and closure of all four adoption prerequisites above. Complete and adopt data/ingestion/trust/compatibility contracts before product code.
 **Requirements**: AC-FH-001, AC-FH-003, AC-FH-005, AC-FH-006, AC-FH-007, AC-FH-008, AC-FH-009, AC-FH-010, AC-FH-011, AC-FH-012, AC-FH-019, AC-FH-020, AC-FH-024, NFR-FH-SEC-01, NFR-FH-DATA-01, NFR-FH-REL-01
@@ -62,11 +63,13 @@ These are source-backed contract/transport defects, not unanswered hat semantics
   3. Direct, model-requested, batched and backend-seeded forbidden/invalid/out-of-scope/unapproved operations fail before handler invocation with zero effects; per-run grants stay isolated, empty/unknown grants grant nothing, poisoned inputs cannot change authority, and secrets/restricted context do not leak.
   4. Operators can submit bounded selected inline artifacts through the adopted mission-start/dispatch contract, obtain server-computed hashes and real atomic mission binding, and distinguish claimed imported metadata from internally observed item-bound receipts after actual computation; IDs, summaries and caller labels alone cannot create evidence.
   5. Progress, failure, partial output, deadline expiry, late results and restart-retained results keep original hat/specialist/task/mission/input attribution within existing finite execution/retry policies; valid evidence survives, unsupported cancellation is stated honestly, and scheduler stop or transport abort never masquerades as acknowledged termination/resume.
+
 **Plans**: TBD
 **Scope/ownership**: Adopt A03/A04 amendments and A07 data/IO/trust/retention detail first, then C1 → serialized C2/C3 windows with one shared integration owner. Preserve existing TaskQueue, Arsenal, snapshots, ledgers, providers and Red contracts; no new persistence/execution platform. Q1 is phase-local authority coverage, not a claim any checks ran here.
 **Cross-phase checks**: Domain-specific registered tools and loaded guidance complete in Phase 27; all six published skill input paths and UI byte adapters complete in Phase 28. Phases 27-29 recheck authority, privacy, finite lifecycle and Red compatibility without duplicating primary requirement ownership.
 
 ### Phase 27: Blue, Black and White Substantive Capability Parity
+
 **Goal**: Operators obtain substantive, genuinely computed Blue, Black and White outcomes from registered permitted tools, staged workflows and loaded role/domain/corpus guidance rather than cosmetic parity.
 **Depends on**: Phase 26 stable adopted DTO/authority/data/receipt interfaces, real retained execution and FH-EXEC-4 scheduling closure before independent parallel work.
 **Requirements**: AC-FH-013, AC-FH-014, AC-FH-015, AC-FH-016, AC-FH-018, AC-FH-021, AC-FH-022, AC-FH-023, AC-FH-025, AC-FH-026, AC-FH-027, AC-FH-028, AC-FH-029, AC-FH-030, AC-FH-031, AC-FH-032, AC-FH-033, AC-FH-034, AC-FH-035, AC-FH-036, NFR-FH-AVAIL-01
@@ -76,11 +79,13 @@ These are source-backed contract/transport defects, not unanswered hat semantics
   3. Black/Specter/Wraith analyze the supplied action plan and every submitted finite-cost path with stable IDs and aggregate budgets, distinguish empty/insufficient plans and modeled/declared routes from authentic relevant observations, retain assumptions/reassessment evidence and refuse destructive concealment, unapproved probing and live bulk exfiltration without effects.
   4. White/Arbiter/Auditor apply established normalized host/IP/domain scope and fail-closed actual ROE/approval stamps to submitted actions, consider paired opposed claims in one neutral ruling, and retain item provenance, missing required evidence, appeal conditions and insufficient aggregates rather than count-based sufficient/100 scores.
   5. Runtime context actually loads dedicated parent/specialist role, workflow and supported-domain guidance plus all three evidence/tool/validation/completion-aware corpus briefings; imported plans/frameworks and dangerous corpus examples stay untrusted data, and dormant prompts or tool counts cannot establish parity.
+
 **Plans**: TBD
 **Scope/ownership**: B1, K1, W1 and P1 are genuinely independent, file-disjoint packages after Phase 26 interface freeze. One shared integration owner then registers/loads every real exported tool and guidance through C2/C3 and the relevant I1 adapter/loader window. Hat workers request shared-file changes rather than edit those files. Q2 supplies real behavioral coverage for these outcomes.
 **Cross-phase checks**: HTTP/MCP/published skill populated contracts, nonempty Black request forwarding and six-skill receipts are completed across Phase 28 consumer integration; no narrowed core-only receipt substitutes for required public paths. Final full parity matrix, actual all-surface evidence and any material asymmetry acceptance belong to Phase 29. Missing validator support remains open unless genuinely supplied/evidenced or explicitly accepted by the owner, not silently deferred.
 
 ### Phase 28: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis
+
 **Goal**: Operators use the existing static UI, API/MCP and published skills to configure and run the same real four-hat capabilities with accessible, attributed lifecycle feedback and explicit evidence-correlated synthesis.
 **Depends on**: Phases 26 and 27 real contracts, registered implementations and retained results; serialized C3/I1 consumer boundaries and U1 shell interface before dependent UI workspace work.
 **Requirements**: AC-FH-017, AC-FH-037, AC-FH-038, AC-FH-039, AC-FH-040, AC-FH-041, AC-FH-042, AC-FH-043, AC-FH-044, AC-FH-045, AC-FH-046, AC-FH-047, AC-FH-048, AC-FH-049, AC-FH-050, AC-FH-051, AC-FH-052, AC-FH-053, AC-FH-054, AC-FH-055, AC-FH-056, NFR-FH-A11Y-01
@@ -90,12 +95,14 @@ These are source-backed contract/transport defects, not unanswered hat semantics
   3. Operators see distinct loading, pending, completed, empty, unavailable, error, partial, timed-out/interrupted and retained-result states, retain valid drafts/evidence, submit once, reconcile lost ACKs and switch safely. Stale reads/late output cannot overwrite or relabel newer work; unsupported cancellation is explicit and no true cancel is advertised without authoritative acknowledgement.
   4. Explicit Purple synthesis forwards findings/detections/verdicts, ID mappings and relevant Black/Blue/White retained run references consistently through UI/MCP/skills; associations are order-independent and mission-correct, missing/claimed evidence and unresolved approval/retest conditions remain visible, riskTier/residualRisk agree, legacy positional mode is disclosed and proposals never auto-dispatch or delegate authority.
   5. Keyboard and assistive-technology users can operate all changed selection/configuration/dispatch/retry controls with meaningful labels/state, visible focus, associated errors and origin-correct live feedback without traps or focus theft; supported responsive layouts, text-based identity, WCAG AA contrast and reduced-motion behavior remain usable, including delayed responses after switches/closure and required recorded visual observation.
+
 **Plans**: TBD
 **UI hint**: yes
 **Scope/ownership**: Serialized C3/I1 integrations; U1, U2, U3; S1, S2, S3, S4; D1 consumer contract documentation. U2/U3 may be independent only after their shared boundary is fixed and authenticated assignments support it. D1 API_REFERENCE ownership is serialized with C3. Existing settings/evidence pages need no unrelated redesign; use existing evidence links and provider conventions.
 **Cross-phase checks**: Core permission/input/receipt guards remain authoritative and are rechecked against all clients; Phase 29 records the integrated real localhost/API/browser/keyboard/responsive/reduced-motion/security/Red acceptance and full requirement-to-evidence audit. Phase-level evidence is not milestone acceptance.
 
 ### Phase 29: Integrated Acceptance and Governed Closure
+
 **Goal**: The owner can judge every requirement and substantive parity row against actual integrated behavior and authentic governance evidence before any milestone completion.
 **Depends on**: Phases 26-28 completed under approved discuss → plan → execute flow; adoption blockers closed through supported authority; no unresolved unaccepted material scope gaps.
 **Requirements**: AC-FH-002, AC-FH-004, AC-FH-057, AC-FH-058, AC-FH-059, AC-FH-060, AC-FH-061, AC-FH-062, AC-FH-063, AC-FH-064, NFR-FH-COMP-01, NFR-FH-EVID-01, NFR-FH-MAINT-01
@@ -105,6 +112,7 @@ These are source-backed contract/transport defects, not unanswered hat semantics
   3. Integrated security and failure-isolation evidence demonstrates zero forbidden effects for relevant malformed command/file/path/URL/symlink/redirect/scope/prompt attacks, preserved origin/Host/CSRF/bearer/rate/redaction controls and finite termination, with no secret/restricted-context leakage, fake fallback or disabling unaffected hats.
   4. All enumerated supported Red workflows, settings/providers, ledgers, legacy start/seeding and public contracts remain usable through regression fixtures and a genuine local representative flow; required security corrections are documented with all affected consumers migrated and unavailable prerequisites disclosed.
   5. The owner can follow authentic TaskStore gate evidence and actual GSD phase/ownership records through the full-scope audit → complete → prescribed cleanup only after acceptance and truthful existing docs/changelog updates after smoke; original history/issue lineage and deferred debt survive, with no premature ship, deployment, merge or unrelated milestone completion.
+
 **Plans**: TBD
 **UI hint**: yes
 **Scope/ownership**: Parent owns union verification after dependent edits land, with Q1/Q2 evidence carried forward, Q3 integrated API/browser/security evidence and A08/A09/A10/trusted canonical gates under genuine assignments. D1 publishes truthful observed examples/docs/changelog after smoke and before closure. Exact Q3 evidence/check paths and plan counts are selected only in approved planning; none are invented here.
@@ -144,7 +152,7 @@ Execution order after mandatory adoption/prerequisites: 26 → 27 → 28 → 29.
 
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
-| 26. Runtime Authority, Bound Inputs and Retained Execution | 0/TBD | Not started | - |
+| 26. Runtime Authority, Bound Inputs and Retained Execution | 2/2 | Complete    | 2026-10-15 |
 | 27. Blue, Black and White Substantive Capability Parity | 0/TBD | Not started | - |
 | 28. Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis | 0/TBD | Not started | - |
 | 29. Integrated Acceptance and Governed Closure | 0/TBD | Not started | - |

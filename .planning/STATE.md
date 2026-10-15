@@ -2,15 +2,20 @@
 gsd_state_version: "1.0"
 milestone: v1.5
 milestone_name: Four-Hat Runtime Parity
+current_phase: 27
+current_phase_name: Blue, Black and White Substantive Capability Parity
 status: planning
-last_updated: "2026-10-14"
-last_activity: 2026-10-14
+stopped_at: Phase 26 complete, ready to plan Phase 27
+last_updated: "2026-10-15T16:12:50.160Z"
+last_activity: 2026-10-15
+last_activity_desc: Phase 26 complete, transitioned to Phase 27
+state_head: 17f0b356e05e24624addafbe297424720ab15641
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 2
+  completed_plans: 2
+  percent: 25
 ---
 
 # Project State
@@ -20,15 +25,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-13), .planning/ROADMAP.md and .planning/milestones/ for the archived v1.0–v1.4 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence.
-**Current focus:** Owner approved full roadmap26–29 and scoped controller repair. A private runtime worktree `/root/src/repos/agent-swarm-amend` preserves the clean user runtime checkout and prior bootstrap commits. A normal fresh host in that legitimate workspace created actual runtime repair correlation `e4d3e0ce-137b-5ee6-bbc5-43df220677ba` with three independent scoped lanes; all remain PLANNED until genuine A01 dispatch. Original redteam13tasks/correlation/DONE history are untouched. Product source remains unchanged.
+**Current focus:** Owner-approved full v1.5 scope is unchanged. Three genuine initial runtime code lanes reached IN_REVIEW/attempt2; parent recovered their accepted results from native events after A01 ended without a final message. Code exists in private `/root/src/repos/agent-swarm-amend`; no separate lane branches, join, gates, green commit or mounted amendment are claimed. Real credential-isolated TaskStore smoke proved `.planning` pin denial, stale duplicate-pin acceptance with acceptance mutation, and FIFO blocking; the revised approved contract requires two file-disjoint signed A05 corrective lanes. Canonical registry check passed. Original product13 tasks/correlation/DONE history/source remain untouched; all72 product criteria/four phases remain Pending.
 
 ## Current Position
 
-Phase: 26 of 26–29 (Runtime Authority, Bound Inputs and Retained Execution) — not started
-Plan: TBD; no implementation plans adopted (zero plans created is not a final plan count)
-Status: Planning — roadmap/repair owner approval received; normal workspace controller handoff is active for the trusted amendment prerequisite before corrective contracts/product code
-Last activity: 2026-10-14 — approved runtime interface and private worktree; legitimate native six-task repair plan created in separate runtime store, no product or runtime code claimed yet
-Progress: [----------] 0% (0/4 new phases complete; all 72 requirements Pending)
+Phase: 27 of 26 (Blue, Black and White Substantive Capability Parity)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-10-15 — Phase 26 complete, transitioned to Phase 27
+Progress: [███░░░░░░░] 25% (0/4 new phases complete; all 72 requirements Pending)
 
 ## Completed Context
 
@@ -44,12 +49,13 @@ Progress: [----------] 0% (0/4 new phases complete; all 72 requirements Pending)
 - Parent presents the written roadmap proposal for mandatory owner acceptance; close all four source-bound adoption prerequisites through supported authenticated operations, then discuss → plan → execute each phase under `gsd-autonomous`, without silently waiving gates or reducing full scope.
 - Deferred outside v1.5: the 5 v1.4 audit follow-ups remain candidates for a later milestone; do not silently add them to the approved parity scope.
 - Owner follow-ups from v1.4 audit: schedule `/gsd:validate-phase 22`–`25` (four draft VALIDATION.md coverage TODOs).
+- Deferred from the 2026-10-15 Purple Team request to v1.5 (owner decision: rebrand now, parity via v1.5 later): per-hat tooling parity and Black/White prompt-depth uplift (Phase 27); blue/black/white prompt text and archetype wiring (Phase 27); hat UI architecture, registry-driven panels and draft switching (Phase 28). Open remit decisions Q1 (White) and Q2 (Black) stay open for Phase 27. Model-facing persona text (`src/prompts/*`, system-prompt strings in `src/admiral`, `src/llm`, `src/general`) still says T3MP3ST; it is pinned by prompt-audit and tests and changes with the Phase 27 prompt work.
 
 ## Blockers/Concerns
 
-- **FH-INPUT-1 — UNRESOLVED, Phase 26 before code (A03/A04/A07; C1/C2/C3, U1/U2 in Phase 28):** evidence POST stores metadata, not bytes/media/registered content; detector/control DTO artifact IDs cannot supply real artifacts. Close the already-proposed INLINE contract in existing mission-start/dispatch with bounded byte/data/media/encoding representations, explicit selected IDs, server-computed hashes, whole-request validation, real mission creation then atomic binding, retention/redaction and usable UI byte input. No summary-as-bytes, implicit URI/command fetch, unsupported ingestion or fake target; gate the data/IO contract before code.
-- **FH-EVID-2 — UNRESOLVED, Phase 26 trust closure (A03/A07/C3; A10 Phase 29):** public callers can label source/tool/system/type/strength; resolving a ledger ID alone does not authenticate observation. Public/legacy/imported labels remain claimed/context-only absent demonstrated authentic internal origin. Specify private server-issued run/mission/stage/tool/input-hash/item associations only after real computation, preserve historical labels without upgrading them, validate restored associations and expose no public receipt-minting endpoint. Phase 27 engines and Phase 28 clients consume/display this boundary.
-- **FH-COMP-3 — UNRESOLVED, Phase 26 (A03/A04 clarify; C2/C3 implement; parent proves legacy fixtures/seeding, Phase 29 regression):** A03 universal nonempty/duplicate rejection conflicts with legacy target-based Red omission/empty/duplicate handling. Preserve legacy Red start and actual seeding; apply nonempty unique role/input requirements separately to new structured/explicit role-selected requests. Unknown explicit roles fail actionably, never silently substitute. Do not call the unamended universal rejection additive compatibility.
+- **FH-INPUT-1 — partial:** start, `POST /api/mission/artifacts`, and the hunt form textarea (`docs/index.html`, `docs/overview.html`) send one optional utf8 artifact. An empty box still starts Red with no artifact field.
+- **FH-EVID-2 — partial:** public evidence stays `origin: claimed`. Observed receipts are written by a successful ROE parse and by `POST /api/teams/blue/gaps`, `POST /api/teams/black/cover`, `POST /api/teams/black/noise`, `POST /api/teams/white/evidence`, and `POST /api/teams/white/report-audit`. The Defend page records gaps, noise, the evidence chain, and the report audit. The GET projections stay read-only.
+- **FH-COMP-3 — resolution adopted in `POST /api/mission/start`:** omitted `roleInputs`/`family`/`targetContext` keeps the existing empty-operator Red start and duplicate skip. A structured launch requires `objective` and nonempty known unique roles, and rejects an unknown or duplicate role before start. Phase 29 still has to prove legacy fixtures. FH-INPUT-1 and FH-EVID-2 are still open.
 - **FH-EXEC-4 — UNRESOLVED, owner decision required:** broader actual A01 investigation confirms native `swarm_plan` can append distinct A03/A04 or A05 parallel lanes under the same correlation and a new prefix, preserving all original task rows and risk gates. This resolves lane eligibility, NOT original typed-input pins or cross-group dependency amendments: no mounted tool can amend nonterminal inputs/dependencies/acceptance, and DONE is terminal. Native append requires supplemental authorization and manual ordering cannot be called a persisted DAG barrier. Recommend a scoped trusted amendment-interface repair, preserving signer/normal approvals/gates and all three DONE prerequisites. No new plan, prefix, transition or product dispatch was performed. Full evidence: `.planning/v1.5-CONTROLLER-ROUTING.md`.
 - **Historical transport resolution retained, not FH-EXEC-4 closure:** fresh A01 mounted `swarm_assignment`; a slice-free fixed-native `swarm_plan` refresh reused the original correlation with `execution_assignment_verified:true`, and exact signed A02 dispatch/ingestion reached DONE at attempt 2. Model-exposed optional-array/object schemas were distorted; documented fixed-native routes preserve canonical schema. No fake slices, empty ingests or generic eval/shell signing. Earlier A03/A04 “dispatched” notes describe that historical wave, not current pending leases.
 - User explicitly approved **Resume full milestone**: after restart, clear only the resolved transport block through legal A01 transitions, obtain the exact canonical specialist prompt, and resume correlation `1b299db3-62f2-4a31-a133-5bb01be01615`; that earlier approval does not waive these newly verified adoption blockers.
@@ -59,7 +65,7 @@ Progress: [----------] 0% (0/4 new phases complete; all 72 requirements Pending)
 ## Session Continuity
 
 Last session: 2026-10-14
-Stopped at: Owner checkpoint — four-phase roadmap/72 requirements validated; signed prerequisite proposals reviewed, three material contract corrections and controller amendment prerequisite unresolved; zero product phases/plans complete
+Stopped at: Phase 26 complete, ready to plan Phase 27
 Resume file: .planning/.continue-here.md (existing handoff retained; this STATE/ROADMAP supersede its earlier roadmap-pending position)
 
 ## Performance Metrics
@@ -80,6 +86,7 @@ Current v1.5: zero completed phases/plans; plan counts TBD. Historical metrics r
 - [v1.5 approved]: owner selected `Approve roadmap` and `Authorize scoped repair`. Phases26–29 retain the full72 requirements and all gates; the repair may add the fixed audited controller amendment/pinning interface and necessary corrective task allocations, with no signer replacement, privilege increase, raw state writes or unsigned fallback.
 - [v1.5 ownership]: adopt complete A07 data/IO/trust contracts before C1/C2/C3 code; freeze shared interfaces, then authenticated file-disjoint B1/K1/W1/P1 independent parallel work; one shared C1/C2/C3/I1 integration owner serializes registration/loading/API/synthesis edits. U1/U2/U3, S1/S2/S3/S4, D1 and Q1/Q2/Q3 retain A03 §12 path boundaries in ROADMAP. Package labels are not issued task IDs or concurrency authority; parent verifies once after dependent edits land.
 - [v1.5 constraints]: no fifth hat/automatic cross-hat execution, new dependencies/platforms/deployment, false cancellation, stub parity or unrelated debt; preserve Red contracts/providers/settings/themes/tokens and history/untracked `coverage-pr/`. Authentic TaskStore gates remain mandatory before audit → complete → prescribed cleanup; truthful docs/changelog follow actual smoke, never this metadata edit.
+- [2026-10-15 rebrand]: owner chose rebrand now, parity via v1.5 later; uncommitted WIP kept in place (not committed); black grants reverted to the committed analysis-only set; user-facing rename only (package name, Tauri productName and window title, UI, docs, CLI copy, log prefixes). Unchanged: `T3MP3ST_*`/`TEMPEST_*` env vars, `t3mp3st`/`tempest` bin names, `~/.t3mp3st` paths, `t3mp3st_*` localStorage keys, `tempest_*`/`tempest-*` tool and skill ids, `com.t3mp3st.app`, `t3mp3st-server`, container and image names, `Dark Purple`. The rebrand is outside the ROADMAP phase list, so no phase CONTEXT/PLAN/SUMMARY was created. Ship not invoked: auto-merge is on and the scope is incomplete.
 
 ## Operator Next Steps
 
