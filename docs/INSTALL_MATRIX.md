@@ -1,4 +1,4 @@
-# T3MP3ST Install Matrix
+# Purple Team Install Matrix
 
 Use this as the team-facing view of what a workstation needs. The UI and API remain useful without every binary installed, but local command readiness improves as these tools appear on `PATH`.
 

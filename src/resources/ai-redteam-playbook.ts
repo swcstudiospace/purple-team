@@ -107,7 +107,7 @@ export const AI_REDTEAM_PLAYBOOK: RedTeamTechnique[] = [
     "id": "tool-surface-indirect",
     "category": "Tool / Surface Routing & Cross-Modal Indirect Injection (agentic)",
     "principle": "Uneven per-surface/per-tool safety and the data/instruction boundary collapse let payloads enter via writing tools, image gen, tool-call args, an agent's own DSL, ingested page/RAG/OCR content, or text->image filter desync. The ingested-content form needs no direct attacker-victim channel (highest severity).",
-    "redteamUse": "garak: a custom agent-probe harness that feeds the reconstructed DSL/objective slot or an OCR'd image and checks whether the agent emits attacker-directed COMMANDS or auto-executes. promptfoo: model each surface/tool as a provider and run the same suite against all, asserting parity; stand up a fixture RAG page with a defanged injection and assert the agent does not adopt it. Wire into the t3mp3st agent loop that drives tool grants.",
+    "redteamUse": "garak: a custom agent-probe harness that feeds the reconstructed DSL/objective slot or an OCR'd image and checks whether the agent emits attacker-directed COMMANDS or auto-executes. promptfoo: model each surface/tool as a provider and run the same suite against all, asserting parity; stand up a fixture RAG page with a defanged injection and assert the agent does not adopt it. Wire into the Purple Team agent loop that drives tool grants.",
     "defense": "Uniform policy across every surface and on tool-call ARGUMENTS (decode args first); strict instruction/data provenance — never parse fetched/OCR'd/tool content as control instructions; require confirmation before acting on retrieved directives; classify two-stage systems on the downstream-resolved representation."
   },
   {

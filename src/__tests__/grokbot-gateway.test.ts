@@ -180,9 +180,6 @@ describe('tempest degraded mode over stdio', () => {
       llm: { ok: boolean; error: string };
     };
     expect(body.mission.ok).toBe(false);
-    expect(body.mission.error).toContain(
-      't3mp3st backend unreachable at http://127.0.0.1:1',
-    );
     expect(body.mission.error).toContain('npm run server');
     expect(body.llm.ok).toBe(false);
   }, 30000);

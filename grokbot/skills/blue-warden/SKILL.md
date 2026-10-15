@@ -60,7 +60,7 @@ misconfiguration call-outs, and the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this audit
+> Purple Team backend unreachable — start it with npm run server; this audit
 > is parked under its mission id and resumes when the backend answers.
 
 — and never present guesses as results. The seat never opens a browser

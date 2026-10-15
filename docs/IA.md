@@ -1,4 +1,4 @@
-# T3MP3ST UI information architecture
+# Purple Team UI information architecture
 
 Legacy single-page compartments (the fourteen `page-*` sections of the old
 `docs/index.html`) are now grouped into eleven static pages sharing one shell

@@ -1,4 +1,11 @@
-# T3MP3ST Changelog
+# Purple Team Changelog
+
+## 2026-10-15 — Purple Team rebrand (user-facing)
+
+The product is presented as Purple Team, a four-hat educational vulnerability AI (Red, Blue, White, Black). Renamed: UI page titles, brand marks and footers, README, VISION, WHITEPAPER and docs prose, CLI banner and tagline, server, MCP and Tauri log prefixes (`[purple-team]`), setup wizard copy, the npm package name (`purple-team`) and description, Tauri `productName` and window title. Unchanged on purpose: `T3MP3ST_*` and `TEMPEST_*` environment variables, `t3mp3st`/`tempest` CLI commands, `~/.t3mp3st` state paths, `t3mp3st_*` localStorage keys, `tempest_*` tool and `tempest-*` skill ids, bundle id `com.t3mp3st.app`, the `t3mp3st-server` binary, and container and image names.
+
+Verified on this tree: typecheck clean; lint 0 errors / 176 warnings (unchanged); `npm test` 102 files / 1125 tests pass; `npm run doctor` exit 0; live server smoke: UI page titles, brand marks and footers, and the health, mission-status and operators endpoints.
+Known pre-existing: `npm run prompt:audit` exits 1 on five UI-doctrine checks whose phrases are absent at HEAD (accepted v1.4 debt F-20-01).
 
 ## 2026-10-10 — v1.2 Phase 13: bearer auth off loopback
 

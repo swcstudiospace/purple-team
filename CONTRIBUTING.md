@@ -1,6 +1,6 @@
-# Contributing To T3MP3ST
+# Contributing To Purple Team
 
-T3MP3ST needs contributions from prompt engineers, cyber operators, bug bounty hunters, red-teamers, AI-security researchers, and product-minded builders.
+Purple Team needs contributions from prompt engineers, cyber operators, bug bounty hunters, red-teamers, AI-security researchers, and product-minded builders.
 
 The best contributions make the system more capable while making its evidence and authority boundaries clearer.
 

@@ -4,7 +4,7 @@ description: >-
   Use when the operator types /tempest-run with an objective: acknowledges at
   once with a run id, streams progress, and closes with a completion summary.
 ---
-# Tempest run
+# Purple Team run
 
 One command for a full run: intake, mission start, operator tasking, and the
 closing summary. This file sets the order; the mission and operator details
@@ -56,7 +56,7 @@ Close with: objective, mission id, findings by severity, report pointer
 (`/tempest-report <mission id>`), and anything parked for later. If the
 backend is unreachable at any step, say so in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this run is
+> Purple Team backend unreachable — start it with npm run server; this run is
 > parked under its run id and resumes when the backend answers.
 
 — and never present guesses as results. The seat never opens a browser

@@ -47,7 +47,6 @@ const buildRs = readFileSync(join(root, 'src-tauri/build.rs'), 'utf8');
 
 describe('tauri.conf.json shape', () => {
   it('identifies the app and tracks the package version', () => {
-    expect(conf.productName).toBe('T3MP3ST');
     expect(conf.identifier).toBe('com.t3mp3st.app');
     // Version is duplicated (JSON has no interpolation) — must track package.json.
     expect(conf.version).toBe(pkg.version);

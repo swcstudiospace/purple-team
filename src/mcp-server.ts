@@ -87,7 +87,7 @@ async function tempestGet(path: string): Promise<string> {
     const res = await fetch(checked.base + path, { headers: tempestHeaders() });
     return JSON.stringify({ ok: res.ok, status: res.status, data: await tempestReadBody(res) });
   } catch {
-    return JSON.stringify({ ok: false, error: `t3mp3st backend unreachable at ${checked.base} — start it with npm run server` });
+    return JSON.stringify({ ok: false, error: `Purple Team backend unreachable at ${checked.base} — start it with npm run server` });
   }
 }
 
@@ -102,7 +102,7 @@ async function tempestPost(path: string, body: unknown): Promise<string> {
     });
     return JSON.stringify({ ok: res.ok, status: res.status, data: await tempestReadBody(res) });
   } catch {
-    return JSON.stringify({ ok: false, error: `t3mp3st backend unreachable at ${checked.base} — start it with npm run server` });
+    return JSON.stringify({ ok: false, error: `Purple Team backend unreachable at ${checked.base} — start it with npm run server` });
   }
 }
 
@@ -538,7 +538,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request: any) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[T3MP3ST MCP] server running — security_recon (nmap/DNS recon) + tempest_* (loopback API proxy)');
+  console.error('[purple-team MCP] server running — security_recon (nmap/DNS recon) + tempest_* (loopback API proxy)');
 }
 
 main().catch(console.error);

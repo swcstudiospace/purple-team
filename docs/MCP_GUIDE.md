@@ -1,6 +1,6 @@
 # MCP Guide
 
-T3MP3ST includes a Model Context Protocol stdio server in `src/mcp-server.ts`.
+Purple Team includes a Model Context Protocol stdio server in `src/mcp-server.ts`.
 
 ## Start The Server
 
@@ -64,9 +64,9 @@ Only use this tool against systems inside your authorized scope.
 
 The response is JSON text containing DNS records, nmap output, command summaries, and suggested next steps.
 
-## Tempest Bot Proxy Tools (`tempest_*`)
+## Purple Team Bot Proxy Tools (`tempest_*`)
 
-Twelve tools proxy the local t3mp3st HTTP API over `T3MP3ST_URL` (default
+Twelve tools proxy the local Purple Team HTTP API over `T3MP3ST_URL` (default
 `http://127.0.0.1:3333`). Reads use GET, state changes use POST; no shells,
 no child processes. Every failure degrades to `{ ok: false, error }` instead
 of throwing — an unreachable backend answers with a "start it with

@@ -22,7 +22,7 @@ fn wait_for_sidecar(port: u16) -> bool {
         std::thread::sleep(Duration::from_millis(250));
     }
     eprintln!(
-        "[t3mp3st] sidecar not answering on 127.0.0.1:{port} after 10s; continuing anyway"
+        "[purple-team] sidecar not answering on 127.0.0.1:{port} after 10s; continuing anyway"
     );
     false
 }
@@ -73,7 +73,7 @@ pub fn run() {
                             {
                                 Ok(child) => {
                                     eprintln!(
-                                        "[t3mp3st] sidecar spawned (pid {}), port {SIDECAR_PORT}",
+                                        "[purple-team] sidecar spawned (pid {}), port {SIDECAR_PORT}",
                                         child.id()
                                     );
                                     if let Ok(mut slot) = spawned.lock() {
@@ -89,12 +89,12 @@ pub fn run() {
                                                 Ok(parsed) => {
                                                     if let Err(err) = window.navigate(parsed) {
                                                         eprintln!(
-                                                            "[t3mp3st] webview navigate failed: {err}"
+                                                            "[purple-team] webview navigate failed: {err}"
                                                         );
                                                     }
                                                 }
                                                 Err(err) => {
-                                                    eprintln!("[t3mp3st] sidecar UI url invalid: {err}");
+                                                    eprintln!("[purple-team] sidecar UI url invalid: {err}");
                                                 }
                                             }
                                         }
@@ -102,7 +102,7 @@ pub fn run() {
                                 }
                                 Err(err) => {
                                     eprintln!(
-                                        "[t3mp3st] sidecar spawn failed: {err}; continuing \
+                                        "[purple-team] sidecar spawn failed: {err}; continuing \
                                          without it (degraded shell — run `npm run server` \
                                          alongside)"
                                     );
@@ -110,7 +110,7 @@ pub fn run() {
                             }
                         } else {
                             eprintln!(
-                                "[t3mp3st] no sidecar binary next to {dir:?}; continuing \
+                                "[purple-team] no sidecar binary next to {dir:?}; continuing \
                                  without it (degraded shell — run `npm run server` alongside)"
                             );
                         }

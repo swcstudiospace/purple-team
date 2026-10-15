@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { createTempest } from 't3mp3st';
+ * import { createTempest } from 'purple-team';
  *
  * const tempest = createTempest({
  *   name: 'Operation Midnight',
@@ -818,7 +818,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     // Start tick loop (1 second interval). Catch any tick error so a single bad tick
     // (e.g. a spawn hitting the pool cap) can never take down the whole server process.
     this.tickInterval = setInterval(() => {
-      this.tick().catch(err => console.error('[T3MP3ST] tick error (mission continues):', err instanceof Error ? err.message : err));
+      this.tick().catch(err => console.error('[purple-team] tick error (mission continues):', err instanceof Error ? err.message : err));
     }, 1000);
   }
 
@@ -1162,7 +1162,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
         : `dispatch timed out after ${Math.round(elapsed / 1000)}s (backstop ${Math.round(this.taskTimeoutMs / 1000)}s)`;
 
       // Clear a CLEAR event/log so a timed-out dispatch is never silent.
-      console.warn(`[T3MP3ST] task ${taskId} force-resolved as timeout — ${reason}`);
+      console.warn(`[purple-team] task ${taskId} force-resolved as timeout — ${reason}`);
 
       // 1) Mark the task failed/timed-out via the queue (idempotent enough: fail()
       //    just stamps status:'failed'; if it somehow already completed, this is a
@@ -1609,10 +1609,10 @@ export function getBanner(): string {
    ░         ░   ░      ░   ░░          ░   ░  ░  ░    ░
              ░  ░       ░               ░  ░      ░
 
-  T3MP3ST - Tactical Execution Multi-agent Platform
-            for Elite Security Testing
+  Purple Team: a four-hat educational vulnerability AI
+            (Red, Blue, White, Black)
 
-  Multi-Agent Red Team / Penetration Testing Framework
+  Multi-Agent Purple Team / Penetration Testing Framework
 `;
 }
 

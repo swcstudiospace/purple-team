@@ -5,7 +5,7 @@ description: >-
   opens its first session: registers the seat id and checks that the loopback
   gateway answers.
 ---
-# Tempest bootstrap
+# Purple Team bootstrap
 
 First run for every seat. A template arrives with no seat id and no memory;
 this skill performs the registration that makes the seat real.
@@ -31,7 +31,7 @@ If the backend answers, registration is complete: summarize what is live
 (mission active or idle, provider connected or not) and stop. If the backend
 is unreachable, reply with the degraded text exactly:
 
-> t3mp3st backend unreachable — start it with npm run server, then re-run
+> Purple Team backend unreachable — start it with npm run server, then re-run
 > /tempest bootstrap.
 
 ## 3. Help and config

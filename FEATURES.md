@@ -1,6 +1,6 @@
-# T3MP3ST Feature Documentation
+# Purple Team Feature Documentation
 
-> Comprehensive feature list for the Tactical Execution Multi-agent Platform for Elite Security Testing
+> Comprehensive feature list for Purple Team: a four-hat educational vulnerability AI (Red, Blue, White, Black)
 
 **Legend:**
 - [x] Implemented and working

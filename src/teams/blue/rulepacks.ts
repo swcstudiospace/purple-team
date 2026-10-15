@@ -133,7 +133,7 @@ export function sigmaRuleForGap(
 
   const rawTitle = finding?.title?.trim() || gap.findingId;
   const description =
-    `t3mp3st blue pipeline template for finding ${gap.findingId} (coverage: ${gap.coverage}). ` +
+    `Purple Team blue pipeline template for finding ${gap.findingId} (coverage: ${gap.coverage}). ` +
     `Uncovered D3FEND countermeasures: ${uncovered.map(id => `${id} ${d3fendLabel(id)}`).join('; ')}.` +
     (gap.unresolvedCountermeasures.length > 0
       ? ` Reported unresolvable ids: ${gap.unresolvedCountermeasures.join(', ')}.`
@@ -145,7 +145,7 @@ export function sigmaRuleForGap(
     status: 'experimental',
     description,
     references: uncovered.map(id => `https://d3fend.mitre.org/technique/d3f:${id}`),
-    author: options?.author ?? 't3mp3st blue pipeline',
+    author: options?.author ?? 'Purple Team blue pipeline',
     logsource:
       options?.logsource ?? {
         category: 'process_creation',
