@@ -75,6 +75,7 @@ export interface PinnedToolOutput {
   title: string;
   summary: string;
   data: unknown;
+  payload?: unknown;
   createdAt: string;
 }
 
@@ -82,8 +83,12 @@ export interface ForwardedHatContext {
   fromHat: HatDomain;
   toHat: HatDomain;
   toolId?: string;
+  sourceToolId?: string;
+  targetToolId?: string;
+  summary?: string;
   payload: unknown;
   timestamp: string;
+  forwardedAt?: string;
 }
 
 export interface ToolExecutionHistoryItem {
@@ -98,7 +103,7 @@ export interface ToolExecutionHistoryItem {
 export interface MigratedWorkspaceState {
   version: 2;
   activeHat: HatDomain;
-  toolDrafts: Record<string, Record<string, unknown>>;
+  toolDrafts: Record<string, Record<string, unknown> | string>;
   pinnedOutputs: PinnedToolOutput[];
   forwardedContext: ForwardedHatContext | null;
   executionHistory: ToolExecutionHistoryItem[];
@@ -237,9 +242,9 @@ export function migrateWorkspaceState(raw: unknown): MigratedWorkspaceState {
     : isPlainRecord(record.drafts)
       ? record.drafts
       : {};
-  const toolDrafts: Record<string, Record<string, unknown>> = {};
+  const toolDrafts: Record<string, Record<string, unknown> | string> = {};
   for (const [toolKey, draftVal] of Object.entries(rawDrafts)) {
-    if (isPlainRecord(draftVal)) {
+    if (isPlainRecord(draftVal) || typeof draftVal === 'string') {
       toolDrafts[toolKey] = draftVal;
     }
   }
@@ -248,13 +253,15 @@ export function migrateWorkspaceState(raw: unknown): MigratedWorkspaceState {
   if (Array.isArray(record.pinnedOutputs)) {
     for (const item of record.pinnedOutputs) {
       if (isPlainRecord(item) && typeof item.id === 'string' && typeof item.toolId === 'string') {
+        const pinData = item.data !== undefined ? item.data : (item.payload !== undefined ? item.payload : null);
         pinnedOutputs.push({
           id: item.id,
           hat: isHatDomain(item.hat) ? item.hat : activeHat,
           toolId: item.toolId,
           title: typeof item.title === 'string' ? item.title : item.toolId,
           summary: typeof item.summary === 'string' ? item.summary : '',
-          data: item.data ?? null,
+          data: pinData,
+          payload: pinData,
           createdAt: typeof item.createdAt === 'string' ? item.createdAt : new Date(0).toISOString(),
         });
       }
@@ -267,14 +274,21 @@ export function migrateWorkspaceState(raw: unknown): MigratedWorkspaceState {
     && isHatDomain(record.forwardedContext.fromHat)
     && isHatDomain(record.forwardedContext.toHat)
   ) {
+    const resolvedToolId = typeof record.forwardedContext.toolId === 'string'
+      ? record.forwardedContext.toolId
+      : (typeof record.forwardedContext.sourceToolId === 'string' ? record.forwardedContext.sourceToolId : undefined);
+    const resolvedTime = typeof record.forwardedContext.timestamp === 'string'
+      ? record.forwardedContext.timestamp
+      : (typeof record.forwardedContext.forwardedAt === 'string' ? record.forwardedContext.forwardedAt : new Date(0).toISOString());
     forwardedContext = {
       fromHat: record.forwardedContext.fromHat,
       toHat: record.forwardedContext.toHat,
-      ...(typeof record.forwardedContext.toolId === 'string' ? { toolId: record.forwardedContext.toolId } : {}),
+      ...(resolvedToolId ? { toolId: resolvedToolId, sourceToolId: resolvedToolId } : {}),
+      ...(typeof record.forwardedContext.targetToolId === 'string' ? { targetToolId: record.forwardedContext.targetToolId } : {}),
+      ...(typeof record.forwardedContext.summary === 'string' ? { summary: record.forwardedContext.summary } : {}),
       payload: record.forwardedContext.payload ?? null,
-      timestamp: typeof record.forwardedContext.timestamp === 'string'
-        ? record.forwardedContext.timestamp
-        : new Date(0).toISOString(),
+      timestamp: resolvedTime,
+      forwardedAt: resolvedTime,
     };
   }
 

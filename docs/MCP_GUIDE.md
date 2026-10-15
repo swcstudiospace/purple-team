@@ -83,14 +83,14 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_findings` | `GET /api/findings` (optional `missionId` filter) |
 | `tempest_providers` | `GET /api/llm/status` + `GET /api/oauth/status` |
 | `tempest_purple_synthesize` | `GET /api/teams/purple/synthesize` when no inputs are supplied; otherwise `POST` with `findings`, `detections`, `verdicts`, and optional `verdictsByFinding` |
-| `tempest_blue_gaps` | `GET /api/teams/blue/gaps`, or `POST` when `findings` is supplied (not stored) |
-| `tempest_blue_rules` | `GET /api/teams/blue/rules`, or `POST` when `findings` is supplied (not stored) |
-| `tempest_blue_hardening` | `GET /api/teams/blue/hardening`, or `POST` when `findings` is supplied (not stored) |
-| `tempest_black_cover` | `GET /api/teams/black/cover`, or `POST` when `actions` or `egress` is supplied (not stored) |
-| `tempest_black_noise` | `GET /api/teams/black/noise`, or `POST` when `actions` or `egress` is supplied (not stored) |
-| `tempest_black_exfil` | `GET /api/teams/black/exfil`, or `POST` when `paths` or `egress` is supplied (not stored) |
-| `tempest_white_evidence` | `GET /api/teams/white/evidence`, or `POST` when `entries` is supplied (context-strength dry run, not stored) |
-| `tempest_white_report` | `GET /api/teams/white/report-audit`, or `POST` when `findings` is supplied (checked against stored evidence, not stored) |
+| `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (read-only over the stored findings ledger) |
+| `tempest_blue_rules` | `GET /api/teams/blue/rules` (read-only over the stored findings ledger) |
+| `tempest_blue_hardening` | `GET /api/teams/blue/hardening` (read-only over the stored findings ledger) |
+| `tempest_black_cover` | `GET /api/teams/black/cover` (read-only over the active RED plan draft) |
+| `tempest_black_noise` | `GET /api/teams/black/noise` (read-only over the active RED plan draft) |
+| `tempest_black_exfil` | `GET /api/teams/black/exfil` (read-only over the stored exfil report) |
+| `tempest_white_evidence` | `GET /api/teams/white/evidence` (read-only over the stored evidence ledger) |
+| `tempest_white_report` | `GET /api/teams/white/report-audit` (read-only over the stored findings and evidence ledgers) |
 | `tempest_white_roe` | `GET /api/teams/white/roe`, or `PUT` when both `text` and `actions` are supplied. A successful parse writes an observed receipt; a failed parse stores the text and does not |
 | `tempest_blue_coverage` | `POST /api/teams/blue/coverage`. Missing artifact bytes fail closed as insufficient-evidence. Not a mission-start step. |
 | `tempest_black_workflow` | `POST /api/teams/black/workflow`. An empty plan is insufficient, not a clean bill. Not a mission-start step. |

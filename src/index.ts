@@ -1273,6 +1273,8 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
       maxTokens: 50000,
       toolCategories: profile.toolCategories,
       tools: profile.defaultTools,
+      role: archetype,
+      redDefaultTools: profile.defaultTools,
     });
     operator.attachArsenal(this.arsenal, agentLoop);
     // [Phase-2] Give the operator the shared board ONLY when swarm coordination is on — so the

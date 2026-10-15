@@ -128,6 +128,38 @@ function tierOf(cost: number): ExfilPathCost['tier'] {
   if (cost >= MEDIUM_TIER_AT) return 'medium';
   return 'low';
 }
+
+function normalizeExfilPath(raw: ExfilPath | string, index: number): ExfilPath {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return {
+            id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : `path-${index + 1}`,
+            ...(typeof parsed.channel === 'string' ? { channel: parsed.channel } : {}),
+            ...(typeof parsed.volumeMb === 'number' ? { volumeMb: parsed.volumeMb } : {}),
+            ...(typeof parsed.encrypted === 'boolean' ? { encrypted: parsed.encrypted } : {}),
+          };
+        }
+      } catch {
+        // fall through to delimited string parsing
+      }
+    }
+    const parts = trimmed.split(/\s*\|\s*/);
+    const id = parts[0] || `path-${index + 1}`;
+    const channel = parts[1] ? parts[1].trim() : (EXFIL_CHANNELS.includes(id) ? id : undefined);
+    const vol = parts[2] !== undefined ? Number(parts[2]) : undefined;
+    return {
+      id,
+      ...(channel ? { channel } : {}),
+      ...(vol !== undefined && !Number.isNaN(vol) ? { volumeMb: vol } : {}),
+    };
+  }
+  return raw;
+}
+
 /**
  * Cost a set of planned exfil paths. Deterministic per path:
  * cost = channel base + ceil(volumeMb/100) + cleartext penalty; tier from the
@@ -137,12 +169,12 @@ function tierOf(cost: number): ExfilPathCost['tier'] {
  * route-evidence id for the same path id. No egress declared is unverified.
  */
 export function exfilCostModel(input: {
-  paths?: readonly ExfilPath[];
+  paths?: readonly (ExfilPath | string)[];
   egress?: readonly string[];
   budget?: number;
   routeEvidence?: readonly RouteEvidence[];
 }): ExfilCostReport {
-  const paths = input.paths ?? [];
+  const paths = (input.paths ?? []).map((p, idx) => normalizeExfilPath(p, idx));
   const egress = input.egress ?? [];
   const routeEvidence = input.routeEvidence ?? [];
   const budget = Math.max(1, input.budget ?? EXFIL_BUDGET_DEFAULT);

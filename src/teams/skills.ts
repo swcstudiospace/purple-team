@@ -632,12 +632,15 @@ export async function runComposableSkill(
     timeoutMs: DEFAULT_SKILL_TIMEOUT_MS,
     signal,
     handler: async (sanitizedParams, innerSignal) => {
+      const callerParams =
+        typeof sanitizedParams === 'object' && sanitizedParams !== null ? sanitizeInput(sanitizedParams) : {};
       const mergedParams = {
         ...skill.defaultParams,
-        ...(typeof sanitizedParams === 'object' && sanitizedParams !== null ? sanitizeInput(sanitizedParams) : {}),
+        ...callerParams,
       };
 
       const stepOutputs: ComposableSkillStepOutput[] = [];
+      const carriedContext: Record<string, unknown> = {};
       let stepsCompleted = 0;
 
       for (let i = 0; i < skill.steps.length; i += 1) {
@@ -645,22 +648,138 @@ export async function runComposableSkill(
         const toolReg = getRegisteredHatTool(step.toolId);
         const stepInput = {
           ...(toolReg?.defaultPreset ?? {}),
+          ...(step.toolId === 'white-data-inspector' && callerParams.rawPayload !== undefined && callerParams.requiredFields === undefined
+            ? { requiredFields: [] }
+            : {}),
+          ...carriedContext,
           ...mergedParams,
         };
 
         const stepEnvelope = await executeRegisteredHatTool(step.toolId, stepInput, innerSignal);
+        const stepDataRecord =
+          stepEnvelope.data && typeof stepEnvelope.data === 'object'
+            ? (stepEnvelope.data as Record<string, unknown>)
+            : null;
+        const stepState = typeof stepDataRecord?.state === 'string' ? stepDataRecord.state : 'success';
+        const stepSucceeded = stepEnvelope.ok && stepState === 'success';
+
         stepOutputs.push({
           stepIndex: i,
           stepId: step.stepId,
           hat: step.hat,
           toolId: step.toolId,
-          status: stepEnvelope.status,
+          status: stepSucceeded ? 'success' : (stepEnvelope.ok ? stepState : stepEnvelope.status),
           durationMs: stepEnvelope.durationMs,
           output: stepEnvelope.data ?? stepEnvelope.error,
         });
 
-        if (stepEnvelope.ok) {
-          stepsCompleted += 1;
+        if (!stepSucceeded) {
+          for (let j = i + 1; j < skill.steps.length; j += 1) {
+            const remStep = skill.steps[j];
+            stepOutputs.push({
+              stepIndex: j,
+              stepId: remStep.stepId,
+              hat: remStep.hat,
+              toolId: remStep.toolId,
+              status: 'skipped',
+              durationMs: 0,
+              output: {
+                state: 'error',
+                message: `Skipped because prerequisite step "${step.stepId}" (${step.toolId}) returned ${stepEnvelope.ok ? stepState : stepEnvelope.status}.`,
+              },
+            });
+          }
+          break;
+        }
+
+        stepsCompleted += 1;
+
+        if (step.toolId === 'white-data-inspector' && Array.isArray(stepDataRecord?.records)) {
+          const records = stepDataRecord.records as Array<Record<string, unknown>>;
+          const derivedFacts = records.map((rec, idx) => ({
+            id: typeof rec.id === 'string' && rec.id.trim() ? rec.id.trim() : `inspected-fact-${idx + 1}`,
+            claim: JSON.stringify(rec),
+            source: 'white-data-inspector',
+            artifactId: `inspector-record-${idx + 1}`,
+            corroboratedBy: ['white-data-inspector'],
+          }));
+          const derivedKnownFacts: Array<{ variable: string; value: string; verified: boolean; source: string }> = [];
+          const seenVars = new Set<string>();
+          for (const rec of records) {
+            for (const [k, v] of Object.entries(rec)) {
+              if (!seenVars.has(k)) {
+                seenVars.add(k);
+                derivedKnownFacts.push({
+                  variable: k,
+                  value: typeof v === 'string' ? v : JSON.stringify(v),
+                  verified: v !== null && v !== undefined && v !== '',
+                  source: 'white-data-inspector',
+                });
+              }
+            }
+          }
+          if (derivedFacts.length > 0 && callerParams.facts === undefined) {
+            carriedContext.facts = derivedFacts;
+          }
+          if (derivedKnownFacts.length > 0 && callerParams.knownFacts === undefined) {
+            carriedContext.knownFacts = derivedKnownFacts;
+            if (callerParams.requiredVariables === undefined) {
+              carriedContext.requiredVariables = [...seenVars];
+            }
+          }
+        } else if (step.toolId === 'white-evidence-collector' && Array.isArray(stepDataRecord?.taggedFacts)) {
+          const tagged = stepDataRecord.taggedFacts as Array<Record<string, unknown>>;
+          if (tagged.length > 0 && callerParams.decisions === undefined) {
+            carriedContext.decisions = tagged.map((tf, idx) => ({
+              id: `dec-ev-${idx + 1}`,
+              fromHat: 'white',
+              toHat: 'blue',
+              summary: typeof tf.claim === 'string' ? tf.claim : `Fact ${idx + 1}`,
+              rationale: `Confidence ${String(tf.confidenceTier ?? 'verified')} (${String(tf.computedSha256 ?? '').slice(0, 16)})`,
+              evidenceRefs: typeof tf.computedSha256 === 'string' ? [tf.computedSha256.slice(0, 16)] : ['ev-ref'],
+            }));
+          }
+        } else if (step.toolId === 'black-policy-validator' && Array.isArray(stepDataRecord?.checks)) {
+          const checks = stepDataRecord.checks as Array<Record<string, unknown>>;
+          const failedChecks = checks.filter((c) => c.passed === false);
+          if (failedChecks.length > 0 && callerParams.assumptions === undefined) {
+            carriedContext.assumptions = failedChecks.map((c) => `${String(c.ruleId)}: ${String(c.evidence)}`);
+          }
+        } else if (step.toolId === 'black-risk-analyzer' && Array.isArray(stepDataRecord?.findings)) {
+          const findings = stepDataRecord.findings as Array<Record<string, unknown>>;
+          if (findings.length > 0 && callerParams.decisions === undefined) {
+            carriedContext.decisions = findings.map((f, idx) => ({
+              id: `dec-risk-${idx + 1}`,
+              fromHat: 'black',
+              toHat: 'blue',
+              summary: typeof f.failureMode === 'string' ? f.failureMode : `Risk finding ${idx + 1}`,
+              rationale: typeof f.mitigation === 'string' ? f.mitigation : 'Apply Black Hat mitigation',
+              evidenceRefs: [typeof f.id === 'string' ? f.id : `risk-${idx + 1}`],
+            }));
+          }
+        } else if (step.toolId === 'red-findings-correlator' && Array.isArray(stepDataRecord?.correlated)) {
+          const correlated = stepDataRecord.correlated as Array<Record<string, unknown>>;
+          if (correlated.length > 0) {
+            if (callerParams.facts === undefined) {
+              carriedContext.facts = correlated.map((c, idx) => ({
+                id: typeof c.id === 'string' ? c.id : `red-fact-${idx + 1}`,
+                claim: `${String(c.title ?? c.id)} on ${String(c.target ?? 'target')}`,
+                source: 'red-findings-correlator',
+                artifactId: typeof c.id === 'string' ? c.id : `red-${idx + 1}`,
+                corroboratedBy: ['red-findings-correlator'],
+              }));
+            }
+            if (callerParams.components === undefined) {
+              carriedContext.components = correlated.map((c) => ({
+                name: typeof c.target === 'string' ? c.target : String(c.id ?? 'target-component'),
+                category: 'network',
+                singlePointOfFailure: c.severity === 'critical' || c.severity === 'high',
+                handlesSecrets: true,
+                externalDependency: false,
+                hasFallback: false,
+              }));
+            }
+          }
         }
       }
 

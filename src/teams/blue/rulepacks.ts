@@ -320,6 +320,11 @@ export function validateDetectorStanding(input: DetectorValidationInput): Detect
       `No matching evidence was supplied for ${findingId}; a syntax-only rule${input.ruleYaml ? ' (rule YAML was supplied but not compared)' : ''} cannot be validated.`,
     );
   }
+  if (input.nonMatchingEvidence.length === 0) {
+    return unavailable(
+      `No non-matching evidence was supplied for ${findingId}; false-positive discrimination cannot be validated.`,
+    );
+  }
 
   const missed = input.matchingEvidence.filter(text => !text.toLowerCase().includes(needle));
   const falseHits = input.nonMatchingEvidence.filter(text => text.toLowerCase().includes(needle));

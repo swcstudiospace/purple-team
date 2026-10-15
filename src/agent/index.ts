@@ -188,12 +188,14 @@ export class AgentLoop extends EventEmitter<AgentEvents> {
     const seenCalls = new Map<string, string>();
     let noProgress = 0;
 
-    // Get tool definitions from Arsenal (the operator's role toolkit: name allowlist wins,
-    // then category filter, then all).
-    const toolDefs = this.arsenal.getToolDefinitions(
-      this.options.toolCategories.length > 0 ? this.options.toolCategories : undefined,
-      this.options.tools.length > 0 ? this.options.tools : undefined
-    );
+    // Get tool definitions from Arsenal (the operator's role toolkit: frozen role allowlist wins,
+    // then name allowlist, then category filter, then all).
+    const toolDefs = this.frozenAllowlist !== undefined
+      ? (this.frozenAllowlist.length > 0 ? this.arsenal.getToolDefinitions(undefined, [...this.frozenAllowlist]) : [])
+      : this.arsenal.getToolDefinitions(
+          this.options.toolCategories.length > 0 ? this.options.toolCategories : undefined,
+          this.options.tools.length > 0 ? this.options.tools : undefined
+        );
 
     // Build initial messages
     const messages: LLMMessage[] = [
@@ -481,12 +483,13 @@ export class AgentLoop extends EventEmitter<AgentEvents> {
       } else {
         // A bad/hallucinated tool name must NOT crash the loop. Return the callable set so the
         // model self-corrects in-place instead of dying or looping on a tool that doesn't exist.
-        const available = this.arsenal
-          .getToolDefinitions(
-            this.options.toolCategories.length ? this.options.toolCategories : undefined,
-            this.options.tools.length ? this.options.tools : undefined
-          )
-          .map((t) => t.name);
+        const available = (this.frozenAllowlist !== undefined
+          ? (this.frozenAllowlist.length > 0 ? this.arsenal.getToolDefinitions(undefined, [...this.frozenAllowlist]) : [])
+          : this.arsenal.getToolDefinitions(
+              this.options.toolCategories.length ? this.options.toolCategories : undefined,
+              this.options.tools.length ? this.options.tools : undefined
+            )
+        ).map((t) => t.name);
         toolResult = {
           success: false,
           error: JSON.stringify({

@@ -371,8 +371,26 @@ export function runBlackPolicyValidator(
     }
   };
 
+  const urlEndpoints: Array<{ scheme: 'http' | 'https'; host: string }> = [];
+  for (const rawUrl of serialized.match(/https?:\/\/[^\s"'<>]+/gi) ?? []) {
+    const scheme: 'http' | 'https' = rawUrl.toLowerCase().startsWith('https://') ? 'https' : 'http';
+    let rest = rawUrl.replace(/^https?:\/\//i, '').split(/[/?#]/)[0] ?? '';
+    const atIdx = rest.lastIndexOf('@');
+    if (atIdx >= 0) rest = rest.slice(atIdx + 1);
+    if (rest.startsWith('[')) {
+      const closeIdx = rest.indexOf(']');
+      rest = closeIdx > 0 ? rest.slice(1, closeIdx) : rest.replace(/^\[|\]$/g, '');
+    } else if ((rest.match(/:/g) ?? []).length <= 1) {
+      rest = rest.replace(/:\d+$/, '');
+    }
+    const host = rest.trim().toLowerCase();
+    if (host) {
+      urlEndpoints.push({ scheme, host });
+    }
+  }
+
   // Rule 1: Secret / credential exposure
-  const hasSecretLeak = /(?:api[_-]?key|secret|bearer|password|token)\s*["':=]\s*["']?(?:sk-[a-zA-Z0-9]{8,}|ghp_[a-zA-Z0-9]{8,}|xai-[a-zA-Z0-9]{8,}|[A-Za-z0-9+/=]{24,})/i.test(serialized);
+  const hasSecretLeak = /(?:api[_-]?key|secret|bearer|password|token|private[_-]?key|credential)["'\s]*[:=]["'\s]*(?:sk-[a-zA-Z0-9_-]{8,}|ghp_[a-zA-Z0-9]{8,}|xai-[a-zA-Z0-9_-]{8,}|[A-Za-z0-9+/=_-]{16,})/i.test(serialized);
   recordCheck({
     ruleId: 'POL-SEC-001',
     title: 'No Hardcoded Secrets or Bearer Tokens',
@@ -401,8 +419,10 @@ export function runBlackPolicyValidator(
 
   // Rule 3: Transport encryption (cleartext HTTP to non-loopback)
   const requireEncryption = input.requireEncryption ?? true;
-  const cleartextMatch = serialized.match(/http:\/\/(?!127\.0\.0\.1|localhost|\[::1\])([a-zA-Z0-9.-]+)/i);
-  const failedEncryption = requireEncryption && cleartextMatch !== null;
+  const cleartextEndpoint = urlEndpoints.find(
+    e => e.scheme === 'http' && e.host !== '127.0.0.1' && e.host !== 'localhost' && e.host !== '::1',
+  );
+  const failedEncryption = requireEncryption && cleartextEndpoint !== undefined;
   recordCheck({
     ruleId: 'POL-SEC-003',
     title: 'Encrypted External Transport (HTTPS/TLS)',
@@ -410,7 +430,7 @@ export function runBlackPolicyValidator(
     passed: !failedEncryption,
     severity: 'High',
     finding: failedEncryption
-      ? `Cleartext HTTP endpoint detected for non-loopback host "${cleartextMatch?.[1] ?? 'external'}".`
+      ? `Cleartext HTTP endpoint detected for non-loopback host "${cleartextEndpoint?.host ?? 'external'}".`
       : 'All external endpoints use encrypted transport or loopback.',
     remediation: 'Upgrade external URLs to https:// or tunnel over an encrypted relay.',
   });
@@ -446,8 +466,8 @@ export function runBlackPolicyValidator(
   // Rule 6: Host allow-list scope check
   const allowedHosts = (input.allowedHosts ?? []).map(h => h.trim().toLowerCase()).filter(Boolean);
   if (allowedHosts.length > 0) {
-    const hostRefs = [...serialized.matchAll(/https?:\/\/([a-zA-Z0-9.-]+)/gi)].map(m => m[1].toLowerCase());
-    const outOfScopeHosts = hostRefs.filter(h => !allowedHosts.includes(h) && h !== '127.0.0.1' && h !== 'localhost');
+    const hostRefs = urlEndpoints.map(e => e.host);
+    const outOfScopeHosts = hostRefs.filter(h => !allowedHosts.includes(h) && h !== '127.0.0.1' && h !== 'localhost' && h !== '::1');
     recordCheck({
       ruleId: 'POL-CMP-006',
       title: 'ROE Allowed-Host Scope Enforcement',

@@ -186,7 +186,7 @@
     try {
       var reviewed = await Shell.apiPost('/api/teams/black/workflow', {
         actions: splitLines(document.getElementById('opBlackActions').value),
-        paths: splitLines(document.getElementById('opBlackPaths').value),
+        paths: splitLines(document.getElementById('opBlackPaths').value).map(function (p) { return { id: p, channel: p }; }),
         egress: []
       });
       var outcome = (reviewed && reviewed.outcome) || 'unknown';

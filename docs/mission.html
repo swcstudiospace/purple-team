@@ -115,7 +115,7 @@
     var result = document.getElementById('missionBlackReviewResult');
     var missionId = currentMissionId();
     var actions = splitLines(document.getElementById('missionBlackActions').value);
-    var paths = splitLines(document.getElementById('missionBlackPaths').value);
+    var paths = splitLines(document.getElementById('missionBlackPaths').value).map(function (p) { return { id: p, channel: p }; });
     result.textContent = 'Reviewing…';
     try {
       var reviewed = await Shell.apiPost('/api/teams/black/workflow', { actions: actions, paths: paths, egress: [] });

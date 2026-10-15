@@ -931,6 +931,7 @@ interface RoeRecord {
   id: string;
   revision: number;
   textHash: string;
+  actionsHash: string;
   text: string;
   actions: AuditedAction[];
   createdAt: string;
@@ -6530,6 +6531,19 @@ app.get('/api/teams/tool-grants', (_req: Request, res: Response) => {
  * event log via emitContractEvent, and the LATEST synthesis persists through the
  * same snapshot machinery (purpleSyntheses slot in buildStateSnapshot).
  */
+app.get('/api/teams/purple/synthesize', (_req: Request, res: Response): void => {
+  const latest = purpleSyntheses.get('latest');
+  if (!latest) {
+    res.json({ synthesis: null });
+    return;
+  }
+  res.json(redactSecrets({
+    synthesis: latest.synthesis,
+    createdAt: latest.createdAt,
+    correlation: latest.correlation,
+  }));
+});
+
 app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const findings = body.findings;
@@ -6704,6 +6718,15 @@ app.get('/api/teams/black/noise', (_req: Request, res: Response): void => {
 // security code; PUT is in STATE_CHANGING_METHODS so the loopback
 // CSRF/Origin guard covers it too.
 const ROE_BODY_CAP_BYTES = 64 * 1024;
+function isValidRoeAction(a: unknown): a is AuditedAction {
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return false;
+  const rec = a as Record<string, unknown>;
+  if (rec.command !== undefined && typeof rec.command !== 'string') return false;
+  if (rec.target !== undefined && typeof rec.target !== 'string') return false;
+  if (rec.approved !== undefined && typeof rec.approved !== 'boolean') return false;
+  if (rec.scope !== undefined && (!Array.isArray(rec.scope) || rec.scope.some((s) => typeof s !== 'string'))) return false;
+  return true;
+}
 app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const text = body.text;
@@ -6712,7 +6735,7 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'text must be a non-empty string' });
     return;
   }
-  if (!Array.isArray(actions) || actions.some((a) => !a || typeof a !== 'object' || Array.isArray(a))) {
+  if (!Array.isArray(actions) || actions.some((a) => !a || typeof a !== 'object' || Array.isArray(a) || !isValidRoeAction(a))) {
     res.status(400).json({ error: 'actions must be an array of action objects' });
     return;
   }
@@ -6729,6 +6752,7 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     id: 'latest',
     revision: prevRevision + 1,
     textHash: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16),
+    actionsHash: createHash('sha256').update(JSON.stringify(actions), 'utf8').digest('hex').slice(0, 16),
     text,
     actions: actions as AuditedAction[],
     createdAt: typeof previous?.createdAt === 'string' ? previous.createdAt : nowIso(),
@@ -6776,7 +6800,8 @@ app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
   const storedActions: unknown = record?.actions;
   const actionsOk =
     Array.isArray(storedActions) &&
-    !(storedActions as unknown[]).some((a) => !a || typeof a !== 'object' || Array.isArray(a));
+    !(storedActions as unknown[]).some((a) => !a || typeof a !== 'object' || Array.isArray(a)) &&
+    (storedActions as unknown[]).every(isValidRoeAction);
   const revisionOk = typeof record?.revision === 'number' && Number.isFinite(record.revision);
   const timestampsOk = typeof record?.createdAt === 'string' && typeof record?.updatedAt === 'string';
   if (!record || typeof record.text !== 'string' || !actionsOk || !revisionOk || !timestampsOk) {
@@ -6785,7 +6810,8 @@ app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
     return;
   }
   const recomputed = createHash('sha256').update(record.text, 'utf8').digest('hex').slice(0, 16);
-  if (recomputed !== record.textHash) {
+  const recomputedActions = createHash('sha256').update(JSON.stringify(record.actions), 'utf8').digest('hex').slice(0, 16);
+  if (recomputed !== record.textHash || recomputedActions !== record.actionsHash) {
     const parse = { ...parseRoe(''), summary: 'no ROE text on record' };
     res.json(redactSecrets(parse));
     return;

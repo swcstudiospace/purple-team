@@ -79,40 +79,43 @@ function parseKvLine(line: string): Record<string, unknown> | null {
   return matched > 0 ? record : null;
 }
 
+const MAX_SCHEMA_FIELDS = 500;
+
 function buildSchemaSummary(
   records: ReadonlyArray<Record<string, unknown>>,
   requiredFields: readonly string[],
 ): WhiteFieldSchemaSummary[] {
-  const fieldSet = new Set<string>(requiredFields);
+  const requiredSet = new Set<string>(requiredFields);
+  const statsMap = new Map<string, { presentCount: number; nullCount: number; typeSet: Set<string> }>();
+  for (const reqField of requiredFields) {
+    statsMap.set(reqField, { presentCount: 0, nullCount: 0, typeSet: new Set<string>() });
+  }
   for (const rec of records) {
-    for (const key of Object.keys(rec)) {
-      fieldSet.add(key);
+    for (const [field, val] of Object.entries(rec)) {
+      let stat = statsMap.get(field);
+      if (!stat) {
+        if (statsMap.size >= MAX_SCHEMA_FIELDS) continue;
+        stat = { presentCount: 0, nullCount: 0, typeSet: new Set<string>() };
+        statsMap.set(field, stat);
+      }
+      if (val === null || val === undefined) {
+        stat.nullCount += 1;
+        stat.typeSet.add('null');
+      } else {
+        stat.presentCount += 1;
+        stat.typeSet.add(Array.isArray(val) ? 'array' : typeof val);
+      }
     }
   }
   const summaries: WhiteFieldSchemaSummary[] = [];
-  for (const field of [...fieldSet].sort()) {
-    let presentCount = 0;
-    let nullCount = 0;
-    const typeSet = new Set<string>();
-    for (const rec of records) {
-      if (Object.prototype.hasOwnProperty.call(rec, field)) {
-        const val = rec[field];
-        if (val === null || val === undefined) {
-          nullCount += 1;
-          typeSet.add('null');
-        } else {
-          presentCount += 1;
-          typeSet.add(Array.isArray(val) ? 'array' : typeof val);
-        }
-      }
-    }
-    const missingCount = Math.max(0, records.length - presentCount - nullCount);
+  for (const [field, stat] of [...statsMap.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const missingCount = Math.max(0, records.length - stat.presentCount);
     summaries.push({
       field,
-      presentCount,
-      nullCount,
-      types: [...typeSet].sort(),
-      required: requiredFields.includes(field),
+      presentCount: stat.presentCount,
+      nullCount: stat.nullCount,
+      types: [...stat.typeSet].sort(),
+      required: requiredSet.has(field),
       missingCount,
     });
   }
@@ -268,8 +271,10 @@ export function runWhiteDataInspector(
     : allRecords;
 
   const schemaSummary = buildSchemaSummary(filtered, requiredFields);
+  let hasRequiredFieldViolation = false;
   for (const fieldStat of schemaSummary) {
     if (fieldStat.required && fieldStat.missingCount > 0) {
+      hasRequiredFieldViolation = true;
       diagnostics.push({
         line: 1,
         column: 1,
@@ -285,7 +290,7 @@ export function runWhiteDataInspector(
   const pageRecords = filtered.slice(start, start + chunkSize);
 
   const hasParseFailure = diagnostics.some(d => d.message.startsWith('Malformed') || d.message.startsWith('Unrecognized') || d.message.includes('JSON'));
-  const state: 'empty' | 'error' | 'success' = hasParseFailure ? 'error' : 'success';
+  const state: 'empty' | 'error' | 'success' = (hasParseFailure || hasRequiredFieldViolation) ? 'error' : 'success';
 
   return {
     state,
@@ -567,7 +572,7 @@ export function runWhiteGapAnalyzer(
         resolvesVariable: reqVar,
         priority: 'P1',
       });
-    } else if (match.verified === false) {
+    } else if (match.verified !== true) {
       unverifiedVariables.push(reqVar);
       resolutionQueries.push({
         id: `gap-q-${resolutionQueries.length + 1}`,

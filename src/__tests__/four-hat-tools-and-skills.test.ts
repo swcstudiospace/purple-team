@@ -33,6 +33,8 @@ import {
   getComposableSkill,
   runComposableSkill,
 } from '../teams/index.js';
+import { synthesize } from '../teams/purple.js';
+import { exfilCostModel } from '../teams/black/exfil.js';
 
 declare global {
   interface PromiseConstructor {
@@ -457,6 +459,104 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
       expect(res.status).toBe('success');
       expect(res.data?.stepOutputs.length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it('enforces Greptile round-1 hardening across sequencers, snapshots, data validation, gap analysis, policy checks, and purple synthesis', () => {
+    // 1. Unknown toolId in sequencer & batch runner fails closed with durationMs 0
+    const badSeq = runBlueWorkflowSequencer({
+      steps: [{ id: 's1', label: 'Unknown', hat: 'blue', toolId: 'nonexistent-tool' }],
+    });
+    expect(badSeq.state).toBe('error');
+    expect(badSeq.timeline[0].status).toBe('failed');
+    expect(badSeq.timeline[0].durationMs).toBe(0);
+
+    const badBatch = runBatchRunnerTool({
+      jobs: [{ id: 'j1', hat: 'blue', toolId: 'nonexistent-tool', payloadSummary: 'test' }],
+    });
+    expect(badBatch.state).toBe('error');
+    expect(badBatch.failedJobs).toBe(1);
+    expect(badBatch.results[0].durationMs).toBe(0);
+
+    // 2. Snapshot restore verifies sha256 against expectedSha
+    const badRestore = runSnapshotManagerTool({
+      action: 'restore',
+      snapshotToVerify: {
+        id: 'snap-1',
+        version: 2,
+        sha256: '0000000000000000000000000000000000000000000000000000000000000000',
+        state: { activeHat: 'blue' },
+      },
+    });
+    expect(badRestore.state).toBe('error');
+    expect(badRestore.integrityVerified).toBe(false);
+
+    // 3. migrateWorkspaceState preserves string toolDrafts, payload on pinnedOutputs, and forwardedContext metadata
+    const migrated = migrateWorkspaceState({
+      version: 2,
+      activeHat: 'white',
+      toolDrafts: { 'white-data-inspector': '{"raw":"text"}' },
+      pinnedOutputs: [{ id: 'p1', hat: 'white', toolId: 'white-data-inspector', label: 'L', pinnedAt: 'now', payload: { ok: 1 } }],
+      forwardedContext: { fromHat: 'white', toHat: 'black', sourceToolId: 't1', targetToolId: 't2', payload: { x: 1 }, forwardedAt: '2026-01-01T00:00:00Z' },
+    });
+    expect(migrated.toolDrafts['white-data-inspector']).toBe('{"raw":"text"}');
+    expect(migrated.pinnedOutputs[0].payload).toEqual({ ok: 1 });
+    expect(migrated.forwardedContext?.sourceToolId).toBe('t1');
+    expect(migrated.forwardedContext?.targetToolId).toBe('t2');
+    expect(migrated.forwardedContext?.forwardedAt).toBe('2026-01-01T00:00:00Z');
+
+    // 4. White Data Inspector marks required field with null value as error
+    const nullField = runWhiteDataInspector({
+      format: 'json',
+      rawPayload: JSON.stringify([{ id: null }]),
+      requiredFields: ['id'],
+    });
+    expect(nullField.state).toBe('error');
+    expect(nullField.schemaSummary.find(f => f.field === 'id')?.missingCount).toBe(1);
+
+    // 5. White Gap Analyzer treats omitted verified flag as unverified
+    const omittedVerified = runWhiteGapAnalyzer({
+      knownFacts: [{ variable: 'scope', value: 'example.com' }],
+      requiredVariables: ['scope'],
+    });
+    expect(omittedVerified.unverifiedVariables).toContain('scope');
+
+    // 6. Black Policy Validator detects JSON secrets and userinfo URL bypasses
+    const jsonSecret = runBlackPolicyValidator({
+      rawConfig: '{"apiKey":"sk-1234567890abcdefghijklmnop"}',
+      allowedHosts: ['localhost'],
+    });
+    expect(jsonSecret.checks.find(c => c.ruleId === 'POL-SEC-001')?.passed).toBe(false);
+
+    const userinfoBypass = runBlackPolicyValidator({
+      rawConfig: { endpoint: 'http://localhost@evil.example/exfil', bindHost: '127.0.0.1', tlsEnabled: true, timeoutMs: 5000 },
+      allowedHosts: ['localhost'],
+    });
+    expect(userinfoBypass.checks.find(c => c.ruleId === 'POL-SEC-003')?.passed).toBe(false);
+    expect(userinfoBypass.checks.find(c => c.ruleId === 'POL-CMP-006')?.passed).toBe(false);
+
+    // 7. Purple synthesis handles prototype property names on severity and findingId
+    const synth = synthesize({
+      findings: [
+        { id: 'toString', title: 'Proto finding', severity: 'toString' },
+        { id: 'constructor', title: 'Constructor finding', severity: 'constructor' },
+      ],
+      detections: [],
+      verdicts: [],
+    });
+    expect(synth.coverageMatrix[0].residualRisk).toContain('high residual risk');
+    expect(synth.coverageMatrix).toHaveLength(2);
+
+    // 8. exfilCostModel normalizes string path entries without undefined pathId
+    const exfil = exfilCostModel({
+      paths: ['dns-tunnel', 'p2 | raw-socket | 250'],
+      egress: ['egress-fw'],
+    });
+    expect(exfil.paths[0].pathId).toBe('dns-tunnel');
+    expect(exfil.paths[0].channel).toBe('dns-tunnel');
+    expect(exfil.paths[1].pathId).toBe('p2');
+    expect(exfil.paths[1].channel).toBe('raw-socket');
+    expect(exfil.paths[1].volumeCost).toBe(3);
+    expect(exfil.totalVolumeMb).toBe(250);
   });
 });
 

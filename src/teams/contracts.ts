@@ -241,18 +241,37 @@ export function bindInlineArtifacts(input: unknown): BoundInlineArtifact | undef
  *   operator defaultTools, which carry probe-grade http_request/curl_request.
  * - Unknown roles (including purple) throw; callers catch that as deny-all.
  */
+const CATALOG_TO_ADAPTER_NAMES: Readonly<Record<string, readonly string[]>> = {
+  dig: ['dns_lookup'],
+  curl: ['curl_request', 'http_request'],
+  nmap: ['port_scanner', 'nmap_scanner'],
+};
+
+function expandCatalogGrantsToToolNames(grants: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const id of grants) {
+    out.add(id);
+    out.add(`${id.replace(/[^a-z0-9]+/gi, '_')}_tool`);
+    const extra = CATALOG_TO_ADAPTER_NAMES[id];
+    if (extra) {
+      for (const alias of extra) out.add(alias);
+    }
+  }
+  return [...out];
+}
+
 export function resolveRunAllowlist(
   role: OperatorArchetype,
   redDefaultTools: readonly string[] = [],
 ): string[] {
   if ((RED_ARCHETYPES as readonly string[]).includes(role)) {
-    return [...redDefaultTools];
+    return expandCatalogGrantsToToolNames(redDefaultTools);
   }
   if (role === 'black' || role === 'blue' || role === 'white') {
-    return teamToolGrants(role);
+    return expandCatalogGrantsToToolNames(teamToolGrants(role));
   }
   if (isHat(role)) {
-    return hatToolGrants(role);
+    return expandCatalogGrantsToToolNames(hatToolGrants(role));
   }
   throw new Error(`resolveRunAllowlist: "${role}" is not a spawnable role (purple never spawns)`);
 }

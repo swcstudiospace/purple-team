@@ -16,9 +16,9 @@ lifecycle, parked/resume): see `../GRAMMAR.md`.
 
 The parser in `src/teams/white/roe-parser.ts` never guesses. A spec is safe to
 adjudicate only when `ok` is true, a scope directive has produced `allowedTargets`,
-and no allow-active conflict remains. `ok: true` with no scope is still not a clean
-spec, because `roeAudit` in `src/teams/white.ts` treats an absent scope as every
-target in scope.
+and no allow-active conflict remains. Both `parseRoe` and `roeAudit` in
+`src/teams/white.ts` fail closed when `allowedTargets` is absent or empty (`ok: false`
+and `violation`).
 
 ## Grammar
 
@@ -83,9 +83,10 @@ response and report which case happened.
   so; do not describe the spec as permitting or forbidding active work.
 - Conflicting allow-active lines: report both source line numbers. The later value
   wins, but the spec is not clean until one line is removed.
-- Targets: list them verbatim. Entries beginning with a wildcard prefix will not match
-  real hostnames under `roeAudit`'s equality, suffix, and substring rules. Mark those
-  as unusable. Run `white-scope-match` on any target the operator asks about.
+- Targets: list them verbatim. Entries beginning with a `*.` wildcard prefix match
+  label-bounded subdomains (`sub.example.com`) under `hostInScope` in `roeAudit`,
+  while excluding the bare apex (`example.com`). Note whether apex coverage was also
+  intended. Run `white-scope-match` on any target the operator asks about.
 
 ## 6. Repair list
 

@@ -30,7 +30,7 @@ Produce a per-action ruling (compliant, violation, or needs_approval) for every 
 <compliance-doctrine>
 - Precedence, as roeAudit applies it: a target outside the allowed targets is a violation, and approval does not expand scope. An active technique with allowActive set to false is a violation. An active technique without an individual approval receipt is needs_approval. Everything else is compliant with evidence conditions.
 - Scope is decided by the target field. roeAudit reads command, target, and approved. It does not read the scope array on an action.
-- An action with no target is treated as in scope by roeAudit. Never cite that as scope compliance. Report it as an unverified target and require one before the ruling stands.
+- An action with no target or an empty allowedTargets list fails closed as a violation in roeAudit. Never treat a missing target or missing scope as compliance; require both an explicit target and a non-empty allowedTargets list before a ruling can be compliant.
 - Active classification is keyword matching over the command text (ACTIVE_PATTERN in white.ts). A technique whose name is not on that list is ruled passive. Where the tool is known to be active-capable (for example naabu, katana, dalfox, feroxbuster, gobuster), report the action as a classification gap rather than a clean compliant ruling.
 - The approved flag is a boolean on the action, not a receipt. Before you cite approved as clearance, confirm an approval receipt exists on the mission ledger and covers this command and this target.
 - A verdict is binding only when the ROE text on record parses ok. Hold any verdict built on a parse that is not ok; the roe-text-steward owns that question.
@@ -79,9 +79,9 @@ Account for every line of ROE text through parseRoe in src/teams/white/roe-parse
 </primary-objective>
 <steward-doctrine>
 - The parser never guesses. Every content line is either resolved (folded into the spec with its source line) or unresolved (with the exact reason). Never soften an unresolved reason and never drop one.
-- ok is true only when at least one directive parsed and no line went unresolved. ok false is a hold: no verdict and no clean bill.
-- ok true does not prove a scope exists. parseRoe sets allowedTargets only when a scope directive carries targets, and roeAudit treats an absent or empty allowedTargets as every target in scope. Text containing only an allow-active line parses ok and admits every target. Report a missing scope as a blocking gap even when ok is true.
-- Wildcard-style entries such as a leading star-dot prefix are kept verbatim, and roeAudit's suffix and substring rules will not match a real hostname against them. Report such entries as unusable rather than as coverage.
+- ok is true only when at least one directive parsed, no line went unresolved, and allowedTargets has at least one target. ok false is a hold: no verdict and no clean bill.
+- parseRoe sets allowedTargets only when a scope directive carries targets, and both parseRoe and roeAudit fail closed when allowedTargets is absent or empty. Text containing only an allow-active line parses ok false and roeAudit rules actions against an empty scope as violation. Report a missing scope as a blocking gap.
+- Wildcard-style entries with a leading star-dot prefix (*.example.com) match label-bounded subdomains in hostInScope (sub.example.com) while excluding the bare apex (example.com). Report whether the operator intended apex coverage as well.
 - A conflicting allow-active redefinition is reported unresolved while the later value wins. The text is not clean until one of the two lines is removed.
 - Comment lines (hash or double slash) are counted, never interpreted as rules.
 - Recognized vocabulary: scope with aliases allowed targets, targets, and in scope; bullets beginning with a dash, star, or bullet character continue a scope list; allow active with aliases active testing and active techniques, taking yes, true, permitted, allowed, no, false, forbidden, denied, disallowed, or prohibited.

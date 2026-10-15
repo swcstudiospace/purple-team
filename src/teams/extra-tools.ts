@@ -326,19 +326,19 @@ export function runSnapshotManagerTool(
   const action = input.action ?? 'create';
   const label = (input.label ?? '').trim() || 'workspace-snapshot';
 
-  if (action === 'verify') {
+  if (action === 'verify' || action === 'restore') {
     const snap = input.snapshotToVerify;
-    if (!snap || typeof snap.sha256 !== 'string') {
+    if (!snap || typeof snap.sha256 !== 'string' || !snap.sha256.trim()) {
       return {
         state: 'empty',
-        action: 'verify',
+        action,
         snapshotId: 'none',
         version: 2,
         sha256: '',
         integrityVerified: false,
         activeHat: 'blue',
         restoredState: {},
-        summary: 'No snapshot supplied for integrity verification.',
+        summary: `No signed snapshot supplied for ${action === 'restore' ? 'restore' : 'integrity verification'}.`,
       };
     }
     const migrated = migrateWorkspaceState(snap.state);
@@ -346,15 +346,15 @@ export function runSnapshotManagerTool(
     const integrityVerified = snap.sha256 === expectedSha;
     return {
       state: integrityVerified ? 'success' : 'error',
-      action: 'verify',
+      action,
       snapshotId: snap.id || label,
       version: 2,
       sha256: expectedSha,
       integrityVerified,
       activeHat: migrated.activeHat,
-      restoredState: migrated,
+      restoredState: integrityVerified ? migrated : {},
       summary: integrityVerified
-        ? `Snapshot "${snap.id}" passed SHA-256 integrity verification (${expectedSha}).`
+        ? `${action === 'restore' ? 'Restored' : 'Snapshot'} "${snap.id}" passed SHA-256 integrity verification (${expectedSha}).`
         : `Snapshot "${snap.id}" hash mismatch: expected ${expectedSha} but received ${snap.sha256}.`,
     };
   }
@@ -373,7 +373,7 @@ export function runSnapshotManagerTool(
     integrityVerified: true,
     activeHat: migrated.activeHat,
     restoredState: migrated,
-    summary: `${action === 'restore' ? 'Restored' : 'Created'} v2 workspace snapshot "${snapshotId}" for ${migrated.activeHat.toUpperCase()} Hat (${sha256}).`,
+    summary: `Created v2 workspace snapshot "${snapshotId}" for ${migrated.activeHat.toUpperCase()} Hat (${sha256}).`,
   };
 }
 
@@ -401,6 +401,7 @@ export interface BatchJobResult {
   toolId: string;
   status: 'success' | 'error' | 'skipped';
   outputSummary: string;
+  durationMs?: number;
 }
 
 export interface BatchRunnerResult {
@@ -412,6 +413,23 @@ export interface BatchRunnerResult {
   skippedJobs: number;
   results: readonly BatchJobResult[];
 }
+
+const KNOWN_BATCH_TOOL_IDS: ReadonlySet<string> = new Set([
+  'blue-workflow-sequencer',
+  'blue-decision-ledger',
+  'blue-execution-monitor',
+  'white-data-inspector',
+  'white-evidence-collector',
+  'white-gap-analyzer',
+  'black-risk-analyzer',
+  'black-policy-validator',
+  'black-stress-prober',
+  'shared-context-transformer',
+  'shared-artifact-diff',
+  'shared-snapshot-manager',
+  'shared-batch-runner',
+  'red-findings-correlator',
+]);
 
 /**
  * Extra Tool 4: Cross-Hat Batch Runner (`runBatchRunnerTool`).
@@ -445,7 +463,8 @@ export function runBatchRunnerTool(
   for (let i = 0; i < jobs.length; i += 1) {
     const job = jobs[i];
     const id = (job.id ?? '').trim() || `job-${i + 1}`;
-    const toolId = (job.toolId ?? '').trim() || 'unassigned';
+    const rawToolId = (job.toolId ?? '').trim();
+    const toolId = rawToolId || 'unassigned';
 
     if (halted) {
       skippedJobs += 1;
@@ -455,19 +474,26 @@ export function runBatchRunnerTool(
         toolId,
         status: 'skipped',
         outputSummary: 'Skipped due to stopOnError on preceding job.',
+        durationMs: 0,
       });
       continue;
     }
 
-    if (job.simulateError === true || !job.toolId) {
+    if (job.simulateError === true || !rawToolId || !KNOWN_BATCH_TOOL_IDS.has(rawToolId)) {
       failedJobs += 1;
       if (stopOnError) halted = true;
+      const reason = !rawToolId
+        ? 'missing toolId'
+        : !KNOWN_BATCH_TOOL_IDS.has(rawToolId)
+          ? `unknown toolId "${rawToolId}"`
+          : 'reported execution failure';
       results.push({
         id,
         hat: job.hat,
         toolId,
         status: 'error',
-        outputSummary: `Batch job "${id}" (${toolId}) reported execution failure.`,
+        outputSummary: `Batch job "${id}" (${toolId}) ${reason}.`,
+        durationMs: 0,
       });
       continue;
     }
@@ -478,7 +504,7 @@ export function runBatchRunnerTool(
       hat: job.hat,
       toolId,
       status: 'success',
-      outputSummary: `[${job.hat.toUpperCase()}] Completed ${toolId}: ${job.payloadSummary || 'ok'}`,
+      outputSummary: `[${job.hat.toUpperCase()}] Staged batch job ${toolId}: ${job.payloadSummary || 'validated catalog tool'}`,
     });
   }
 

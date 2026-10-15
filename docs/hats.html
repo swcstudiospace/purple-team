@@ -453,6 +453,7 @@
   var selectedId = 'blue-workflow-sequencer';
   var lastRunOutput = null;
   var activeAbortController = null;
+  var runSeq = 0;
 
   function updateContextBar(hatKey) {
     var info = HAT_DESCRIPTIONS[hatKey] || HAT_DESCRIPTIONS.all;
@@ -667,44 +668,59 @@
       }
     }
 
+    if (activeAbortController) {
+      try { activeAbortController.abort(); } catch (e) { /* ignore */ }
+    }
+    var reqSeq = ++runSeq;
+    var reqMode = currentMode;
+    var reqItem = item;
+    var reqHat = reqMode === 'skills' ? (reqItem.primaryHat || 'blue') : (reqItem.hat || 'blue');
+    var reqController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    activeAbortController = reqController;
+
     Shell.showState(root, 'loading');
     if (cancelBtn) cancelBtn.hidden = false;
-    activeAbortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
 
     try {
-      var endpoint = currentMode === 'skills' ? '/api/teams/skills/run' : '/api/teams/tools/run';
-      var body = currentMode === 'skills'
-        ? { skillId: item.id, params: parsedInput }
-        : { toolId: item.id, input: parsedInput };
+      var endpoint = reqMode === 'skills' ? '/api/teams/skills/run' : '/api/teams/tools/run';
+      var body = reqMode === 'skills'
+        ? { skillId: reqItem.id, params: parsedInput }
+        : { toolId: reqItem.id, input: parsedInput };
 
       var res = await fetch(Shell.apiBase() + endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
-        signal: activeAbortController ? activeAbortController.signal : undefined
+        signal: reqController ? reqController.signal : undefined
       });
       var payload = await res.json();
+      if (reqSeq !== runSeq) return;
       if (cancelBtn) cancelBtn.hidden = true;
 
-      if (!res.ok && (!payload || !payload.error)) {
-        throw new Error('HTTP ' + res.status);
-      }
-
-      lastRunOutput = {
-        id: item.id,
-        hat: currentMode === 'skills' ? (item.primaryHat || 'blue') : (item.hat || 'blue'),
-        mode: currentMode,
-        envelope: payload
-      };
-
-      if (payload && payload.ok === false && payload.error) {
+      if (!res.ok || !payload || payload.ok === false || payload.error) {
+        var errObj = payload && payload.error;
+        var errText = '';
+        if (typeof errObj === 'string') {
+          errText = errObj;
+        } else if (errObj && typeof errObj === 'object') {
+          errText = '[' + (errObj.code || 'ERROR') + '] ' + (errObj.message || 'Execution failed');
+        } else {
+          errText = 'HTTP ' + res.status;
+        }
         var gErr = document.getElementById('toolErrorMsg');
-        if (gErr) gErr.textContent = '[' + (payload.error.code || 'ERROR') + '] ' + (payload.error.message || 'Execution failed');
+        if (gErr) gErr.textContent = errText;
         Shell.showState(root, 'error');
         return;
       }
 
-      var resultData = currentMode === 'skills' ? payload : (payload && payload.data ? payload.data : payload);
+      lastRunOutput = {
+        id: reqItem.id,
+        hat: reqHat,
+        mode: reqMode,
+        envelope: payload
+      };
+
+      var resultData = reqMode === 'skills' ? payload : (payload && payload.data ? payload.data : payload);
       if (resultData && resultData.state === 'empty') {
         var emptyEl = document.getElementById('toolEmptyMsg');
         if (emptyEl) emptyEl.textContent = resultData.summary || 'Tool returned an empty state for the provided input.';
@@ -737,8 +753,9 @@
         preEl.textContent = JSON.stringify(resultData, null, 2);
       }
       Shell.showState(root, 'data');
-      Shell.announce('Completed ' + item.name);
+      Shell.announce('Completed ' + reqItem.name);
     } catch (err) {
+      if (reqSeq !== runSeq) return;
       if (cancelBtn) cancelBtn.hidden = true;
       var msg = (err && err.name === 'AbortError') ? 'Execution cancelled by user.' : ((err && err.message) || String(err));
       var errEl = document.getElementById('toolErrorMsg');

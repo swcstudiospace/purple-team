@@ -229,35 +229,18 @@ Requires: Target hostname or IP.`,
   ,
   {
     name: 'tempest_blue_gaps',
-    description: `Blue detection-coverage gaps (GET /api/teams/blue/gaps, or POST when findings are supplied). Supplied findings are scored and not written to the ledger. Use when: the operator asks which findings lack telemetry coverage or which detectors to build.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        findings: { type: 'array', description: 'Optional findings to score. Omit to read the ledger.' },
-        telemetry: { type: 'array', description: 'Optional telemetry sources ({ source, countermeasures?, coveredIds? }). Replaces the installed registry for this score.' }
-      }
-    }
+    description: `Blue detection-coverage gaps (GET /api/teams/blue/gaps). Reads the stored findings ledger; supplied findings are not accepted — use tempest_blue_coverage to score supplied findings. Use when: the operator asks which findings lack telemetry coverage or which detectors to build.`,
+    inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'tempest_blue_rules',
-    description: `Blue experimental Sigma pack (GET /api/teams/blue/rules, or POST when findings are supplied). Supplied findings are not written to the ledger. Use when: the operator asks for detection rules from uncovered gaps.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        findings: { type: 'array', description: 'Optional findings to score. Omit to read the ledger.' },
-        telemetry: { type: 'array', description: 'Optional telemetry sources ({ source, countermeasures?, coveredIds? }). Replaces the installed registry for this pack.' }
-      }
-    }
+    description: `Blue experimental Sigma pack (GET /api/teams/blue/rules). Reads the stored findings ledger; supplied findings are not accepted. Use when: the operator asks for detection rules from uncovered gaps.`,
+    inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'tempest_blue_hardening',
-    description: `Blue severity-tiered hardening plan (GET /api/teams/blue/hardening, or POST when findings are supplied). Supplied findings are not written to the ledger. Use when: the operator asks for the hardening work items.`,
-    inputSchema: {
-      type: 'object',
-      properties: {
-        findings: { type: 'array', description: 'Optional findings to score. Omit to read the ledger.' }
-      }
-    }
+    description: `Blue severity-tiered hardening plan (GET /api/teams/blue/hardening). Reads the stored findings ledger; supplied findings are not accepted. Use when: the operator asks for the hardening work items.`,
+    inputSchema: { type: 'object', properties: {} }
   },
   {
     name: 'tempest_blue_coverage',
@@ -270,9 +253,10 @@ Requires: Target hostname or IP.`,
         family: { type: 'string' },
         artifactIds: { type: 'array' },
         artifactBytes: { type: 'string' },
-        findings: { type: 'array' }
+        findings: { type: 'array' },
+        telemetry: { type: 'array' }
       },
-      required: ['runId', 'missionId', 'family', 'findings']
+      required: ['runId', 'missionId', 'family', 'artifactIds', 'artifactBytes', 'findings', 'telemetry']
     }
   },
   {
@@ -543,29 +527,35 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
 
     case 'tempest_blue_gaps': {
       const { findings, telemetry } = args as { findings?: unknown; telemetry?: unknown };
-      return findings === undefined && telemetry === undefined
-        ? tempestGet('/api/teams/blue/gaps')
-        : tempestPost('/api/teams/blue/gaps', {
-          ...(findings !== undefined ? { findings } : {}),
-          ...(telemetry !== undefined ? { telemetry } : {}),
+      if (findings !== undefined || telemetry !== undefined) {
+        return JSON.stringify({
+          ok: false,
+          error: 'Supplied findings/telemetry are not accepted on GET /api/teams/blue/gaps; use tempest_blue_coverage to score supplied findings.',
         });
+      }
+      return tempestGet('/api/teams/blue/gaps');
     }
 
     case 'tempest_blue_rules': {
       const { findings, telemetry } = args as { findings?: unknown; telemetry?: unknown };
-      return findings === undefined && telemetry === undefined
-        ? tempestGet('/api/teams/blue/rules')
-        : tempestPost('/api/teams/blue/rules', {
-          ...(findings !== undefined ? { findings } : {}),
-          ...(telemetry !== undefined ? { telemetry } : {}),
+      if (findings !== undefined || telemetry !== undefined) {
+        return JSON.stringify({
+          ok: false,
+          error: 'Supplied findings/telemetry are not accepted on GET /api/teams/blue/rules; use tempest_blue_coverage to score supplied findings.',
         });
+      }
+      return tempestGet('/api/teams/blue/rules');
     }
 
     case 'tempest_blue_hardening': {
       const { findings } = args as { findings?: unknown };
-      return findings === undefined
-        ? tempestGet('/api/teams/blue/hardening')
-        : tempestPost('/api/teams/blue/hardening', { findings });
+      if (findings !== undefined) {
+        return JSON.stringify({
+          ok: false,
+          error: 'Supplied findings are not accepted on GET /api/teams/blue/hardening; use tempest_blue_coverage to score supplied findings.',
+        });
+      }
+      return tempestGet('/api/teams/blue/hardening');
     }
     case 'tempest_blue_coverage':
       return tempestPost('/api/teams/blue/coverage', args);

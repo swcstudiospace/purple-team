@@ -88,7 +88,7 @@ function residualRiskTier(
   detection: DetectionGap['coverage'],
   verdict: string | undefined,
 ): PurpleRiskTier {
-  const baseIndex = severity !== undefined && RISK_TIER_BY_SEVERITY[severity] !== undefined
+  const baseIndex = severity !== undefined && Object.prototype.hasOwnProperty.call(RISK_TIER_BY_SEVERITY, severity)
     ? RISK_TIER_BY_SEVERITY[severity]
     : RISK_TIER_DEFAULT_INDEX;
   let tierIndex = baseIndex;
@@ -129,7 +129,9 @@ export function synthesize(input: {
 
   const coverageMatrix = input.findings.map((finding, index) => {
     const detection = coverageByFinding.get(finding.id) || 'none';
-    const joined = verdictById ? verdictById[finding.id] : input.verdicts[index];
+    const joined = verdictById
+      ? (Object.prototype.hasOwnProperty.call(verdictById, finding.id) ? verdictById[finding.id] : undefined)
+      : input.verdicts[index];
     const verdict = joined?.verdict;
     const rationale = joined && 'rationale' in joined && joined.rationale ? joined.rationale : undefined;
     const subject = finding.title ? ` (${finding.title})` : '';

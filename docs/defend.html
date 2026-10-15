@@ -35,6 +35,7 @@
 <div><label class="flabel" for="coverageFinding">Finding id</label><input class="form-input" id="coverageFinding" name="findingId" autocomplete="off" required aria-describedby="coverageBindResult"></div>
 <div><label class="flabel" for="coverageArtifact">Artifact id</label><input class="form-input" id="coverageArtifact" name="artifactId" autocomplete="off" required aria-describedby="coverageBindResult"></div>
 <div><label class="flabel" for="coverageFamily">Family</label><input class="form-input" id="coverageFamily" name="family" value="web_api" autocomplete="off" aria-describedby="coverageBindResult"></div>
+<div><label class="flabel" for="coverageBytes">Artifact bytes</label><textarea class="form-input" id="coverageBytes" name="artifactBytes" rows="1" aria-describedby="coverageBindResult"></textarea></div>
 <div><label class="flabel" for="coverageBindSubmit">Score</label><button class="btn btn--sm btn--primary" id="coverageBindSubmit" type="submit">Score artifact</button></div>
 </form>
 <p id="coverageBindResult" class="text-secondary" role="status" aria-live="polite"></p>
@@ -184,14 +185,17 @@ document.getElementById('coverageBind').addEventListener('submit', async functio
   var findingId = document.getElementById('coverageFinding').value.trim();
   var artifactId = document.getElementById('coverageArtifact').value.trim();
   var family = document.getElementById('coverageFamily').value.trim() || 'web_api';
+  var bytes = document.getElementById('coverageBytes').value;
   result.textContent = 'Scoring…';
   try {
     var scored = await Shell.apiPost('/api/teams/blue/coverage', {
       runId: 'ui-' + Date.now(),
       missionId: 'ui-defend',
       family: family,
-      artifactIds: [artifactId],
-      findings: [{ id: findingId }]
+      artifactIds: artifactId ? [artifactId] : [],
+      artifactBytes: bytes,
+      findings: [{ id: findingId }],
+      telemetry: []
     });
     var gaps = Array.isArray(scored.gaps) ? scored.gaps : [];
     var row = gaps.find(function (gap) { return gap.findingId === findingId; });
@@ -207,7 +211,7 @@ document.getElementById('blackReview').addEventListener('submit', async function
   event.preventDefault();
   var result = document.getElementById('blackReviewResult');
   var actions = document.getElementById('blackActions').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
-  var paths = document.getElementById('blackPaths').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  var paths = document.getElementById('blackPaths').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean).map(function (p) { return { id: p, channel: p }; });
   result.textContent = 'Reviewing…';
   try {
     var reviewed = await Shell.apiPost('/api/teams/black/workflow', { actions: actions, paths: paths, egress: [] });

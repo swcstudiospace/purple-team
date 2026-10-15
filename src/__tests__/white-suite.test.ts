@@ -544,4 +544,18 @@ describe('white suite: prompts name real exports and referee limits', () => {
     expect(WHITE_SPECIALIST_PROMPTS['roe-compliance-reviewer']).toContain('dig');
     expect(WHITE_SPECIALIST_PROMPTS['report-coverage-auditor']).toContain('nist-800-115');
   });
+
+  it('matches bare IPv6 and bracketed IPv6 targets accurately in roeAudit', () => {
+    const verdicts = roeAudit(
+      [
+        { command: 'curl -s http://[::1]:8080/health', target: '::1' },
+        { command: 'curl -s http://[::1]:8080/health', target: 'http://[::1]:8080/health' },
+        { command: 'curl -s http://[::2]:8080/health', target: '::2' },
+      ],
+      { allowedTargets: ['::1'], allowActive: true },
+    );
+    expect(verdicts[0].verdict).toBe('compliant');
+    expect(verdicts[1].verdict).toBe('compliant');
+    expect(verdicts[2].verdict).toBe('violation');
+  });
 });

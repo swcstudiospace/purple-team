@@ -10,9 +10,9 @@
  * modeled/imported, never observed.
  */
 
-import { exfilCostModel, type ExfilPath, type RouteEvidence } from './exfil.js';
-import { structuredNoiseBudget } from './noise.js';
-import { opsecReview } from './checklist.js';
+import { exfilCostModel, type ExfilCostReport, type ExfilPath, type RouteEvidence } from './exfil.js';
+import { structuredNoiseBudget, type StructuredNoiseReport } from './noise.js';
+import { opsecReview, type OpsecReview } from './checklist.js';
 
 /** Staged workflow outcome: insufficient (empty), refused (boundary), complete. */
 export type BlackWorkflowOutcome = 'insufficient' | 'refused' | 'complete';
@@ -22,7 +22,7 @@ export type BlackWorkflowTool = 'exfilCostModel' | 'structuredNoiseBudget' | 'op
 
 export interface BlackWorkflowInput {
   actions?: readonly string[];
-  paths?: readonly ExfilPath[];
+  paths?: readonly (ExfilPath | string)[];
   egress?: readonly string[];
   routeEvidence?: readonly RouteEvidence[];
   requestKind?: 'analysis' | 'destructive-concealment' | 'live-probe' | 'live-bulk-exfil' | 'verify-route';
@@ -44,6 +44,9 @@ export interface BlackWorkflowResult {
   /** ATT&CK hits are modeled/imported vocabulary matches, never observed. */
   provenance: 'modeled' | 'imported';
   evidence?: BlackWorkflowEvidence;
+  noise?: StructuredNoiseReport;
+  costs?: ExfilCostReport;
+  review?: OpsecReview;
 }
 
 /** Deterministic FNV-1a hash over the JSON input, cited with every result. */
@@ -131,8 +134,6 @@ export function runBlackWorkflow(input: BlackWorkflowInput): BlackWorkflowResult
   const noise = structuredNoiseBudget({ actions, egress });
   const costs = exfilCostModel({ paths, egress, routeEvidence: input.routeEvidence });
   const review = opsecReview({ actions, egress });
-  void noise;
-  void review;
   const refs = [
     ...actions.map((action, index) => `plan[${index}]: ${action}`),
     ...costs.paths.map(path => `path:${path.pathId}`),
@@ -147,6 +148,9 @@ export function runBlackWorkflow(input: BlackWorkflowInput): BlackWorkflowResult
       inputHash: hashBlackInput(input),
       refs,
     },
+    noise,
+    costs,
+    review,
   };
 }
 

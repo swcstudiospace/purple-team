@@ -522,4 +522,15 @@ describe('blue pipeline: sigmaRulepack', () => {
     expect(pack.rules).toEqual([]);
     expect(pack.yaml).toBe('');
   });
+
+  it('requires non-empty nonMatchingEvidence before validateDetectorStanding returns validated', () => {
+    const standingWithoutNegative = validateDetectorStanding({
+      findingId: 'F-DET',
+      validator: 'sigma',
+      pattern: 'union select',
+      matchingEvidence: ['UNION SELECT payload echoed in the error page'],
+      nonMatchingEvidence: [],
+    });
+    expect(standingWithoutNegative.standing).toBe('unavailable');
+  });
 });

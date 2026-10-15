@@ -118,6 +118,27 @@ export const BLUE_STARTER_TEMPLATES: readonly BlueStarterTemplate[] = [
   },
 ];
 
+const KNOWN_SEQUENCER_TOOL_IDS: ReadonlySet<string> = new Set([
+  'blue-workflow-sequencer',
+  'blue-decision-ledger',
+  'blue-execution-monitor',
+  'white-data-inspector',
+  'white-evidence-collector',
+  'white-gap-analyzer',
+  'black-risk-analyzer',
+  'black-policy-validator',
+  'black-stress-prober',
+  'shared-context-transformer',
+  'shared-artifact-diff',
+  'shared-snapshot-manager',
+  'shared-batch-runner',
+  'red-findings-correlator',
+  'coverageGaps',
+  'recon',
+  'hardeningPlan',
+  'detectionGaps',
+]);
+
 function shortSha256(payload: string): string {
   return createHash('sha256').update(payload, 'utf8').digest('hex').slice(0, 16);
 }
@@ -212,10 +233,12 @@ export function runBlueWorkflowSequencer(
       continue;
     }
 
-    if (!toolId || step.simulateFailure === true) {
+    if (!toolId || !KNOWN_SEQUENCER_TOOL_IDS.has(toolId) || step.simulateFailure === true) {
       const errorMessage = !toolId
         ? `Step ${i + 1} is missing a valid toolId`
-        : `Step ${i + 1} (${toolId}) reported simulated execution failure`;
+        : !KNOWN_SEQUENCER_TOOL_IDS.has(toolId)
+          ? `Step ${i + 1} references unknown toolId "${toolId}"`
+          : `Step ${i + 1} (${toolId}) reported simulated execution failure`;
       failedStep = {
         stepIndex: i,
         toolId: toolId || 'missing-tool-id',
@@ -234,7 +257,7 @@ export function runBlueWorkflowSequencer(
         condition,
         status: 'failed',
         outputSummary: errorMessage,
-        durationMs: 12,
+        durationMs: 0,
       });
       continue;
     }
@@ -249,7 +272,7 @@ export function runBlueWorkflowSequencer(
         condition,
         status: 'skipped',
         outputSummary: `Condition "${condition}" evaluated to false under current context signals.`,
-        durationMs: 1,
+        durationMs: 0,
       });
       continue;
     }
@@ -267,8 +290,8 @@ export function runBlueWorkflowSequencer(
       condition,
       status: 'completed',
       ...(checkpointHash ? { checkpointHash } : {}),
-      outputSummary: `[${step.hat.toUpperCase()}] Executed ${toolId}${step.inputSummary ? ` on "${step.inputSummary}"` : ''} — verified output ready for downstream handoff.`,
-      durationMs: 15 + (i * 7),
+      outputSummary: `[${step.hat.toUpperCase()}] Staged plan step ${toolId}${step.inputSummary ? ` on "${step.inputSummary}"` : ''} — dry-run sequence checkpoint ready for downstream handoff.`,
+      durationMs: 0,
     });
   }
 
@@ -298,7 +321,7 @@ export function runBlueWorkflowSequencer(
     objective,
     starterTemplates: BLUE_STARTER_TEMPLATES,
     timeline,
-    synthesisReport: `Workflow "${workflowName}" completed ${completedCount} of ${timeline.length} step(s) (${skippedCount} skipped) for objective: ${objective}.`,
+    synthesisReport: `Workflow plan "${workflowName}" staged ${completedCount} of ${timeline.length} step(s) (${skippedCount} skipped) for objective: ${objective}.`,
     nextHatHandoff: {
       targetHat: lastCompleted?.hat === 'blue' ? 'white' : 'blue',
       reason: 'Record completed workflow checkpoints in the Blue Hat Session & Decision Ledger.',

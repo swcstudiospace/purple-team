@@ -393,12 +393,20 @@ describe('grant isolation (AC-FH-012)', () => {
     expect(() => resolveRunAllowlist('ninja' as never)).toThrow();
   });
 
-  it('blue, white, and their hats never freeze probe-grade defaultTools', () => {
+  it('blue, white, and their hats never freeze probe-grade defaultTools and expand catalog grants to adapter tool names', () => {
     for (const role of ['blue', 'white', 'sentinel', 'warden', 'arbiter', 'auditor'] as const) {
       const frozen = resolveRunAllowlist(role);
       expect(frozen).not.toContain('http_request');
       expect(frozen).not.toContain('curl_request');
     }
+    const blueAllow = resolveRunAllowlist('blue');
+    expect(blueAllow).toContain('file');
+    expect(blueAllow).toContain('file_tool');
+    expect(blueAllow).toContain('gitleaks');
+    expect(blueAllow).toContain('gitleaks_tool');
+    const whiteAllow = resolveRunAllowlist('white');
+    expect(whiteAllow).toContain('dig');
+    expect(whiteAllow).toContain('dns_lookup');
   });
 });
 
