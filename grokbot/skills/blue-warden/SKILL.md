@@ -43,6 +43,8 @@ then read the hardening plan the backend tiers from the same ledger:
   `curl -s http://127.0.0.1:3333/api/teams/blue/gaps`: a finding with
   `coverage: "partial"` is logged but not alerted; name it.
 
+A hardening retest is not proven by a recommendation. Item-linked baseline and retest evidence ids are required before a control is called retested. Relay `insufficient-evidence` when those ids are absent.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.

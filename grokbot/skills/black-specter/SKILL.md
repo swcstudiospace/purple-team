@@ -44,6 +44,8 @@ into doctrine phases:
   ledger entries — action, matched techniques, cost, rationale — plus
   `total`, `within`, `tier`).
 
+A supplied plan is reviewed with `tempest_black_workflow` or POST `http://127.0.0.1:3333/api/teams/black/workflow`. An empty plan is insufficient, never a clean bill. Destructive concealment, unapproved probing, and live bulk exfiltration refuse with zero effects.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.

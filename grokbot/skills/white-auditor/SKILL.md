@@ -40,6 +40,8 @@ ledger — one chain-link verdict per entry:
   `strength`, the platform `verdict`, and the `reason` behind every
   `broken` link — plus the `intact`/`broken` totals and the `summary`).
 
+An aggregate is not sufficient, and is not 100, when a required item is missing, broken, or contradictory. Relay the standing from `aggregateEvidenceStanding` rather than counting accepted rows.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
