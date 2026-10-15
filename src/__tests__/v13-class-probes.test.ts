@@ -9,8 +9,7 @@ import { synthesize } from '../teams/purple.js';
 
 describe('v1.3 class probes: phase-19 empty-spec never-all-compliant (flagship)', () => {
   it('never green-lights a mixed plan against an empty spec, still binds an explicit allowActive=false, and refuses an empty parse', () => {
-    // Facet 1: mixed active-plus-passive set against an empty spec must never
-    // return all-compliant; the unapproved active action needs approval first.
+    // Empty allow-list is out of scope, never in scope and never compliant.
     const mixed = roeAudit(
       [
         { command: 'nmap -sV app.example.com', target: 'app.example.com' },
@@ -18,14 +17,19 @@ describe('v1.3 class probes: phase-19 empty-spec never-all-compliant (flagship)'
       ],
       {},
     );
-    expect(mixed.map((v) => v.verdict)).toContain('needs_approval');
+    expect(mixed.map((v) => v.verdict)).toEqual(['violation', 'violation']);
     expect(mixed.every((v) => v.verdict === 'compliant')).toBe(false);
-    expect(mixed[0].verdict).toBe('needs_approval');
+
+    const unapproved = roeAudit(
+      [{ command: 'nmap -sV app.example.com', target: 'app.example.com' }],
+      { allowedTargets: ['app.example.com'] },
+    );
+    expect(unapproved[0].verdict).toBe('needs_approval');
 
     // Facet 2: an explicit allowActive=false spec still binds approved active work.
     const bound = roeAudit(
       [{ command: 'nmap -sV app.example.com', target: 'app.example.com', approved: true }],
-      { allowActive: false },
+      { allowActive: false, allowedTargets: ['app.example.com'] },
     );
     expect(bound[0].verdict).toBe('violation');
 
@@ -44,7 +48,7 @@ describe('v1.3 class probes: phase-15 lookalike-id coverage honesty', () => {
     expect(gap.unresolvedCountermeasures).toContain('D3-P');
     expect(gap.countermeasures).toEqual(['D3-PA']);
     expect(gap.coveredCountermeasures).toEqual(['D3-PA']);
-    expect(gap.coverage).toBe('covered');
+    expect(gap.coverage).toBe('partial');
     expect(gap.recommendation).toContain('reported, not used');
   });
 });

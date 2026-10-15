@@ -3,6 +3,8 @@ import { parseRoe } from '../teams/white/roe-parser.js';
 import { auditEvidenceChain, type LedgerEvidenceShape } from '../teams/white/evidence-chain.js';
 import { auditReport, type FindingShape } from '../teams/white/report-auditor.js';
 import { roeAudit, type AuditedAction } from '../teams/white.js';
+import { stageRoeAudit, pairDisputeRulings, aggregateEvidenceStanding } from '../teams/white/workflow.js';
+import { WHITE_PARENT_PROMPT, WHITE_SPECIALIST_PROMPTS } from '../prompts/white.js';
 
 describe('white suite: parseRoe', () => {
   it('maps scope and allow-active directives onto RoeSpec fields with per-line accounting', () => {
@@ -95,9 +97,9 @@ describe('white suite: v1 roeAudit fed by a parsed spec', () => {
     expect(parse.ok).toBe(true);
     const actions: AuditedAction[] = [
       { command: 'curl -s https://app.example.com/login', target: 'app.example.com' },
-      { command: 'nmap -sV app.example.com', approved: true },
+      { command: 'nmap -sV app.example.com', target: 'app.example.com', approved: true },
       { command: 'nmap -sV 10.0.0.5', target: '10.0.0.5', approved: true },
-      { command: 'sqlmap -u http://app.example.com/item?id=1' },
+      { command: 'sqlmap -u http://app.example.com/item?id=1', target: 'app.example.com' },
     ];
     const verdicts = roeAudit(actions, parse.roe);
     expect(verdicts.map(verdict => verdict.verdict)).toEqual([
@@ -114,7 +116,7 @@ describe('white suite: v1 roeAudit fed by a parsed spec', () => {
   it('rules an approved active technique a violation when the parsed spec forbids active', () => {
     const parse = parseRoe('scope: app.example.com\nallow active: no');
     expect(parse.ok).toBe(true);
-    const verdicts = roeAudit([{ command: 'nmap -sV app.example.com', approved: true }], parse.roe);
+    const verdicts = roeAudit([{ command: 'nmap -sV app.example.com', target: 'app.example.com', approved: true }], parse.roe);
     expect(verdicts[0].verdict).toBe('violation');
     expect(verdicts[0].rationale).toContain('disallowed by the ROE');
   });
@@ -310,5 +312,236 @@ describe('white suite: auditReport', () => {
     expect(empty.withGaps).toBe(0);
     expect(empty.unclaimedEvidence).toEqual([]);
     expect(empty.summary).toBe('0/0 findings report-ready; 0 unclaimed ledger entries');
+  });
+});
+
+describe('white suite: fail-closed scope', () => {
+  const roe = { allowedTargets: ['allowed.example'], allowActive: true };
+
+  it('rules a missing target out of scope, never in scope', () => {
+    const verdicts = roeAudit([{ command: 'curl -s https://allowed.example/' }], roe);
+    expect(verdicts[0].verdict).toBe('violation');
+    expect(verdicts[0].rationale).toContain('outside the ROE allowed targets');
+  });
+
+  it('rules every host out of scope against an empty allow-list', () => {
+    const verdicts = roeAudit(
+      [{ command: 'curl -s https://allowed.example/', target: 'allowed.example' }],
+      { allowedTargets: [], allowActive: true },
+    );
+    expect(verdicts[0].verdict).toBe('violation');
+  });
+
+  it('resolves userinfo-bearing URLs by their real host', () => {
+    const carried = roeAudit(
+      [{ command: 'curl -s https://user:pass@allowed.example/path', target: 'https://user:pass@allowed.example/path' }],
+      roe,
+    );
+    expect(carried[0].verdict).toBe('compliant');
+    const spoofed = roeAudit(
+      [{ command: 'curl -s https://allowed.example@attacker.test/path', target: 'https://allowed.example@attacker.test/path' }],
+      roe,
+    );
+    expect(spoofed[0].verdict).toBe('violation');
+  });
+
+  it('keeps a permitted host matching after port normalization', () => {
+    const verdicts = roeAudit(
+      [{ command: 'curl -s http://allowed.example:8443/admin', target: 'http://allowed.example:8443/admin' }],
+      roe,
+    );
+    expect(verdicts[0].verdict).toBe('compliant');
+  });
+
+  it('parses bracketed IPv6 targets before matching', () => {
+    const v6 = roeAudit(
+      [{ command: 'curl -s http://[::1]:8080/admin', target: 'http://[::1]:8080/admin' }],
+      { allowedTargets: ['::1'], allowActive: true },
+    );
+    expect(v6[0].verdict).toBe('compliant');
+  });
+
+  it('rejects named-suffix and path/query lookalikes', () => {
+    for (const target of [
+      'allowed.example.attacker.test',
+      'https://attacker.test/allowed.example',
+      'https://attacker.test?x=allowed.example',
+      'notallowed.example',
+    ]) {
+      const verdicts = roeAudit([{ command: `curl -s ${target}`, target }], roe);
+      expect(verdicts[0].verdict).toBe('violation');
+    }
+  });
+
+  it('never lets approval flip an out-of-scope host to compliant', () => {
+    const verdicts = roeAudit(
+      [{ command: 'nmap -sV 10.0.0.5', target: '10.0.0.5', approved: true }],
+      roe,
+    );
+    expect(verdicts[0].verdict).toBe('violation');
+    expect(verdicts[0].rationale).toContain('outside the ROE allowed targets');
+  });
+});
+
+describe('white suite: staged workflow', () => {
+  const roeText = 'scope: app.example.com\nallow active: yes';
+
+  it('refuses before roeAudit when the ROE text does not parse ok', () => {
+    const result = stageRoeAudit('allow active: maybe', [
+      { command: 'curl -s https://app.example.com/', target: 'app.example.com' },
+    ]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toBe('roe-parse-failed');
+  });
+
+  it('refuses before roeAudit when the parsed allow-list is empty', () => {
+    // parseRoe itself withholds ok on allow-active-only text (a spec without
+    // scope cannot be adjudicated); the staged workflow refuses before audit.
+    const result = stageRoeAudit('allow active: yes', [
+      { command: 'curl -s https://app.example.com/', target: 'app.example.com' },
+    ]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toBe('roe-parse-failed');
+      expect(result.detail).toContain('no scope');
+    }
+  });
+
+  it('holds an approved active action at needs_approval without a supplied approval evidence id', () => {
+    const result = stageRoeAudit(roeText, [
+      { command: 'nmap -sV app.example.com', target: 'app.example.com', approved: true },
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.verdicts[0].verdict).toBe('needs_approval');
+      expect(result.verdicts[0].rationale).toContain('a boolean is not a receipt');
+    }
+  });
+
+  it('rules a supplied-approval active action compliant and echoes caller provenance without minting', () => {
+    const result = stageRoeAudit(
+      roeText,
+      [{ command: 'nmap -sV app.example.com', target: 'app.example.com', approved: true, approvalEvidenceId: 'R-12' }],
+      { revision: 'r3', textHash: 'abc123', sourceLine: 7 },
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.verdicts[0].verdict).toBe('compliant');
+      expect(result.revision).toBe('r3');
+      expect(result.textHash).toBe('abc123');
+      expect(result.sourceLine).toBe(7);
+    }
+  });
+
+  it('pairs two opposed claims on one action into a single ruling keeping both positions', () => {
+    const staged = stageRoeAudit(roeText, [
+      { command: 'nmap -sV app.example.com', target: 'app.example.com', approved: true, approvalEvidenceId: 'R-12' },
+    ]);
+    expect(staged.ok).toBe(true);
+    if (!staged.ok) return;
+    const rulings = pairDisputeRulings([
+      { side: 'red', position: 'scan was approved under receipt R-12', actionIndex: 0 },
+      { side: 'blue', position: 'receipt R-12 names a different target', actionIndex: 0 },
+    ], staged.verdicts);
+    expect(rulings).toHaveLength(1);
+    expect(rulings[0].status).toBe('paired');
+    expect(rulings[0].redPosition).toBe('scan was approved under receipt R-12');
+    expect(rulings[0].bluePosition).toBe('receipt R-12 names a different target');
+  });
+
+  it('records a missing dispute side as insufficiency, never a one-sided record', () => {
+    const staged = stageRoeAudit(roeText, [
+      { command: 'curl -s https://app.example.com/', target: 'app.example.com' },
+    ]);
+    expect(staged.ok).toBe(true);
+    if (!staged.ok) return;
+    const rulings = pairDisputeRulings(
+      [{ side: 'red', position: 'passive fetch needed no approval', actionIndex: 0 }],
+      staged.verdicts,
+    );
+    expect(rulings).toHaveLength(1);
+    expect(rulings[0].status).toBe('insufficient');
+    expect(rulings[0].bluePosition).toBeUndefined();
+    expect(rulings[0].rationale).toContain('the blue position');
+  });
+});
+
+describe('white suite: honest aggregates', () => {
+  const carried: LedgerEvidenceShape = { id: 'E-1', type: 'command', command: 'nmap -sV app.example.com' };
+  const ready = {
+    id: 'F-1',
+    title: 'Open admin panel',
+    severity: 'medium' as const,
+    evidenceIds: ['E-1'],
+    recommendedFix: 'restrict /admin',
+    acceptanceCriteria: ['/admin requires auth'],
+  };
+
+  it('scores a fully carried report sufficient at 100', () => {
+    const standing = aggregateEvidenceStanding([ready], [carried]);
+    expect(standing.sufficient).toBe(true);
+    expect(standing.score).toBe(100);
+    expect(standing.gaps).toEqual([]);
+  });
+
+  it('withholds sufficiency and 100 when a required item is insufficient', () => {
+    const weak = { ...ready, id: 'F-2', evidenceIds: ['E-9'] };
+    const standing = aggregateEvidenceStanding([ready, weak], [carried, { id: 'E-9', type: 'report' }]);
+    expect(standing.sufficient).toBe(false);
+    expect(standing.score).toBeLessThan(100);
+    expect(standing.gaps.some(gap => gap.includes('F-2'))).toBe(true);
+  });
+
+  it('withholds sufficiency and 100 on missing, broken, and contradictory rows', () => {
+    const missing = aggregateEvidenceStanding([{ ...ready, id: 'F-req' }], [carried], { requiredFindingIds: ['F-req', 'F-absent'] });
+    expect(missing.sufficient).toBe(false);
+    expect(missing.score).toBeLessThan(100);
+
+    const dup = aggregateEvidenceStanding([ready], [
+      carried,
+      { id: 'E-1', type: 'command', command: 'nmap -sV app.example.com' },
+    ]);
+    expect(dup.sufficient).toBe(false);
+    expect(dup.score).toBeLessThan(100);
+
+    const staged = stageRoeAudit('scope: app.example.com\nallow active: yes', [
+      { command: 'curl -s https://app.example.com/', target: 'app.example.com' },
+    ]);
+    expect(staged.ok).toBe(true);
+    if (!staged.ok) return;
+    const oneSided = pairDisputeRulings(
+      [{ side: 'blue', position: 'fetch exceeded scope', actionIndex: 0 }],
+      staged.verdicts,
+    );
+    const contested = aggregateEvidenceStanding([ready], [carried], { disputes: oneSided });
+    expect(contested.sufficient).toBe(false);
+    expect(contested.score).toBeLessThan(100);
+  });
+
+  it('scores an empty required set at honest zero, never 100', () => {
+    const standing = aggregateEvidenceStanding([], []);
+    expect(standing.sufficient).toBe(false);
+    expect(standing.score).toBe(0);
+  });
+});
+
+describe('white suite: prompts name real exports and referee limits', () => {
+  it('parent guidance cites the staged workflow and the fail-closed limits', () => {
+    expect(WHITE_PARENT_PROMPT).toContain('stageRoeAudit');
+    expect(WHITE_PARENT_PROMPT).toContain('aggregateEvidenceStanding');
+    expect(WHITE_PARENT_PROMPT).toContain('auditEvidenceChain');
+    expect(WHITE_PARENT_PROMPT).toContain('auditReport');
+    expect(WHITE_PARENT_PROMPT).toContain('Fail closed');
+    expect(WHITE_PARENT_PROMPT).toContain('Insufficient required evidence can never score sufficient or 100');
+  });
+
+  it('specialist blocks name their engine and grant ids', () => {
+    expect(WHITE_SPECIALIST_PROMPTS['roe-compliance-reviewer']).toContain('roeAudit');
+    expect(WHITE_SPECIALIST_PROMPTS['evidence-custodian']).toContain('auditEvidenceChain');
+    expect(WHITE_SPECIALIST_PROMPTS['report-coverage-auditor']).toContain('auditReport');
+    expect(WHITE_SPECIALIST_PROMPTS['dispute-adjudicator']).toContain('pairDisputeRulings');
+    expect(WHITE_SPECIALIST_PROMPTS['evidence-strength-scorer']).toContain('aggregateEvidenceStanding');
+    expect(WHITE_SPECIALIST_PROMPTS['roe-compliance-reviewer']).toContain('dig');
+    expect(WHITE_SPECIALIST_PROMPTS['report-coverage-auditor']).toContain('nist-800-115');
   });
 });

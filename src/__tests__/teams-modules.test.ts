@@ -107,14 +107,17 @@ describe('blue team: detectionGaps', () => {
     { id: 'f3', title: 'Missing security headers', severity: 'medium' },
   ];
 
-  it('maps covered ids to covered and everything else to partial when telemetry exists', () => {
-    const gaps = detectionGaps(findings, [
+  it('maps id overlap without an artifact to partial, and covered only with an observed artifact', () => {
+    const telemetry = [
       { source: 'waf', coveredIds: ['f3'] },
       { source: 'siem', coveredIds: [] },
-    ]);
-    expect(gaps.find(g => g.findingId === 'f3')?.coverage).toBe('covered');
+    ];
+    const gaps = detectionGaps(findings, telemetry);
+    expect(gaps.find(g => g.findingId === 'f3')?.coverage).toBe('partial');
     expect(gaps.find(g => g.findingId === 'f1')?.coverage).toBe('partial');
     expect(gaps.find(g => g.findingId === 'f2')?.coverage).toBe('partial');
+    const observed = detectionGaps(findings, telemetry, { f3: ['artifact-f3'] });
+    expect(observed.find(g => g.findingId === 'f3')?.coverage).toBe('covered');
   });
 
   it('returns none for every finding when no telemetry exists at all', () => {
@@ -253,7 +256,7 @@ describe('purple synthesis', () => {
     // telemetry run that covers it. detectionGaps() cannot mix the two in one call.
     const detections = [
       ...detectionGaps([findings[0]]),
-      ...detectionGaps([findings[1]], [{ source: 'siem', coveredIds: ['f2'] }]),
+      ...detectionGaps([findings[1]], [{ source: 'siem', coveredIds: ['f2'] }], { f2: ['artifact-f2'] }),
     ];
     const verdicts = roeAudit([{ command: 'nmap --top-ports 100 t.example', target: 't.example', approved: true }], roe);
     const result = synthesize({ findings, detections, verdicts });

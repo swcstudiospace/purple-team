@@ -19,7 +19,7 @@
  * Pure functions: no I/O, no LLM, no persistence.
  */
 
-import type { RedFindingShape, TelemetrySourceShape } from '../blue.js';
+import type { ObservedArtifactIds, RedFindingShape, TelemetrySourceShape } from '../blue.js';
 import { D3FEND_BY_ID, d3fendLabel } from './d3fend.js';
 
 /** A red finding with optional D3FEND countermeasure keys for keyed coverage. */
@@ -48,6 +48,9 @@ export interface CoverageGap {
   unresolvedCountermeasures: string[];
   /** Recommendation naming real ontology countermeasures, never severity prose. */
   recommendation: string;
+  /** Fail-closed caveats: nonempty when id overlap exists without an observed
+   * artifact id. A recommendation string never appears here as proof. */
+  limitations: string[];
 }
 
 /** Render ids with their ontology labels for recommendation text (shared so every gap cites the same way). */
@@ -55,7 +58,9 @@ function citeAll(ids: string[]): string {
   return ids.map(id => `${id} (${d3fendLabel(id)})`).join(', ');
 }
 
-/** Assemble the gap once the per-finding id resolution is done. */
+/** Assemble the gap once the per-finding id resolution is done. Overlap without
+ * an observed artifact id caps at `partial` with a limitation: an id list or a
+ * recommendation string alone never yields `covered`. */
 function buildGap(
   finding: RedFindingShape,
   resolved: string[],
@@ -63,15 +68,23 @@ function buildGap(
   covered: string[],
   directFindingCover: boolean,
   hasTelemetry: boolean,
+  hasObservedArtifact: boolean,
 ): CoverageGap {
   const uncovered = resolved.filter(id => !covered.includes(id));
+  const limitations: string[] = [];
   let coverage: CoverageGap['coverage'];
   let recommendation: string;
 
   if (resolved.length > 0) {
     if (uncovered.length === 0) {
-      coverage = 'covered';
-      recommendation = `Existing telemetry covers ${finding.id} via ${citeAll(covered)}; retain and regression-test it against stored evidence.`;
+      if (hasObservedArtifact) {
+        coverage = 'covered';
+        recommendation = `Existing telemetry covers ${finding.id} via ${citeAll(covered)}; retain and regression-test it against stored evidence.`;
+      } else {
+        coverage = 'partial';
+        recommendation = `Telemetry overlaps ${finding.id} on ${citeAll(covered)} but no observed artifact id is linked to this finding; link stored evidence before calling it covered.`;
+        limitations.push(`Countermeasure-id overlap alone is not coverage for ${finding.id}: supply an observed artifact id.`);
+      }
     } else if (covered.length > 0 || hasTelemetry) {
       coverage = 'partial';
       recommendation = `Telemetry is deployed but does not cover ${finding.id} on ${citeAll(uncovered)}; extend the deployed sources or add sources implementing these countermeasures.`;
@@ -81,8 +94,15 @@ function buildGap(
     }
   } else if (directFindingCover) {
     // No countermeasure keys, but some source listed the finding id directly (v1 semantics).
-    coverage = 'covered';
-    recommendation = `Existing telemetry directly covers ${finding.id} by finding id; retain and regression-test it against stored evidence.`;
+    // Overlap still needs an observed artifact id before it counts as covered.
+    if (hasObservedArtifact) {
+      coverage = 'covered';
+      recommendation = `Existing telemetry directly covers ${finding.id} by finding id; retain and regression-test it against stored evidence.`;
+    } else {
+      coverage = 'partial';
+      recommendation = `A deployed source lists ${finding.id} by finding id but no observed artifact id is linked to this finding; link stored evidence before calling it covered.`;
+      limitations.push(`Finding-id overlap alone is not coverage for ${finding.id}: supply an observed artifact id.`);
+    }
   } else if (hasTelemetry) {
     coverage = 'partial';
     recommendation = `Telemetry is deployed but does not cover ${finding.id}, and the finding carries no D3FEND countermeasure keys; tag the finding with countermeasure ids from D3FEND_BY_ID to enable keyed coverage and Sigma rule packs.`;
@@ -102,16 +122,23 @@ function buildGap(
     uncoveredCountermeasures: uncovered,
     unresolvedCountermeasures: unresolved,
     recommendation,
+    limitations,
   };
 }
 
 /**
  * Score detection coverage per finding against the declared telemetry. Direct
- * finding-id matches in telemetry coveredIds still count (v1 compatibility) and
- * mark every resolved countermeasure as covered; countermeasure coverage is the
- * v2 key. Decisions derive only from the vendored ontology and supplied inputs.
+ * finding-id matches in telemetry coveredIds and countermeasure overlap count
+ * as overlap only: `covered` additionally requires an observed artifact id for
+ * that finding (see ObservedArtifactIds). Overlap without an artifact caps at
+ * `partial` with a limitation; a recommendation string never upgrades coverage.
+ * Decisions derive only from the vendored ontology and supplied inputs.
  */
-export function coverageGaps(findings: CoverageFinding[], telemetry: TelemetryDeclaration[]): CoverageGap[] {
+export function coverageGaps(
+  findings: CoverageFinding[],
+  telemetry: TelemetryDeclaration[],
+  observed?: ObservedArtifactIds,
+): CoverageGap[] {
   const telemetryCountermeasures = new Set<string>();
   const directlyCovered = new Set<string>();
   for (const source of telemetry) {
@@ -129,10 +156,13 @@ export function coverageGaps(findings: CoverageFinding[], telemetry: TelemetryDe
         unresolved.push(id);
       }
     }
-    // Direct finding-id coverage by any deployed source covers the finding's whole keyed surface.
+    // Direct finding-id coverage by any deployed source marks the finding's whole
+    // keyed surface as overlapped; the observed-artifact check in buildGap still
+    // decides whether that overlap may be called covered.
     const covered = directlyCovered.has(finding.id)
       ? [...resolved]
       : resolved.filter(id => telemetryCountermeasures.has(id));
-    return buildGap(finding, resolved, unresolved, covered, directlyCovered.has(finding.id), telemetry.length > 0);
+    const hasObservedArtifact = (observed?.[finding.id] || []).length > 0;
+    return buildGap(finding, resolved, unresolved, covered, directlyCovered.has(finding.id), telemetry.length > 0, hasObservedArtifact);
   });
 }

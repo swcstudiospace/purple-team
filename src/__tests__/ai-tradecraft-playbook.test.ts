@@ -6,6 +6,8 @@ import {
   tradecraftTechnique,
   type OpsecRiskLevel,
 } from '../resources/ai-tradecraft-playbook.js';
+import { teamToolGrants } from '../teams/index.js';
+import { hatToolGrants } from '../teams/hats.js';
 import { ATTACK_BY_ID } from '../teams/black/attack-data.js';
 
 const RISK_LEVELS: readonly OpsecRiskLevel[] = ['low', 'medium', 'high', 'critical'];
@@ -21,10 +23,11 @@ describe('AI tradecraft playbook (black counterpart to the blue corpus)', () => 
     for (const t of AI_TRADECRAFT_PLAYBOOK) {
       expect(t.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
       expect(t.attckId).toMatch(/^T\d{4}(\.\d{3})?$/);
-      for (const field of ['detectionSurface', 'tradecraftUse'] as const) {
+      for (const field of ['detectionSurface', 'tradecraftUse', 'evidence', 'validation', 'completion'] as const) {
         expect(typeof t[field]).toBe('string');
         expect(t[field].length).toBeGreaterThan(10);
       }
+      expect(t.permittedTools.length).toBeGreaterThan(0);
     }
   });
 
@@ -74,5 +77,31 @@ describe('AI tradecraft playbook (black counterpart to the blue corpus)', () => 
 
   it('every technique names concrete telemetry and a quiet-operations discipline', () => {
     expect(AI_TRADECRAFT_PLAYBOOK.every(t => t.detectionSurface.trim().length > 0 && t.tradecraftUse.trim().length > 0)).toBe(true);
+  });
+  it('permitted-tool ids reference existing black grants only (labels, never new ids)', () => {
+    const grants = new Set([...teamToolGrants('black'), ...hatToolGrants('specter'), ...hatToolGrants('wraith')]);
+    for (const t of AI_TRADECRAFT_PLAYBOOK) {
+      for (const id of t.permittedTools) {
+        expect(grants.has(id), `tool ${id} (${t.id}) is not an existing black grant`).toBe(true);
+      }
+    }
+  });
+
+  it('briefing lines carry evidence, tool, validation, completion, and untrusted-data segments', () => {
+    const lines = aiTradecraftBriefing().split('\n');
+    expect(lines.length).toBe(AI_TRADECRAFT_PLAYBOOK.length);
+    lines.forEach((line, i) => {
+      const t = AI_TRADECRAFT_PLAYBOOK[i];
+      expect(line).toContain(`[${t.id}]`);
+      expect(line).toContain('evidence:');
+      expect(line).toContain(t.evidence.slice(0, 40));
+      expect(line).toContain('tools:');
+      for (const id of t.permittedTools) expect(line).toContain(id);
+      expect(line).toContain('grants unchanged');
+      expect(line).toContain('validation:');
+      expect(line).toContain('done:');
+      expect(line).toContain(t.completion.slice(0, 40));
+      expect(line).toContain('untrusted-data');
+    });
   });
 });

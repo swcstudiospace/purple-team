@@ -160,13 +160,13 @@ describe('sentinel: sentinelDetectorMap', () => {
     expect(result.gapPriority).toEqual(['f1', 'f2']);
   });
 
-  it('reuses detectionGaps and skips covered findings in artifacts and priority', () => {
+  it('does not skip a finding whose id is listed without an observed artifact', () => {
     const telemetry = [{ source: 'siem', coveredIds: ['f2'] }];
     const result = sentinelDetectorMap(findings, telemetry);
     expect(result.gaps).toEqual(detectionGaps(findings, telemetry));
-    expect(result.detectorRecommendations).toHaveLength(1);
-    expect(result.detectorRecommendations[0]).toContain('f1');
-    expect(result.gapPriority).toEqual(['f1']);
+    expect(result.detectorRecommendations).toHaveLength(2);
+    expect(result.detectorRecommendations.some(line => line.includes('f1'))).toBe(true);
+    expect(result.gapPriority).toEqual(['f1', 'f2']);
   });
 });
 

@@ -28,18 +28,57 @@ export interface LedgerEvidenceShape extends EvidenceEntryShape {
   command?: string;
   /** Finding this entry claims to support (ledger back-reference). */
   findingId?: string;
+  /** Public label. Absent means the entry did not claim an authentic observation. */
+  origin?: 'claimed' | 'observed';
+  /** Tool recorded on an internal observation, when one exists. */
+  observation?: { tool?: string; stage?: string; inputSha256?: string; runId?: string; missionId?: string };
+  missionId?: string;
+  operationId?: string;
+  title?: string;
+  createdAt?: string;
+  resourceIds?: string[];
 }
 
 export type ChainLinkStatus = 'intact' | 'broken';
 
 export interface ChainLinkVerdict {
   evidenceId: string;
+  /** Finding the ledger entry claims to support, when the entry names one. */
+  findingId?: string;
   status: ChainLinkStatus;
   strength: ProvenanceStrength;
   /** The platform ruling from ../white.ts adjudicateEvidence: accepted at tool-grade or better. */
   verdict: EvidenceVerdict['verdict'];
-  /** Exact command or uri that re-runs this evidence; absent when none is attached. */
+  /** Exact command or uri that re-runs this evidence; command wins when both are attached. */
   replayHook?: string;
+  /** Present only when the entry named a command. */
+  command?: string;
+  /** Present only when the entry named a uri. */
+  uri?: string;
+  /** Present only when the entry carried an origin label. */
+  origin?: 'claimed' | 'observed';
+  /** Producer label from the entry, when it has one. */
+  source?: string;
+  /** Observation tool, when the entry recorded one. */
+  tool?: string;
+  /** Observation stage, when the entry recorded one. */
+  stage?: string;
+  /** Hash of the input the observation was computed from, when recorded. */
+  inputSha256?: string;
+  /** Entry type used for the strength ruling, when the entry named one. */
+  type?: string;
+  /** Observation run, when recorded. */
+  runId?: string;
+  /** Mission on the observation, or on the entry when the observation has none. */
+  missionId?: string;
+  /** Operation on the entry, when it has one. */
+  operationId?: string;
+  /** Entry title, when it has one. */
+  title?: string;
+  /** When the entry was recorded, when it has a timestamp. */
+  createdAt?: string;
+  /** Resource ids on the entry, when it names any. */
+  resourceIds?: string[];
   reason: string;
   /** Appeal path: what restores the chain (empty when intact with a hook attached). */
   conditions: string[];
@@ -84,11 +123,31 @@ export function auditEvidenceChain(entries: LedgerEvidenceShape[]): EvidenceChai
   const links = entries.map(entry => {
     const strength = resolveLedgerStrength(entry);
     const [ruling] = adjudicateEvidence([{ id: entry.id, type: entry.type, strength }]);
-    const replayHook = entry.command?.trim() || entry.uri?.trim();
+    const command = entry.command?.trim() || undefined;
+    const uri = entry.uri?.trim() || undefined;
+    const replayHook = command || uri;
+    const named = {
+      ...(entry.findingId ? { findingId: entry.findingId } : {}),
+      ...(command ? { command } : {}),
+      ...(uri ? { uri } : {}),
+      ...(entry.origin ? { origin: entry.origin } : {}),
+      ...(entry.source ? { source: entry.source } : {}),
+      ...(entry.observation?.tool ? { tool: entry.observation.tool } : {}),
+      ...(entry.observation?.stage ? { stage: entry.observation.stage } : {}),
+      ...(entry.observation?.inputSha256 ? { inputSha256: entry.observation.inputSha256 } : {}),
+      ...(entry.type ? { type: entry.type } : {}),
+      ...(entry.observation?.runId ? { runId: entry.observation.runId } : {}),
+      ...((entry.observation?.missionId || entry.missionId) ? { missionId: entry.observation?.missionId || entry.missionId } : {}),
+      ...(entry.operationId ? { operationId: entry.operationId } : {}),
+      ...(entry.title ? { title: entry.title } : {}),
+      ...(entry.createdAt ? { createdAt: entry.createdAt } : {}),
+      ...(entry.resourceIds?.length ? { resourceIds: [...entry.resourceIds] } : {}),
+    };
 
     if (seen.has(entry.id)) {
       return {
         evidenceId: entry.id,
+        ...named,
         status: 'broken' as const,
         strength,
         verdict: ruling.verdict,
@@ -102,6 +161,7 @@ export function auditEvidenceChain(entries: LedgerEvidenceShape[]): EvidenceChai
     if (ruling.verdict === 'insufficient') {
       return {
         evidenceId: entry.id,
+        ...named,
         status: 'broken' as const,
         strength,
         verdict: ruling.verdict,
@@ -114,6 +174,7 @@ export function auditEvidenceChain(entries: LedgerEvidenceShape[]): EvidenceChai
     if (strength === 'replayable' && !replayHook) {
       return {
         evidenceId: entry.id,
+        ...named,
         status: 'broken' as const,
         strength,
         verdict: ruling.verdict,
@@ -125,6 +186,7 @@ export function auditEvidenceChain(entries: LedgerEvidenceShape[]): EvidenceChai
 
     return {
       evidenceId: entry.id,
+      ...named,
       status: 'intact' as const,
       strength,
       verdict: ruling.verdict,

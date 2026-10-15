@@ -29,7 +29,31 @@ export interface RoeVerdict {
 }
 
 /** Commands that perform active/offensive testing against the target. */
-const ACTIVE_PATTERN = /scan|exploit|fuzz|brute|spray|inject|payload|nmap|masscan|sqlmap|nuclei|ffuf|nikto|hydra|metasploit|post exploit/i;
+const ACTIVE_PATTERN = /scan|exploit|fuzz|brute|spray|inject|payload|nmap|masscan|sqlmap|nuclei|ffuf|nikto|hydra|metasploit|post exploit|naabu|katana|dalfox|feroxbuster|gobuster|whatweb/i;
+
+/** Host part of a target: strips scheme, userinfo, path, query, fragment, port, and IPv6 brackets. */
+function hostOf(target: string): string {
+  let rest = target.replace(/^[a-z][a-z0-9+.-]*:\/\//, '').split(/[/?#]/)[0];
+  const at = rest.lastIndexOf('@');
+  if (at >= 0) rest = rest.slice(at + 1);
+  rest = rest.replace(/:\d+$/, '');
+  if (rest.startsWith('[') && rest.endsWith(']')) rest = rest.slice(1, -1);
+  return rest;
+}
+
+/**
+ * Label-boundary host match. "app.example.com" covers itself and its subdomains;
+ * "*.example.com" covers subdomains only. Substring matches like "notexample.com"
+ * against "example.com" are rejected.
+ */
+function hostInScope(host: string, allowed: string): boolean {
+  const a = allowed.trim().toLowerCase();
+  if (a.startsWith('*.')) {
+    const suffix = a.slice(1);
+    return host.endsWith(suffix) && host.length > suffix.length;
+  }
+  return host === a || host.endsWith(`.${a}`);
+}
 
 /**
  * Audit actions against the ROE. Precedence: out-of-scope targets are violations
@@ -43,12 +67,10 @@ export function roeAudit(actions: AuditedAction[], roe: RoeSpec): RoeVerdict[] {
   return actions.map((action, actionIndex) => {
     const command = action.command || '';
     const target = action.target?.trim().toLowerCase();
-    // Suffix/substring matching: an allowed entry like "app.example.com" covers
-    // paths and subpaths under it, but nothing outside it.
-    const inScope = !target || !allowedTargets.length || allowedTargets.some(allowed => {
-      const a = allowed.trim().toLowerCase();
-      return target === a || target.endsWith(a) || target.includes(a);
-    });
+    // Host-level label-boundary matching (see hostInScope). Fail closed: a
+    // missing target or an empty allow-list is out of scope, never in scope.
+    const host = target ? hostOf(target) : '';
+    const inScope = !!target && allowedTargets.length > 0 && allowedTargets.some(allowed => hostInScope(host, allowed));
     const active = ACTIVE_PATTERN.test(command);
 
     if (!inScope) {

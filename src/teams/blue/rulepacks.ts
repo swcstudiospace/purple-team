@@ -133,7 +133,7 @@ export function sigmaRuleForGap(
 
   const rawTitle = finding?.title?.trim() || gap.findingId;
   const description =
-    `t3mp3st blue pipeline template for finding ${gap.findingId} (coverage: ${gap.coverage}). ` +
+    `Purple Team blue pipeline template for finding ${gap.findingId} (coverage: ${gap.coverage}). ` +
     `Uncovered D3FEND countermeasures: ${uncovered.map(id => `${id} ${d3fendLabel(id)}`).join('; ')}.` +
     (gap.unresolvedCountermeasures.length > 0
       ? ` Reported unresolvable ids: ${gap.unresolvedCountermeasures.join(', ')}.`
@@ -145,7 +145,7 @@ export function sigmaRuleForGap(
     status: 'experimental',
     description,
     references: uncovered.map(id => `https://d3fend.mitre.org/technique/d3f:${id}`),
-    author: options?.author ?? 't3mp3st blue pipeline',
+    author: options?.author ?? 'Purple Team blue pipeline',
     logsource:
       options?.logsource ?? {
         category: 'process_creation',
@@ -220,5 +220,124 @@ export function sigmaRulepack(
   return {
     rules,
     yaml: rules.map(sigmaYaml).join('---\n'),
+  };
+}
+
+// ── Offline detector standing (AC-FH-026, AC-FH-015) ──────────────────────────
+
+/** Detector standing: exactly one of these three, never a stubbed pass. */
+export type DetectorStanding = 'validated' | 'failed' | 'unavailable';
+
+/** Local validator the standing is claimed against. Binaries are never spawned. */
+export type DetectorValidator = 'sigma' | 'yara';
+
+/**
+ * Catalog next actions for a missing validator (mirrors the catalog installHint
+ * text so the workflow never invents install advice).
+ */
+export const DETECTOR_INSTALL_HINTS: Record<DetectorValidator, string> = {
+  sigma: 'pipx install sigma-cli  # plus the pySigma conversion-pipeline extras',
+  yara: 'brew install yara',
+};
+
+/** Supplied inputs for one offline detector-evidence compare. */
+export interface DetectorValidationInput {
+  /** Finding the detector claims to catch (required, nonempty). */
+  findingId: string;
+  /** Which local validator the rule targets. */
+  validator: DetectorValidator;
+  /** Detection keyword compared offline against the supplied evidence. */
+  pattern: string;
+  /** Evidence excerpts the detector must hit. */
+  matchingEvidence: string[];
+  /** Evidence excerpts the detector must miss. */
+  nonMatchingEvidence: string[];
+  /** Optional syntax-only Sigma YAML context. Presence alone never validates:
+   * without an evidence compare the standing stays `unavailable`. */
+  ruleYaml?: string;
+}
+
+/** Outcome of one offline detector-evidence compare. */
+export interface DetectorValidation {
+  findingId: string;
+  validator: DetectorValidator;
+  standing: DetectorStanding;
+  /** Present exactly when standing is `unavailable`: the next safe action. */
+  nextAction?: string;
+  /** One honest sentence saying what was compared. */
+  detail: string;
+}
+
+/**
+ * Validate a detector offline by comparing a supplied detection keyword against
+ * supplied matching and non-matching evidence, entirely in process: every
+ * matching excerpt must contain the keyword and every non-matching excerpt must
+ * not. Malformed arguments (missing finding id, wrong-typed evidence) throw
+ * before any compare runs. Syntax-only YAML, missing evidence, or a missing
+ * pattern yields `unavailable` plus the catalog next action — never a pass.
+ * No subprocess is spawned; `sigma` and `yara` binaries are never executed.
+ */
+export function validateDetectorStanding(input: DetectorValidationInput): DetectorValidation {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new Error('validateDetectorStanding: input must be an object');
+  }
+  if (typeof input.findingId !== 'string' || !input.findingId.trim()) {
+    throw new Error('validateDetectorStanding: findingId must be a nonempty string');
+  }
+  if (input.validator !== 'sigma' && input.validator !== 'yara') {
+    throw new Error('validateDetectorStanding: validator must be "sigma" or "yara"');
+  }
+  if (typeof input.pattern !== 'string') {
+    throw new Error('validateDetectorStanding: pattern must be a string');
+  }
+  for (const field of ['matchingEvidence', 'nonMatchingEvidence'] as const) {
+    const value = input[field];
+    if (!Array.isArray(value)) {
+      throw new Error(`validateDetectorStanding: ${field} must be an array of strings`);
+    }
+    for (const entry of value) {
+      if (typeof entry !== 'string') {
+        throw new Error(`validateDetectorStanding: ${field} must be an array of strings`);
+      }
+    }
+  }
+
+  const findingId = input.findingId.trim();
+  const needle = input.pattern.toLowerCase();
+  const unavailable = (detail: string): DetectorValidation => ({
+    findingId,
+    validator: input.validator,
+    standing: 'unavailable',
+    nextAction: `${input.validator} validation needs supplied matching and non-matching evidence to compare offline; syntax-only YAML is not validation. Next action: ${DETECTOR_INSTALL_HINTS[input.validator]}`,
+    detail,
+  });
+
+  if (!needle) {
+    return unavailable(`No detection pattern was supplied for ${findingId}; nothing was compared.`);
+  }
+  if (input.matchingEvidence.length === 0) {
+    return unavailable(
+      `No matching evidence was supplied for ${findingId}; a syntax-only rule${input.ruleYaml ? ' (rule YAML was supplied but not compared)' : ''} cannot be validated.`,
+    );
+  }
+
+  const missed = input.matchingEvidence.filter(text => !text.toLowerCase().includes(needle));
+  const falseHits = input.nonMatchingEvidence.filter(text => text.toLowerCase().includes(needle));
+  if (missed.length === 0 && falseHits.length === 0) {
+    return {
+      findingId,
+      validator: input.validator,
+      standing: 'validated',
+      detail: `Offline compare hit on all ${input.matchingEvidence.length} matching excerpt(s) and missed on all ${input.nonMatchingEvidence.length} non-matching excerpt(s) for ${findingId}.`,
+    };
+  }
+  const reasons: string[] = [];
+  if (missed.length > 0) reasons.push(`${missed.length} matching excerpt(s) missed`);
+  if (falseHits.length > 0) reasons.push(`${falseHits.length} non-matching excerpt(s) hit`);
+  return {
+    findingId,
+    validator: input.validator,
+    standing: 'failed',
+    detail: `Offline compare for ${findingId} did not discriminate: ${reasons.join(' and ')}.`,
   };
 }
