@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { createTempest } from 'purple-team';
+ * import { createTempest } from 't3mp3st';
  *
  * const tempest = createTempest({
  *   name: 'Operation Midnight',

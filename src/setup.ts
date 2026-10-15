@@ -633,7 +633,7 @@ ${chalk.cyan('npx t3mp3st')}        Start the interactive CLI
 ${chalk.cyan('npx t3mp3st --help')} View all commands
 
 Or use in your code:
-${chalk.gray(`import { createTempest } from 'purple-team';
+${chalk.gray(`import { createTempest } from 't3mp3st';
 const tempest = createTempest({ name: 'My Operation' });`)}`,
     'green'
   );

@@ -19,7 +19,7 @@ Probed read-only on the scaffold machine:
 | `node_modules/.bin/tauri` | ABSENT — no `node_modules/.bin/tauri` (CLI not installed) |
 | `npx --no-install @tauri-apps/cli --version` | ABSENT — npx refused without a fetch (`missing packages and no YES option`) |
 | `src-tauri/` | ABSENT before this unit — scaffolded fresh |
-| `package.json` name / version | `purple-team` / `1.0.0` — no tenant/id hints |
+| `package.json` name / version | `t3mp3st` / `1.0.0` — no tenant/id hints |
 | `tenants.json` | docs-tenant only (`t3mp3st-docs`) — no app-id hint |
 
 Consequences:

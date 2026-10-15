@@ -78,7 +78,7 @@ Set `PAGENARY_SITE_URL` before `docs:sync` or `docs:build` when publishing somew
 The package exports the main factory functions and core classes from `src/index.ts`.
 
 ```ts
-import { createTempest, createTestTempest } from 'purple-team';
+import { createTempest, createTestTempest } from 't3mp3st';
 
 const tempest = createTempest({
   name: 'Authorized Lab Run',
