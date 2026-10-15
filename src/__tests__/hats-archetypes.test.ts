@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { OPERATOR_SYSTEM_PROMPTS } from '../prompts/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants } from '../teams/hats.js';
 import { TEAM_ARCHETYPES, teamToolGrants } from '../teams/index.js';
 import { TOOL_ADAPTERS } from '../arsenal/catalog.js';
+import { TaskQueue } from '../mission/index.js';
+import { KillChainPhase } from '../types/index.js';
 
 const CATALOG_IDS = new Set(TOOL_ADAPTERS.map(adapter => adapter.id));
 const RISK_BY_ID = new Map(TOOL_ADAPTERS.map(adapter => [adapter.id, adapter.risk]));
@@ -138,5 +142,41 @@ describe('hat tool grants', () => {
         expect(white.has(id)).toBe(false);
       }
     }
+  });
+});
+
+describe('phase 26 retained attribution and honest cancellation', () => {
+  it('a late result cannot retarget a task onto another mission id', () => {
+    const queue = new TaskQueue();
+    queue.add({
+      id: 'task-1',
+      missionId: 'mission-a',
+      name: 'probe',
+      description: 'probe target',
+      phase: KillChainPhase.RECON,
+      operatorType: 'recon',
+      status: 'pending',
+      priority: 1,
+      dependencies: [],
+      createdAt: Date.now(),
+    });
+    expect(queue.completeForMission('task-1', 'mission-b', { success: true, output: 'late' })).toBe(false);
+    expect(queue.getTask('task-1')?.status).toBe('pending');
+    expect(queue.completeForMission('task-1', 'mission-a', { success: true, output: 'on time' })).toBe(true);
+    expect(queue.getTask('task-1')?.status).toBe('completed');
+    expect(queue.getTask('task-1')?.missionId).toBe('mission-a');
+  });
+
+  it('stop is never acknowledged as a cancel (source pin)', () => {
+    const src = readFileSync(join(process.cwd(), 'src/server.ts'), 'utf8');
+    expect(src).toContain('cancelAcknowledged: false');
+    expect(src).not.toContain("app.post('/api/mission/cancel'");
+  });
+
+  it('snapshot persists the retained slots behind the secret scrub (source pin)', () => {
+    const src = readFileSync(join(process.cwd(), 'src/server.ts'), 'utf8');
+    expect(src).toContain('observedReceipts: [...observedReceipts.values()]');
+    expect(src).toContain('operatorTaskRuns: [...operatorTaskRuns.values()]');
+    expect(src).toContain('redactSecrets({ ...buildStateSnapshot()');
   });
 });
