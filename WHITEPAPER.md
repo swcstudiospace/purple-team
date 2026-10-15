@@ -1,4 +1,4 @@
-# T3MP3ST: Tactical Execution Multi-agent Platform for Security Testing
+# Purple Team: Tactical Execution Multi-agent Platform for Security Testing
 
 ## A Technical Whitepaper
 
@@ -6,7 +6,7 @@
 
 ---
 
-> **What is real vs. scaffolding — read this first.** T3MP3ST's live, tool-backed
+> **What is real vs. scaffolding — read this first.** Purple Team's live, tool-backed
 > engine is **reconnaissance**: the recon operator drives a real ReAct tool-calling
 > loop against a target and is what produces the re-derivable benchmark numbers (run
 > under a **single-agent loop**, not the full operator swarm). The rest of the
@@ -22,19 +22,19 @@
 
 ## Abstract
 
-T3MP3ST (TEMPEST) is an open-source, TypeScript-based multi-agent framework for
+Purple Team is an open-source, TypeScript-based multi-agent framework for
 penetration testing and red team operations. The platform models the workflow as a
 structured Cyber Kill Chain pipeline of specialized AI-powered agents ("operators"),
 backed by payload databases, real security tooling, and LLM-driven decision-making.
 Today its live engine is the **reconnaissance operator** (a real tool-calling ReAct
 loop); the downstream kill-chain phases and advanced modules are framework
 scaffolding rather than autonomous exploitation (see the note above and
-[`FEATURES.md`](FEATURES.md)). T3MP3ST exposes its capabilities through three
+[`FEATURES.md`](FEATURES.md)). Purple Team exposes its capabilities through three
 interfaces: a command-line interface, an HTTP REST API, and a Model Context Protocol
 (MCP) server, for embedding recon-driven security testing into human-driven
 workflows and agent pipelines.
 
-This whitepaper details the architecture, agent model, execution pipeline, tooling, and integration surface of T3MP3ST, providing a comprehensive technical reference for security professionals, researchers, and developers.
+This whitepaper details the architecture, agent model, execution pipeline, tooling, and integration surface of Purple Team, providing a comprehensive technical reference for security professionals, researchers, and developers.
 
 ---
 
@@ -73,9 +73,9 @@ Modern penetration testing demands coordination across multiple specialized tool
 
 Traditionally, these are performed sequentially by human operators switching between dozens of tools. This is slow, error-prone, and difficult to scale. Existing automation approaches tend to be either too narrow (single-tool wrappers) or too broad (full autopilot without human oversight).
 
-### 1.2 The T3MP3ST Approach
+### 1.2 The Purple Team Approach
 
-T3MP3ST addresses this gap by modeling the penetration testing workflow as a **multi-agent coordination problem**. Rather than building a monolithic scanner, T3MP3ST decomposes security testing into specialized agent roles (operators) that communicate, share intelligence, and advance through a structured kill chain. Each operator is powered by an LLM backbone that enables autonomous reasoning, tool selection, and finding extraction.
+Purple Team addresses this gap by modeling the penetration testing workflow as a **multi-agent coordination problem**. Rather than building a monolithic scanner, Purple Team decomposes security testing into specialized agent roles (operators) that communicate, share intelligence, and advance through a structured kill chain. Each operator is powered by an LLM backbone that enables autonomous reasoning, tool selection, and finding extraction.
 
 Key design principles:
 
@@ -87,7 +87,7 @@ Key design principles:
 
 ### 1.3 Scope of This Document
 
-This whitepaper covers T3MP3ST v1.0, encompassing the core framework (~12,000 lines of TypeScript), the web UI (~14,000 lines), and the supporting infrastructure. All code is MIT-licensed.
+This whitepaper covers Purple Team v1.0, encompassing the core framework (~12,000 lines of TypeScript), the web UI (~14,000 lines), and the supporting infrastructure. All code is MIT-licensed.
 
 ---
 
@@ -97,7 +97,7 @@ This whitepaper covers T3MP3ST v1.0, encompassing the core framework (~12,000 li
 
 ```
 +------------------------------------------------------------------+
-|                       T3MP3ST COMMAND                              |
+|                       PURPLE TEAM COMMAND                        |
 |   (TempestCommand - Central EventEmitter-based Orchestrator)      |
 +------------------------------------------------------------------+
 |                                                                    |
@@ -242,7 +242,7 @@ Pre-built team compositions for common scenarios:
 
 ### 4.1 Phase Model
 
-T3MP3ST implements the 7-phase Cyber Kill Chain:
+Purple Team implements the 7-phase Cyber Kill Chain:
 
 ```
 RECON -> WEAPONIZE -> DELIVER -> EXPLOIT -> INSTALL -> C2 -> ACTIONS
@@ -332,7 +332,7 @@ Configuration is managed through `src/config/index.ts` using the `conf` library 
 
 ### 6.1 Overview
 
-The "Pliny Specials" are T3MP3ST's nine elite capability organs. Each provides a specialized, high-level security operation backed by structured payload knowledge, local simulators, evidence contracts, and LLM-powered analysis. The intended shape is not a loose tool drawer: every Special should participate in the same loop of hypothesis, safe probe, evidence, finding, fix, and retest.
+The "Pliny Specials" are Purple Team's nine elite capability organs. Each provides a specialized, high-level security operation backed by structured payload knowledge, local simulators, evidence contracts, and LLM-powered analysis. The intended shape is not a loose tool drawer: every Special should participate in the same loop of hypothesis, safe probe, evidence, finding, fix, and retest.
 
 ### 6.2 Tool Catalog
 
@@ -563,7 +563,7 @@ The server also includes SSE endpoints for real-time event streaming to the web 
 
 ### 10.3 Model Context Protocol (MCP) Server
 
-The MCP server (`src/mcp-server.ts`, 83K lines) implements the [Model Context Protocol](https://modelcontextprotocol.io/) specification, enabling AI assistants (Claude, etc.) to use T3MP3ST tools directly:
+The MCP server (`src/mcp-server.ts`, 83K lines) implements the [Model Context Protocol](https://modelcontextprotocol.io/) specification, enabling AI assistants (Claude, etc.) to use Purple Team tools directly:
 
 ```json
 {
@@ -616,7 +616,7 @@ The web UI (`docs/index.html`, ~14K lines) is a single-page application with a d
 
 ### 12.1 Built-in Categories
 
-T3MP3ST includes a comprehensive benchmarking system across 9 categories:
+Purple Team includes a comprehensive benchmarking system across 9 categories:
 
 | Category | Description |
 |----------|-------------|
@@ -656,7 +656,7 @@ The system integrates with two major CTF benchmark datasets:
 
 ### 13.1 Authorized Use Only
 
-T3MP3ST is designed exclusively for **authorized security testing**:
+Purple Team is designed exclusively for **authorized security testing**:
 
 - Penetration testing engagements with written authorization
 - Red team exercises with signed Rules of Engagement
@@ -690,8 +690,8 @@ Usage should comply with:
 
 ## 14. Comparison with Existing Tools
 
-| Feature | T3MP3ST | Metasploit | Cobalt Strike | AutoPT Tools |
-|---------|---------|-----------|---------------|-------------|
+| Feature | Purple Team | Metasploit | Cobalt Strike | AutoPT Tools |
+|---------|-------------|-----------|---------------|-------------|
 | Multi-agent architecture | Yes | No | Partial (teamserver) | Varies |
 | LLM-powered reasoning | Yes (50+ models) | No | No | Some |
 | Kill chain alignment | Full 7-phase | Exploit-focused | Post-exploitation | Varies |
@@ -703,7 +703,7 @@ Usage should comply with:
 | Payload databases | 200+ | 2000+ | Focused | Limited |
 | Evidence management | Full pipeline | Database | Logs | Minimal |
 
-T3MP3ST distinguishes itself through its **LLM-native multi-agent architecture** and **MCP integration**, enabling a new class of AI-assisted security testing workflows that don't exist in traditional tooling.
+Purple Team distinguishes itself through its **LLM-native multi-agent architecture** and **MCP integration**, enabling a new class of AI-assisted security testing workflows that don't exist in traditional tooling.
 
 ---
 
@@ -737,11 +737,11 @@ T3MP3ST distinguishes itself through its **LLM-native multi-agent architecture**
 
 ## 16. Conclusion
 
-T3MP3ST represents a new paradigm in security testing tooling: **LLM-native, multi-agent, kill-chain-aligned penetration testing**. By decomposing the security testing workflow into specialized operators that communicate, share intelligence, and advance autonomously through structured phases, T3MP3ST enables both deeper analysis and broader coverage than traditional single-tool approaches.
+Purple Team represents a new paradigm in security testing tooling: **LLM-native, multi-agent, kill-chain-aligned penetration testing**. By decomposing the security testing workflow into specialized operators that communicate, share intelligence, and advance autonomously through structured phases, Purple Team enables both deeper analysis and broader coverage than traditional single-tool approaches.
 
 The platform's triple integration surface (CLI, REST API, MCP) makes it embeddable in any workflow, from human-driven engagements to fully autonomous AI agent pipelines. Its comprehensive payload databases, real tooling implementations, and OPSEC-first design philosophy provide a solid foundation for authorized security testing at scale.
 
-T3MP3ST is open source under the MIT license, welcoming contributions from the security research community.
+Purple Team is open source under the MIT license, welcoming contributions from the security research community.
 
 ---
 
@@ -796,4 +796,4 @@ ctf/
 
 ---
 
-*T3MP3ST is developed for authorized security testing only. Never use this framework for unauthorized access to systems.*
+*Purple Team is developed for authorized security testing only. Never use this framework for unauthorized access to systems.*

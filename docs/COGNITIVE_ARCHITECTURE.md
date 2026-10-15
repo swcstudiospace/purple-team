@@ -1,4 +1,4 @@
-# T3MP3ST Cognitive Architecture
+# Purple Team Cognitive Architecture
 
 The agent that drives Cybench / live-tools runs is steered entirely by
 `scripts/cybench-bench.mjs::TOOLS_SYSTEM`. Below is the v3 design rationale —

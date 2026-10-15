@@ -170,7 +170,7 @@ const SPECS: AgentSpec[] = [
     vendor: 'Anomaly',
     bin: 'opencode',
     blurb: 'Open-source coding agent CLI',
-    invokeHint: 'opencode run "<prompt>" (internal tools denied by T3MP3ST)',
+    invokeHint: 'opencode run "<prompt>" (internal tools denied by Purple Team)',
     versionArgs: ['--version'],
     parseVersion: (o) => (o.match(/[\d]+\.[\d]+(\.[\d]+)?/) || ['?'])[0],
     authArtifacts: ['~/.local/share/opencode/auth.json', '~/.config/opencode/auth.json'],

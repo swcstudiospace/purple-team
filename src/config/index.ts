@@ -157,7 +157,7 @@ const DEFAULT_SETTINGS: TempestSettings = {
     baseUrl: 'https://openrouter.ai/api/v1',
     defaultModel: 'anthropic/claude-opus-4.8',
     siteUrl: 'https://github.com/tempest',
-    siteName: 'T3MP3ST',
+    siteName: 'Purple Team',
   },
 
   venice: {
@@ -1371,9 +1371,9 @@ class ConfigManager {
    * Create a .env template file
    */
   createEnvTemplate(filePath: string = join(process.cwd(), '.env.template')): void {
-    const template = `# T3MP3ST Environment Configuration
+    const template = `# Purple Team Environment Configuration
 # Save this file as ~/.t3mp3st/.env and fill in your API keys
-# The setup script writes the same T3MP3ST-owned file.
+# The setup script writes the same Purple Team-owned file.
 
 # OpenRouter API Key (recommended - access to multiple models)
 # Get your key at: https://openrouter.ai/keys

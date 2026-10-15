@@ -1,4 +1,4 @@
-# T3MP3ST Tauri 2.0 shell
+# Purple Team Tauri 2.0 shell
 
 Desktop (and later mobile) wrapper around the existing static UI (`docs/`, served
 at `/ui`) plus the loopback API server (`src/server.ts`). Threat model stays

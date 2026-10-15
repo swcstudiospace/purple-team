@@ -47,7 +47,7 @@ by pausing, resume by quoting the id back, and offer parked ids whenever
 the operator returns. If the backend is unreachable at any step, say so
 in one line and keep the work parked under its id:
 
-> t3mp3st backend unreachable — start it with npm run server; this work is
+> Purple Team backend unreachable — start it with npm run server; this work is
 > parked under its mission id and resumes when the backend answers.
 
 Never present guesses as results. Seats never open a browser panel; every

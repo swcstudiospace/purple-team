@@ -1,4 +1,4 @@
-# T3MP3ST API Reference
+# Purple Team API Reference
 
 The API server is implemented in `src/server.ts`.
 

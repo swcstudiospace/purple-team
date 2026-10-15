@@ -4,7 +4,7 @@ description: >-
   Use when the operator recalls past work or reviews learned entries: reads
   the memory capsule and accepts or rejects proposals.
 ---
-# Tempest memory
+# Purple Team memory
 
 Learned entries live on the server as a memory capsule plus accept/reject
 proposals. The seat reads and judges them; promotion happens through the

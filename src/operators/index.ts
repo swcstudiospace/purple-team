@@ -627,7 +627,7 @@ export class OperatorAgent extends EventEmitter<OperatorEvents> {
               `Operator: ${this.callsign} (${this.archetype})\n` +
               `Phase: ${task.phase}\n` +
               `Required capabilities: ${this.profile.capabilities.join(', ')}\n\n` +
-              `To execute this task, configure an LLM provider in your T3MP3ST configuration.`,
+              `To execute this task, configure an LLM provider in your Purple Team configuration.`,
     };
   }
 

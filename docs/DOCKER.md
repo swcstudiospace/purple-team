@@ -1,6 +1,6 @@
-# T3MP3ST Docker Deployment
+# Purple Team Docker Deployment
 
-Run T3MP3ST in a containerized environment. The Docker setup provides a minimal Node.js runtime with persistent volumes for reports and evidence.
+Run Purple Team in a containerized environment. The Docker setup provides a minimal Node.js runtime with persistent volumes for reports and evidence.
 
 ## Quick Start
 

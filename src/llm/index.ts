@@ -252,7 +252,7 @@ class OpenRouterAdapter implements LLMProviderAdapter {
 
     // Get site info from config
     const siteUrl = config.get('openrouter').siteUrl || 'https://github.com/tempest';
-    const siteName = config.get('openrouter').siteName || 'T3MP3ST';
+    const siteName = config.get('openrouter').siteName || 'Purple Team';
 
     const requestBody: Record<string, unknown> = {
       model: this.config.model,
@@ -328,7 +328,7 @@ class OpenRouterAdapter implements LLMProviderAdapter {
     const url = `${baseUrl}/chat/completions`;
 
     const siteUrl = config.get('openrouter').siteUrl || 'https://github.com/tempest';
-    const siteName = config.get('openrouter').siteName || 'T3MP3ST';
+    const siteName = config.get('openrouter').siteName || 'Purple Team';
 
     const requestBody = {
       model: this.config.model,

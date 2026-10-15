@@ -1,14 +1,14 @@
-# Multi-language white-box ingest for T3MP3ST
+# Multi-language white-box ingest for Purple Team
 
 **Status:** Draft design (for an upstream PR to `swcstudiospace/purple-team`)
 **Date:** 2026-07-10
-**Scope:** Replace the Python-only ingest parser with a portable multi-language parser, reusing T3MP3ST's existing security-ranking pipeline unchanged.
+**Scope:** Replace the Python-only ingest parser with a portable multi-language parser, reusing Purple Team's existing security-ranking pipeline unchanged.
 
 ---
 
 ## 1. Problem
 
-T3MP3ST markets white-box source hunting as a proven strength ("Code: ✅ Proven — CVE-Zero 8/10 across 7 languages"), but the ingest **engine** only reads Python. `src/recon/code-ingest.ts:6` says so itself:
+Purple Team markets white-box source hunting as a proven strength ("Code: ✅ Proven — CVE-Zero 8/10 across 7 languages"), but the ingest **engine** only reads Python. `src/recon/code-ingest.ts:6` says so itself:
 
 > "This is a PYTHON-ONLY, regex-based 'AST-lite' PROTOTYPE … The real version is tree-sitter (or a language server) + multi-language."
 
@@ -16,7 +16,7 @@ The README status table flags it: **Code → ⚠️ Python-only ingest**. Point 
 
 ## 2. Goal / Non-goals
 
-**Goal.** White-box ingest parses many languages, feeding T3MP3ST's *existing* security-ranking so multi-language repos get the same attack-surface-ordered analysis Python repos get today.
+**Goal.** White-box ingest parses many languages, feeding Purple Team's *existing* security-ranking so multi-language repos get the same attack-surface-ordered analysis Python repos get today.
 
 **Non-goals.**
 - Not changing the security model (`classify`/`prioritize`/`reachability`/`context-pack`) — it is reused verbatim.
@@ -34,7 +34,7 @@ The ingest is a pipeline (`whitebox.ts`): `code-ingest (SELECT) → context-pack
 
 So the change is surgical: **replace `parseFile` with a multi-language block extractor that emits the same `CodeBlock` shape.** No downstream code changes.
 
-## 4. Decision record — how to parse (embedded ADR; T3MP3ST has no ADR dir)
+## 4. Decision record — how to parse (embedded ADR; Purple Team has no ADR dir)
 
 **Decision: `web-tree-sitter` (WASM), as the default on every platform.**
 
@@ -43,12 +43,12 @@ Options considered:
 | Option | Nature | Rejected because |
 |---|---|---|
 | Extend regex per language | fragile per-language regex | The exact trap the file header warns against; unmaintainable across 40 grammars. |
-| `tree-sitter` (node-tree-sitter) | **native** N-API C++ addon; fastest | Compiles native code at install (node-gyp/toolchain) or needs per-OS/ABI prebuilds. T3MP3ST has **zero** native deps today and ships via `npx tempest` / `npm install` onto arbitrary machines, **fully offline**, cross-platform (open Windows bug #18). Native compile is the #1 install-failure mode in exactly that scenario. |
+| `tree-sitter` (node-tree-sitter) | **native** N-API C++ addon; fastest | Compiles native code at install (node-gyp/toolchain) or needs per-OS/ABI prebuilds. Purple Team has **zero** native deps today and ships via `npx tempest` / `npm install` onto arbitrary machines, **fully offline**, cross-platform (open Windows bug #18). Native compile is the #1 install-failure mode in exactly that scenario. |
 | Per-language JS parsers (`@babel/parser`…) | pure JS, one language each | Cannot cover many languages. |
 | Shell out to cxpak (external Rust tool) | multi-language, but external | Adds a binary install (brew/cargo/docker); and cxpak exposes **no** `{name, params, body, span}` symbol interface (CLI = markdown prose; `serve` = analyses, not a symbol table; `lsp` = MCP-over-stdio, no `documentSymbol`) — verified. Cannot cheaply supply `CodeBlock`s. |
 | **`web-tree-sitter` (WASM)** | official WASM build of tree-sitter | **Chosen.** |
 
-**Rationale.** web-tree-sitter is the WASM sibling of the native binding — same grammars, same parse quality — with **zero compile step**, running identically on any OS/Node/offline. It preserves T3MP3ST's pure-JS, portable, keyless character. The native binding's ~2–5× parse-speed edge is worthless here: ingest parses a repo **once per mission**, dwarfed by LLM latency. Grammar `.wasm` files are sourced from a prebuilt collection (e.g. `tree-sitter-wasms`; exact package/coverage confirmed at implementation time), not built locally.
+**Rationale.** web-tree-sitter is the WASM sibling of the native binding — same grammars, same parse quality — with **zero compile step**, running identically on any OS/Node/offline. It preserves Purple Team's pure-JS, portable, keyless character. The native binding's ~2–5× parse-speed edge is worthless here: ingest parses a repo **once per mission**, dwarfed by LLM latency. Grammar `.wasm` files are sourced from a prebuilt collection (e.g. `tree-sitter-wasms`; exact package/coverage confirmed at implementation time), not built locally.
 
 **Consequence / accepted cost.** Async grammar init; a few MB of bundled wasm for the top languages (lazy-loaded by extension); slightly more setup code than a `require()` grammar.
 
@@ -103,7 +103,7 @@ crawl (broadened includeExts)
 
 ## 10. Phase 2 (noted, not this PR) — cxpak as an optional ranking upgrade
 
-When installed, cxpak's `serve` endpoints supply genuinely better multi-language facts than T3MP3ST's regex heuristics: `/call_graph` (cross-language edges), `/api_surface` (entry points with file+line), `/data_flow` (taint paths). A later, fail-open, opt-in PR can let cxpak *upgrade* the ranking inputs (entry points, reachability, sinks) while the web-tree-sitter parser from phase 1 remains the universal default. Not required for the headline win.
+When installed, cxpak's `serve` endpoints supply genuinely better multi-language facts than Purple Team's regex heuristics: `/call_graph` (cross-language edges), `/api_surface` (entry points with file+line), `/data_flow` (taint paths). A later, fail-open, opt-in PR can let cxpak *upgrade* the ranking inputs (entry points, reachability, sinks) while the web-tree-sitter parser from phase 1 remains the universal default. Not required for the headline win.
 
 ## 11. Risks
 

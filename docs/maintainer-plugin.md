@@ -1,6 +1,6 @@
 # Shared BT6 Maintainer Plugin
 
-T3MP3ST consumes `bt6-maintainer` from the shared
+Purple Team consumes `bt6-maintainer` from the shared
 [`jmagly/bt6-aiwg-plugins`](https://github.com/jmagly/bt6-aiwg-plugins)
 repository. The public mirror is
 [`roctinam/bt6-aiwg-plugins`](https://git.integrolabs.net/roctinam/bt6-aiwg-plugins).
@@ -43,5 +43,5 @@ project-local wrapper path. AIWG issues
 local-source installer crash and unsafe removal classification respectively.
 
 Do not restore `.aiwg/addons/t3mp3st-maintainer`; reusable maintainer behavior
-belongs in the shared repository, while T3MP3ST-specific commands and risk paths
+belongs in the shared repository, while Purple Team-specific commands and risk paths
 belong in the repository profile.

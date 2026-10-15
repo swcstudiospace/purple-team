@@ -1,4 +1,4 @@
-# T3MP3ST Arsenal Activation Plan
+# Purple Team Arsenal Activation Plan
 
 This plan turns the visual 100+ tool loadout into a real local operator workstation without pretending missing binaries are ready. The backend reports three separate numbers:
 
@@ -25,7 +25,7 @@ brew install projectdiscovery/tap/subfinder projectdiscovery/tap/httpx projectdi
 
 ## Phase 2: Repository, Package, And Cloud
 
-These make T3MP3ST useful as a package and supply-chain hunter.
+These make Purple Team useful as a package and supply-chain hunter.
 
 ```bash
 brew install semgrep gitleaks trufflehog syft grype osv-scanner checkov
@@ -64,7 +64,7 @@ brew install radare2 afl++ apktool jadx
 
 ## Held Behind Gates
 
-Some tools should remain catalog-only or import-only until T3MP3ST has narrow adapters, scope receipts, and evidence redaction for each workflow:
+Some tools should remain catalog-only or import-only until Purple Team has narrow adapters, scope receipts, and evidence redaction for each workflow:
 
 - Metasploit: no generic shell-through execution.
 - Hydra: no generic credential attack runner.

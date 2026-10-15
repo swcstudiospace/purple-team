@@ -1,4 +1,4 @@
-# T3MP3ST UI design tokens
+# Purple Team UI design tokens
 
 `docs/assets/tokens.css` holds the single `:root` custom-property block for
 the static UI. All pages and the shared shell consume these variables; no

@@ -4,7 +4,7 @@ description: >-
   Use when the operator types /tempest-status or /tempest-providers: reads
   mission status plus provider and subscription-session state.
 ---
-# Tempest status
+# Purple Team status
 
 ## /tempest-status — mission state
 
@@ -35,7 +35,7 @@ and never echo one back.
 
 Degraded mode for both commands: if the backend is unreachable, reply
 
-> t3mp3st backend unreachable — start it with npm run server.
+> Purple Team backend unreachable — start it with npm run server.
 
 and nothing else shaped like status. The seat never opens a browser panel;
 every step goes through the MCP tools or the loopback HTTP API.

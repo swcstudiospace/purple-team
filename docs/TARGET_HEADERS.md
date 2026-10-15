@@ -1,6 +1,6 @@
 # Target Header Injection
 
-T3MP3ST can apply authentication headers to its HTTP arsenal tools. The headers are bound to one exact origin so credentials are not sent to other authorized targets, subdomains, ports, or redirect destinations.
+Purple Team can apply authentication headers to its HTTP arsenal tools. The headers are bound to one exact origin so credentials are not sent to other authorized targets, subdomains, ports, or redirect destinations.
 
 ## Configuration
 
@@ -25,7 +25,7 @@ Headers supplied explicitly by a tool call override configured defaults case-ins
 
 ## Redirect Safety
 
-Built-in requests follow redirects while retaining configured headers only for same-origin hops. Before following a cross-origin redirect, T3MP3ST removes every configured header as well as standard credential headers.
+Built-in requests follow redirects while retaining configured headers only for same-origin hops. Before following a cross-origin redirect, Purple Team removes every configured header as well as standard credential headers.
 
 When configured headers are active, `curl_request` removes `-L`, `--location`, and `--location-trusted` from caller-supplied flags. This prevents custom authentication headers from being forwarded to a redirect destination.
 

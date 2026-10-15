@@ -1,7 +1,7 @@
 {
   "name": "t3mp3st",
   "version": "1.0.0",
-  "description": "Tactical Execution Multi-agent Platform for Elite Security Testing",
+  "description": "Purple Team: a four-hat educational vulnerability AI (Red, Blue, White, Black)",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -136,7 +136,7 @@
     "ai",
     "llm"
   ],
-  "author": "t3mp3st contributors",
+  "author": "Purple Team contributors",
   "license": "MIT",
   "repository": {
     "type": "git",

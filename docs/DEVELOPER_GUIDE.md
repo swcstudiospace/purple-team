@@ -1,4 +1,4 @@
-# T3MP3ST Developer Guide
+# Purple Team Developer Guide
 
 This guide maps the codebase to the public surfaces documented for operators and integrators.
 
