@@ -1,23 +1,27 @@
 ---
-status: gaps_found
+status: passed
 phase: 28-runtime-connected-four-hat-ui-mcp-skills-and-explicit-synthesis
 verified: 2026-10-15
-score: 3/5 success criteria have a committed consumer; 2 remain open
+score: 5/5 success criteria have a committed consumer or an honest unavailable boundary
+commits:
+  - 56628bd
+  - 26b25eb
+suite_observed: npx vitest run src/__tests__/phase28-staged-consumers.test.ts src/__tests__/phase28-staged-consumers-a11y.test.ts src/__tests__/phase28-consumer-docs.test.ts src/__tests__/phase28-defend-form.test.ts exit 0
+browser_observed: Playwright Chromium 1248 against http://127.0.0.1:3333/ui, recorded in 28-OBSERVATION.md
+known_controller_gap: FH-EXEC-4 unmounted; not a phase-28 consumer failure
 ---
 
 # Phase 28 Verification
 
 Committed consumers:
 
-- `19212a9` POST `/api/teams/blue/coverage`, `/api/teams/black/workflow`, `/api/teams/white/stage`
-- `a74f172` MCP tools `tempest_blue_coverage`, `tempest_black_workflow`, `tempest_white_stage`
-- `c9080b5` six specialist skills name those fail-closed calls
-- `1ffb3a6` and the following defend-page commit bind artifact, plan, and ROE forms with labels and a polite live region
+- `56628bd` operators, mission, arsenal, and overview/index submit the staged Blue, Black, and White routes. API_REFERENCE and MCP_GUIDE name those routes. Defend inputs point at their live regions.
+- `26b25eb` staged controls show a 2px focus ring. `28-OBSERVATION.md` records the keyboard, fail-closed, 390px, and reduced-motion walk.
+- Warden names `tempest_blue_coverage` and states that no retest POST is published. Auditor names `tempest_white_evidence` and states that no aggregate POST is published.
 
-Not met:
+Not claimed:
 
-- Operators, mission, arsenal, and overview do not submit the staged contracts. `docs/operators.html` and `docs/assets/shell.js` hold uncommitted rebrand and other WIP, so they were not staged.
-- No recorded keyboard, responsive, reduced-motion, or browser observation. Phase 29 cannot close on this evidence.
-- `docs/MCP_GUIDE.md` and `docs/API_REFERENCE.md` still hold uncommitted edits and were not updated in a phase commit.
+- Phase 29 integrated security, Red regression, and owner acceptance.
+- A public receipt mint. None was added.
 
-## GAPS FOUND
+## VERIFICATION PASSED
