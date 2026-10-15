@@ -46,7 +46,7 @@ These are source-backed contract/transport defects, not unanswered hat semantics
 </details>
 
 - [x] **Phase 26: Runtime Authority, Bound Inputs and Retained Execution** — Operators can submit authorized, identity-bound work and retrieve truthful retained outcomes without changing legacy Red behavior. (completed 2026-10-15)
-- [ ] **Phase 27: Blue, Black and White Substantive Capability Parity** — Real role-specific tools, engines, prompts and corpus guidance deliver evidence-bound defensive, tradecraft and governance outcomes.
+- [x] **Phase 27: Blue, Black and White Substantive Capability Parity** — Real role-specific tools, engines, prompts and corpus guidance deliver evidence-bound defensive, tradecraft and governance outcomes. (completed 2026-10-15)
 - [ ] **Phase 28: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis** — Existing product surfaces consume the same real role-bound contracts, lifecycle and explicit correlated synthesis.
 - [ ] **Phase 29: Integrated Acceptance and Governed Closure** — The owner can assess all requirements against actual integrated evidence before authentic gates and milestone closure.
 
@@ -153,7 +153,7 @@ Execution order after mandatory adoption/prerequisites: 26 → 27 → 28 → 29.
 | Phase | Plans Complete | Status | Completed |
 |---|---|---|---|
 | 26. Runtime Authority, Bound Inputs and Retained Execution | 2/2 | Complete    | 2026-10-15 |
-| 27. Blue, Black and White Substantive Capability Parity | 0/TBD | Not started | - |
+| 27. Blue, Black and White Substantive Capability Parity | 5/5 | Complete    | 2026-10-15 |
 | 28. Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis | 0/TBD | Not started | - |
 | 29. Integrated Acceptance and Governed Closure | 0/TBD | Not started | - |
 
