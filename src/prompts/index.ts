@@ -8,6 +8,38 @@
  */
 
 import type { OperatorArchetype } from '../types/index.js';
+import { BLUE_PARENT_PROMPT, BLUE_SENTINEL_PROMPT, BLUE_WARDEN_PROMPT } from './blue.js';
+import { BLACK_PARENT_PROMPT, BLACK_SPECTER_PROMPT, BLACK_WRAITH_PROMPT } from './black.js';
+import { WHITE_PARENT_PROMPT, WHITE_SPECIALIST_PROMPTS } from './white.js';
+import { aiDefenseBriefing } from '../resources/ai-defense-playbook.js';
+import { aiTradecraftBriefing } from '../resources/ai-tradecraft-playbook.js';
+import { aiAdjudicationBriefing } from '../resources/ai-adjudication-playbook.js';
+
+/**
+ * Playbook briefing for an operator archetype: the P1 surface briefings loaded
+ * into the operator path this module feeds. Blue parents/specialists brief the
+ * defense playbook, black briefs tradecraft, white briefs adjudication, and
+ * everything else keeps the red-team briefing. server.ts stays untouched;
+ * this is the only wiring point for the three new briefings.
+ */
+export function operatorPlaybookBriefing(archetype: OperatorArchetype): string {
+  switch (archetype) {
+    case 'blue':
+    case 'sentinel':
+    case 'warden':
+      return aiDefenseBriefing();
+    case 'black':
+    case 'specter':
+    case 'wraith':
+      return aiTradecraftBriefing();
+    case 'white':
+    case 'arbiter':
+    case 'auditor':
+      return aiAdjudicationBriefing();
+    default:
+      return '';
+  }
+}
 
 // =============================================================================
 // SHARED PREAMBLE — injected into every operator prompt
@@ -734,7 +766,17 @@ Every black-operator report includes:
 </critical-rules>
 ${REACT_PREAMBLE}
 ${OPSEC_RULES}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${BLACK_PARENT_PROMPT}
+<specialists>
+${BLACK_SPECTER_PROMPT}
+${BLACK_WRAITH_PROMPT}
+</specialists>
+<surface-briefing>
+${aiTradecraftBriefing()}
+</surface-briefing>
+</dedicated-hat-guidance>`,
 
   blue: `<role>
 You are T3MP3ST Blue Operator — the defender-side detection and hardening specialist working from authorized red-team findings.
@@ -795,7 +837,17 @@ Every blue-operator report includes:
 
 </critical-rules>
 ${REACT_PREAMBLE}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${BLUE_PARENT_PROMPT}
+<specialists>
+${BLUE_SENTINEL_PROMPT}
+${BLUE_WARDEN_PROMPT}
+</specialists>
+<surface-briefing>
+${aiDefenseBriefing()}
+</surface-briefing>
+</dedicated-hat-guidance>`,
 
   white: `<role>
 You are T3MP3ST White Operator — the neutral referee and evidence adjudicator for authorized security testing operations.
@@ -854,7 +906,17 @@ Every white-operator report includes:
 
 </critical-rules>
 ${REACT_PREAMBLE}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${WHITE_PARENT_PROMPT}
+<specialists>
+${WHITE_SPECIALIST_PROMPTS['dispute-adjudicator']}
+${WHITE_SPECIALIST_PROMPTS['evidence-strength-scorer']}
+</specialists>
+<surface-briefing>
+${aiAdjudicationBriefing()}
+</surface-briefing>
+</dedicated-hat-guidance>`,
 
    specter: `<role>
  You are T3MP3ST Specter — the covert tradecraft reviewer of the black team, conducting authorized security testing review.
@@ -914,7 +976,10 @@ ${AUTHORIZATION_NOTICE}`,
  </critical-rules>
 ${REACT_PREAMBLE}
 ${OPSEC_RULES}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${BLACK_SPECTER_PROMPT}
+</dedicated-hat-guidance>`,
 
    wraith: `<role>
  You are T3MP3ST Wraith — the exfil-simulation and opsec-pressure specialist of the black team, conducting authorized security testing analysis.
@@ -978,7 +1043,10 @@ ${AUTHORIZATION_NOTICE}`,
  </critical-rules>
 ${REACT_PREAMBLE}
 ${OPSEC_RULES}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${BLACK_WRAITH_PROMPT}
+</dedicated-hat-guidance>`,
 
    sentinel: `<role>
  You are T3MP3ST Sentinel — the detection-engineering specialist of the blue team, working from authorized red-team findings.
@@ -1037,7 +1105,10 @@ ${AUTHORIZATION_NOTICE}`,
 
  </critical-rules>
 ${REACT_PREAMBLE}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${BLUE_SENTINEL_PROMPT}
+</dedicated-hat-guidance>`,
 
    warden: `<role>
  You are T3MP3ST Warden — the hardening-audit specialist of the blue team, working from authorized red-team findings.
@@ -1095,7 +1166,10 @@ ${AUTHORIZATION_NOTICE}`,
 
  </critical-rules>
 ${REACT_PREAMBLE}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${BLUE_WARDEN_PROMPT}
+</dedicated-hat-guidance>`,
 
    arbiter: `<role>
  You are T3MP3ST Arbiter — the ROE adjudicator and dispute referee of the white team for authorized security testing operations.
@@ -1151,7 +1225,10 @@ ${AUTHORIZATION_NOTICE}`,
 
  </critical-rules>
 ${REACT_PREAMBLE}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${WHITE_SPECIALIST_PROMPTS['dispute-adjudicator']}
+</dedicated-hat-guidance>`,
 
    auditor: `<role>
  You are T3MP3ST Auditor — the evidence reviewer and finding scorer of the white team for authorized security testing operations.
@@ -1209,7 +1286,10 @@ ${AUTHORIZATION_NOTICE}`,
 
  </critical-rules>
 ${REACT_PREAMBLE}
-${AUTHORIZATION_NOTICE}`,
+${AUTHORIZATION_NOTICE}
+<dedicated-hat-guidance>
+${WHITE_SPECIALIST_PROMPTS['evidence-strength-scorer']}
+</dedicated-hat-guidance>`,
  };
 
 // =============================================================================

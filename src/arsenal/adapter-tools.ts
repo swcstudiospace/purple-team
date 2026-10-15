@@ -477,14 +477,41 @@ export function isMintable(adapter: ToolAdapter): boolean {
 }
 
 /**
+ * Adapters that stay validation-surface only: sigma and yara name a
+ * validation surface, never a binary the platform executes. They are
+ * registered as explicit-unavailable tools (success false plus installHint
+ * inside the call) so callers see the boundary instead of a missing tool —
+ * and the handler never spawns, never probes availability, and never runs at
+ * module load, so one missing binary cannot take Red or a sibling hat down.
+ * osquery, suricata, and caldera are catalog_only/import_only and stay null
+ * via isMintable below. No catalog stubs are minted for any of the five.
+ */
+const VALIDATION_SURFACE_ONLY: Record<string, true> = { sigma: true, yara: true };
+
+/**
  * Turn one catalogued adapter into a callable `CustomTool`.
  *
  * Returns `null` for `execution === 'catalog_only'` (metasploit, hydra) and `execution ===
  * 'import_only'` (bloodhound) — those are NEVER minted, so they cannot be reached through generic
- * command execution.
+ * command execution. Sigma and yara register as explicit-unavailable tools instead: the handler
+ * fails closed inside the call with the install hint and never spawns, so the boundary is visible
+ * to callers and one missing binary cannot take Red or a sibling hat down.
  */
 export function adapterToCustomTool(adapter: ToolAdapter, deps: AdapterToolDeps): CustomTool | null {
   if (!isMintable(adapter)) return null; // catalog_only / import_only are never callable
+  if (VALIDATION_SURFACE_ONLY[adapter.id]) {
+    return {
+      name: toolNameFor(adapter),
+      description: `${adapter.name}: ${adapter.notes} (Kali+ adapter; validation surface only — unavailable, ${adapter.execution}, risk=${adapter.risk})`,
+      category: adapter.category,
+      riskTier: adapter.risk,
+      parameters: [],
+      handler: async (): Promise<ToolResult> => ({
+        success: false,
+        error: `${adapter.name} (${adapter.binary}) is unavailable as an executed tool: validation surface only. ${adapter.installHint}`,
+      }),
+    };
+  }
 
   const template = resolveTemplate(adapter);
 

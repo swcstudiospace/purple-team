@@ -100,16 +100,25 @@ describe('specter: specterCoverReview', () => {
 });
 
 describe('wraith: wraithExfilSim', () => {
-  it('verifies a small encrypted path on declared egress as feasible and low-noise', () => {
+  it('declares a small encrypted path on a declared egress string without verifying it', () => {
     const result = wraithExfilSim({
       paths: [{ id: 'p1', channel: 'api-pagination', volumeMb: 4, encrypted: true }],
       egress: ['proxy-egress-1'],
     });
     expect(result.paths).toHaveLength(1);
-    expect(result.paths[0]).toMatchObject({ pathId: 'p1', feasible: true, noiseCost: 'low', egressVerified: true });
-    expect(result.paths[0].pressureNotes).toEqual([]);
+    expect(result.paths[0]).toMatchObject({ pathId: 'p1', feasible: true, noiseCost: 'low', standing: 'modeled', egressVerified: false });
+    expect(result.paths[0].pressureNotes.join(' ')).toMatch(/modeled, not verified/);
     expect(result.totalVolumeMb).toBe(4);
     expect(result.budget.violations).toEqual([]);
+  });
+
+  it('verifies a route only with observed route evidence for the same path id', () => {
+    const result = wraithExfilSim({
+      paths: [{ id: 'p1', channel: 'api-pagination', volumeMb: 4, encrypted: true }],
+      egress: ['proxy-egress-1'],
+      routeEvidence: [{ pathId: 'p1', evidenceId: 'route-obs-1', observed: true }],
+    });
+    expect(result.paths[0]).toMatchObject({ pathId: 'p1', standing: 'verified', egressVerified: true, routeEvidenceId: 'route-obs-1' });
   });
 
   it('rates bulk unencrypted tunnels high-noise and infeasible, with pressure notes', () => {
