@@ -30,6 +30,13 @@
 <div><label class="flabel" for="coverageSel">Coverage</label><select class="form-input" id="coverageSel"><option value="all">all</option><option value="none">none</option><option value="partial">partial</option><option value="covered">covered</option></select></div>
 <div><label class="flabel" for="coverageRefresh">Refresh</label><button class="btn btn--sm" id="coverageRefresh" type="button">Reload gaps</button></div>
 </div>
+<form class="form-row" id="coverageBind" aria-label="Bind an observed artifact to a finding">
+<div><label class="flabel" for="coverageFinding">Finding id</label><input class="form-input" id="coverageFinding" name="findingId" autocomplete="off" required></div>
+<div><label class="flabel" for="coverageArtifact">Artifact id</label><input class="form-input" id="coverageArtifact" name="artifactId" autocomplete="off" required></div>
+<div><label class="flabel" for="coverageFamily">Family</label><input class="form-input" id="coverageFamily" name="family" value="web_api" autocomplete="off"></div>
+<div><label class="flabel" for="coverageBindSubmit">Score</label><button class="btn btn--sm btn--primary" id="coverageBindSubmit" type="submit">Score artifact</button></div>
+</form>
+<p id="coverageBindResult" class="text-secondary" role="status" aria-live="polite"></p>
 <div data-state-root id="coverageState">
 <div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
 <div data-state="empty" class="st-empty" hidden><p>No coverage rows to show — the findings ledger is empty or nothing matches the filter.</p><a class="btn btn--sm btn--primary" href="overview.html">Run a mission</a></div>
@@ -156,6 +163,31 @@ async function loadCoverage() {
     failState(root, e);
   }
 }
+
+document.getElementById('coverageBind').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var result = document.getElementById('coverageBindResult');
+  var findingId = document.getElementById('coverageFinding').value.trim();
+  var artifactId = document.getElementById('coverageArtifact').value.trim();
+  var family = document.getElementById('coverageFamily').value.trim() || 'web_api';
+  result.textContent = 'Scoring…';
+  try {
+    var scored = await Shell.apiPost('/api/teams/blue/coverage', {
+      runId: 'ui-' + Date.now(),
+      missionId: 'ui-defend',
+      family: family,
+      artifactIds: [artifactId],
+      findings: [{ id: findingId }]
+    });
+    var gaps = Array.isArray(scored.gaps) ? scored.gaps : [];
+    var row = gaps.find(function (gap) { return gap.findingId === findingId; });
+    result.textContent = row
+      ? findingId + ' is ' + row.coverage + '. An id list alone is not coverage.'
+      : 'No row returned for ' + findingId + '.';
+  } catch (err) {
+    result.textContent = err && err.message ? err.message : 'Coverage request failed.';
+  }
+});
 
 async function loadNoise() {
   var root = document.getElementById('noiseState');
