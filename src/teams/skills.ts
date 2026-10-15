@@ -648,11 +648,17 @@ export async function runComposableSkill(
         const toolReg = getRegisteredHatTool(step.toolId);
         const stepInput = {
           ...(toolReg?.defaultPreset ?? {}),
-          ...(step.toolId === 'white-data-inspector' && callerParams.rawPayload !== undefined && callerParams.requiredFields === undefined
-            ? { requiredFields: [] }
+          ...(step.toolId === 'white-data-inspector'
+            ? {
+                includeAllRecords: true,
+                ...(callerParams.rawPayload !== undefined && callerParams.requiredFields === undefined
+                  ? { requiredFields: [] }
+                  : {}),
+              }
             : {}),
           ...carriedContext,
           ...mergedParams,
+          ...(step.toolId === 'white-data-inspector' ? { includeAllRecords: true } : {}),
         };
 
         const stepEnvelope = await executeRegisteredHatTool(step.toolId, stepInput, innerSignal);
@@ -694,26 +700,17 @@ export async function runComposableSkill(
 
         stepsCompleted += 1;
 
-        if (step.toolId === 'white-data-inspector' && Array.isArray(stepDataRecord?.records)) {
-          const initialRecords = stepDataRecord.records as Array<Record<string, unknown>>;
-          const totalChunks = typeof stepDataRecord.totalChunks === 'number' ? stepDataRecord.totalChunks : 1;
-          const currentChunkIndex = typeof stepDataRecord.chunkIndex === 'number' ? stepDataRecord.chunkIndex : 0;
-          const allRecords: Array<Record<string, unknown>> = [];
-
-          if (totalChunks > 1) {
-            for (let pageIdx = 0; pageIdx < totalChunks; pageIdx += 1) {
-              if (pageIdx === currentChunkIndex) {
-                allRecords.push(...initialRecords);
-              } else {
-                const pageResult = runWhiteDataInspector({
-                  ...(stepInput as WhiteDataInspectorInput),
-                  chunkIndex: pageIdx,
-                });
-                allRecords.push(...pageResult.records);
-              }
-            }
-          } else {
-            allRecords.push(...initialRecords);
+        if (
+          step.toolId === 'white-data-inspector'
+          && (Array.isArray(stepDataRecord?.allFilteredRecords) || Array.isArray(stepDataRecord?.records))
+        ) {
+          const allRecords = (
+            Array.isArray(stepDataRecord?.allFilteredRecords)
+              ? stepDataRecord.allFilteredRecords
+              : stepDataRecord.records
+          ) as Array<Record<string, unknown>>;
+          if (stepDataRecord && 'allFilteredRecords' in stepDataRecord) {
+            delete stepDataRecord.allFilteredRecords;
           }
 
           const hasRecordEvidence = (rec: Record<string, unknown>): boolean => {
@@ -763,14 +760,33 @@ export async function runComposableSkill(
         } else if (step.toolId === 'white-evidence-collector' && Array.isArray(stepDataRecord?.items)) {
           const items = stepDataRecord.items as Array<Record<string, unknown>>;
           if (items.length > 0 && callerParams.decisions === undefined) {
-            carriedContext.decisions = items.map((tf, idx) => ({
-              id: `dec-ev-${idx + 1}`,
-              fromHat: 'white',
-              toHat: 'blue',
-              summary: typeof tf.claim === 'string' ? tf.claim : `Fact ${idx + 1}`,
-              rationale: `Confidence ${String(tf.confidenceLevel ?? 'unverified')} (${String(tf.sha256 ?? '').slice(0, 16)})`,
-              evidenceRefs: typeof tf.sha256 === 'string' ? [tf.sha256.slice(0, 16)] : ['ev-ref'],
-            }));
+            carriedContext.decisions = items.map((tf, idx) => {
+              const confidence = typeof tf.confidenceLevel === 'string' ? tf.confidenceLevel : 'unverified';
+              const status: 'accepted' | 'deferred' | 'rejected' =
+                confidence === 'contradicted'
+                  ? 'rejected'
+                  : confidence === 'verified' || confidence === 'corroborated'
+                    ? 'accepted'
+                    : 'deferred';
+              const artifactId = typeof tf.artifactId === 'string' && tf.artifactId.trim() ? tf.artifactId.trim() : null;
+              const corroboratedBy = Array.isArray(tf.corroboratedBy)
+                ? tf.corroboratedBy.filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+                : [];
+              const evidenceRefs: string[] = [];
+              if (artifactId) evidenceRefs.push(artifactId);
+              for (const ref of corroboratedBy) {
+                if (!evidenceRefs.includes(ref)) evidenceRefs.push(ref);
+              }
+              return {
+                id: `dec-ev-${idx + 1}`,
+                fromHat: 'white',
+                toHat: 'blue',
+                summary: typeof tf.claim === 'string' ? tf.claim : `Fact ${idx + 1}`,
+                rationale: `Confidence ${confidence} (${String(tf.sha256 ?? '').slice(0, 16)})`,
+                evidenceRefs,
+                status,
+              };
+            });
           }
         } else if (step.toolId === 'black-policy-validator' && Array.isArray(stepDataRecord?.checks)) {
           const checks = stepDataRecord.checks as Array<Record<string, unknown>>;

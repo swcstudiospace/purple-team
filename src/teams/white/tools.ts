@@ -20,6 +20,7 @@ export interface WhiteDataInspectorInput {
   filterValue?: string;
   chunkSize?: number;
   chunkIndex?: number;
+  includeAllRecords?: boolean;
 }
 
 export interface WhiteFieldSchemaSummary {
@@ -47,6 +48,7 @@ export interface WhiteDataInspectorResult {
   chunkSize: number;
   totalChunks: number;
   records: ReadonlyArray<Record<string, unknown>>;
+  allFilteredRecords?: ReadonlyArray<Record<string, unknown>>;
   schemaSummary: readonly WhiteFieldSchemaSummary[];
   omittedSchemaFieldsCount?: number;
   omittedSchemaFields?: readonly string[];
@@ -328,6 +330,7 @@ export function runWhiteDataInspector(
     chunkSize,
     totalChunks,
     records: pageRecords,
+    ...(input.includeAllRecords === true ? { allFilteredRecords: filtered } : {}),
     schemaSummary,
     ...(omittedSchemaFieldsCount > 0 ? { omittedSchemaFieldsCount, omittedSchemaFields } : {}),
     diagnostics,

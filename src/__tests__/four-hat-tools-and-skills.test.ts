@@ -619,6 +619,25 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     };
     expect(evStepOut.summaryCounts?.total).toBe(51);
     expect(evStepOut.summaryCounts?.unverified).toBe(51);
+
+    // 12. Blue incident sequencer defers unverified claims and rejects contradicted claims in ledger handoff
+    const disputedIncident = await runComposableSkill('skill-blue-incident-sequencer', {
+      facts: [
+        { id: 'f-unverified', claim: 'Unverified lateral movement rumor', source: 'chat' },
+        { id: 'f-contradicted', claim: 'Contradicted root compromise', source: 'rumor', contradictedBy: ['edr-host-log'] },
+        { id: 'f-verified', claim: 'Verified SSH brute force', source: 'auth.log', artifactId: 'art-ssh-1', sha256: 'sha256-1122334455667788', corroboratedBy: ['siem-rule-1'] },
+      ],
+    });
+    expect(disputedIncident.ok).toBe(true);
+    const ledgerOut = disputedIncident.data?.stepOutputs[3].output as {
+      entries?: Array<{ status: string; evidenceRefs: string[] }>;
+    };
+    expect(ledgerOut.entries?.[0].status).toBe('deferred');
+    expect(ledgerOut.entries?.[0].evidenceRefs).toEqual([]);
+    expect(ledgerOut.entries?.[1].status).toBe('rejected');
+    expect(ledgerOut.entries?.[1].evidenceRefs).toEqual([]);
+    expect(ledgerOut.entries?.[2].status).toBe('accepted');
+    expect(ledgerOut.entries?.[2].evidenceRefs).toEqual(['art-ssh-1', 'siem-rule-1']);
   });
 });
 
