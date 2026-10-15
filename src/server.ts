@@ -929,6 +929,84 @@ interface RoeRecord {
 const roeRecords = new Map<string, RoeRecord>();
 
 /**
+ * Observed receipts (Phase 26, D-receipts): written ONLY by the private
+ * recordReceipt writer below, after a real computation returns — never by an
+ * HTTP route. Public POST /api/evidence cannot set origin; rows without
+ * origin stay unlabeled with no backfill. Restore drops any origin:observed
+ * row lacking its full observation binding.
+ */
+interface ObservedReceipt {
+  id: string;
+  origin: 'observed';
+  runId: string;
+  missionId: string;
+  stage: string;
+  tool: string;
+  inputSha256: string;
+  itemId: string;
+  createdAt: string;
+}
+const observedReceipts = new Map<string, ObservedReceipt>();
+
+/**
+ * Retained operator task runs (Phase 26, D-lifecycle): every string leaving
+ * the process passes redactSecrets/redactLedgerText and raw artifact bytes
+ * are never persisted here. Pending/running rows at process loss become
+ * interrupted with executionSettled:true — never resumed.
+ */
+interface OperatorTaskRun {
+  id: string;
+  runId: string;
+  missionId: string;
+  hat: string;
+  specialist: string;
+  taskId: string;
+  inputSha256: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
+  executionSettled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+const operatorTaskRuns = new Map<string, OperatorTaskRun>();
+
+/**
+ * Private receipt writer — the ONLY path that mints origin:observed. Call
+ * only after a real computation returns, with the full run/mission/stage/
+ * tool/input-hash/item binding. No HTTP route calls this with caller input.
+ */
+function recordReceipt(binding: {
+  runId: string;
+  missionId: string;
+  stage: string;
+  tool: string;
+  inputSha256: string;
+  itemId: string;
+}): ObservedReceipt {
+  const receipt: ObservedReceipt = {
+    id: randomUUID(),
+    origin: 'observed',
+    ...binding,
+    createdAt: nowIso(),
+  };
+  observedReceipts.set(receipt.id, receipt);
+  return receipt;
+}
+
+/** Observation binding is complete only with tool, stage, input hash, run, and mission. */
+function isForgedObservedReceipt(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return true;
+  const row = value as Record<string, unknown>;
+  if (row.origin !== 'observed') return false;
+  return !(
+    typeof row.tool === 'string' && row.tool &&
+    typeof row.stage === 'string' && row.stage &&
+    typeof row.inputSha256 === 'string' && row.inputSha256 &&
+    typeof row.runId === 'string' && row.runId &&
+    typeof row.missionId === 'string' && row.missionId
+  );
+}
+
+/**
  * Mirror a live mission finding into the persistent findingsLedger (the one the
  * Evidence Vault reads via /api/findings). Mission findings otherwise live only in
  * the ephemeral vault (/api/mission/findings) and vanish from the Vault after a run.
@@ -1203,6 +1281,8 @@ function buildStateSnapshot(): Record<string, unknown> {
     memoryProposals: [...memoryProposals.values()],
     purpleSyntheses: [...purpleSyntheses.values()],
     roeRecords: [...roeRecords.values()],
+    observedReceipts: [...observedReceipts.values()],
+    operatorTaskRuns: [...operatorTaskRuns.values()],
   };
 }
 
@@ -1275,6 +1355,23 @@ async function loadPersistedState(): Promise<void> {
     replaceMapContents(memoryProposals, state.memoryProposals);
     replaceMapContents(purpleSyntheses, state.purpleSyntheses);
     replaceMapContents(roeRecords, state.roeRecords);
+    // Observed receipts: drop any forged origin:observed row lacking its full
+    // observation binding (tool, stage, inputSha256, runId, missionId). Absent
+    // slot restores as empty — the replace is absent-tolerant.
+    replaceMapContents(observedReceipts, state.observedReceipts);
+    for (const [id, row] of [...observedReceipts]) {
+      if (isForgedObservedReceipt(row)) observedReceipts.delete(id);
+    }
+    // Retained runs keep original attribution; pending/running rows at process
+    // loss become interrupted with executionSettled:true — never resumed.
+    replaceMapContents(operatorTaskRuns, state.operatorTaskRuns);
+    for (const row of operatorTaskRuns.values()) {
+      if (row.status === 'pending' || row.status === 'running') {
+        row.status = 'interrupted';
+        row.executionSettled = true;
+        row.updatedAt = nowIso();
+      }
+    }
     console.log(`[purple-team] State restored from ${file}`);
   } catch (error: any) {
     if (error?.code !== 'ENOENT') {
@@ -5783,6 +5880,10 @@ app.get('/api/evidence', (req: Request, res: Response) => {
 app.post('/api/evidence', (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   if (rejectDuplicateLedgerId(res, evidenceLedger, body.id, 'Evidence', '/api/evidence')) return;
+  // Claimed-versus-observed boundary (Phase 26, D-receipts): the public path
+  // can never set origin — body.origin is ignored and every row stays
+  // claimed (unlabeled, no backfill). Only the private recordReceipt writer
+  // mints origin:observed after a real computation.
   const evidence: EvidenceEntry = {
     id: clientLedgerId(body.id, 'evidence'),
     missionId: typeof body.missionId === 'string' ? body.missionId : undefined,
@@ -6630,6 +6731,20 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     actions: record.actions.length,
   });
   const putParse = parseRoe(record.text);
+  // First honest observed-receipt hook (Phase 26, D-receipts): a successful
+  // parseRoe IS a real computation returning, so it mints one observed
+  // receipt bound to the parsed text. Parse failure mints nothing; GET
+  // handlers never mint.
+  if (putParse.ok) {
+    recordReceipt({
+      runId: `roe-rev-${record.revision}`,
+      missionId: 'roe-record',
+      stage: 'parse',
+      tool: 'parseRoe',
+      inputSha256: record.textHash,
+      itemId: record.id,
+    });
+  }
   res.json(redactSecrets({ revision: record.revision, textHash: record.textHash, ok: putParse.ok, summary: putParse.summary }));
 });
 
@@ -7141,7 +7256,10 @@ app.post('/api/mission/stop', (_req: Request, res: Response) => {
   // leaks and keeps firing against a dead mission.
   if (activeGeneral) activeGeneral.stopMonitoring();
   broadcastEvent('mission:stopped', { timestamp: Date.now() });
-  res.json({ success: true, message: 'Mission stopped' });
+  // Honest cancellation (Phase 26, AC-FH-020): a transport stop halts the
+  // tick loop — it is never an acknowledged cancel or resume. No cancel
+  // route exists; in-flight work is left interrupted, not acknowledged.
+  res.json({ success: true, message: 'Mission stopped', cancelAcknowledged: false });
 });
 
 /**
