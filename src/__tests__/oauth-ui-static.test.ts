@@ -55,7 +55,7 @@ describe('token foundation', () => {
     for (const name of [
       '--bg', '--surface', '--surface-alt', '--border',
       '--text-primary', '--text-secondary',
-      '--accent-red', '--accent-red-hover', '--text-accent',
+      '--brand', '--brand-hover', '--text-accent', '--font-display',
       '--danger', '--danger-surface', '--focus-ring',
       '--radius', '--gap',
     ]) {
@@ -109,7 +109,7 @@ describe('v1.1 component-system tokens', () => {
   it('defines the raised-surface, faint-text, and success/warning aliases', () => {
     for (const name of [
       '--surface-raised', '--surface-overlay', '--border-strong', '--text-faint',
-      '--accent-red-crisp', '--success', '--warning',
+      '--brand-crisp', '--success', '--warning',
       '--tint-success', '--tint-warning',
       '--shadow-raised', '--shadow-pop', '--touch',
       '--trans-fast', '--trans-med', '--trans-slow', '--ease-out',
