@@ -7,6 +7,8 @@ import {
   adjudicationTechnique,
   type AdjudicationFramework,
 } from '../resources/ai-adjudication-playbook.js';
+import { teamToolGrants } from '../teams/index.js';
+import { hatToolGrants } from '../teams/hats.js';
 import { TOOL_ADAPTERS } from '../arsenal/catalog.js';
 
 const FRAMEWORKS: readonly AdjudicationFramework[] = ['nist-800-115', 'ptes', 'osstmm'];
@@ -21,10 +23,11 @@ describe('AI adjudication playbook (white governance rule catalogs)', () => {
   it('every technique is well-formed (all fields, kebab-case id)', () => {
     for (const t of AI_ADJUDICATION_PLAYBOOK) {
       expect(t.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
-      for (const field of ['control', 'adjudicationRule', 'evidenceStandard'] as const) {
+      for (const field of ['control', 'adjudicationRule', 'evidenceStandard', 'validation', 'completion'] as const) {
         expect(typeof t[field]).toBe('string');
         expect(t[field].length).toBeGreaterThan(10);
       }
+      expect(t.permittedTools.length).toBeGreaterThan(0);
     }
   });
 
@@ -85,5 +88,31 @@ describe('AI adjudication playbook (white governance rule catalogs)', () => {
 
   it('every technique names a framework anchor and an evidence standard', () => {
     expect(AI_ADJUDICATION_PLAYBOOK.every(t => t.control.trim().length > 0 && t.evidenceStandard.trim().length > 0)).toBe(true);
+  });
+  it('permitted-tool ids reference existing white grants only (labels, never new ids)', () => {
+    const grants = new Set([...teamToolGrants('white'), ...hatToolGrants('arbiter'), ...hatToolGrants('auditor')]);
+    for (const t of AI_ADJUDICATION_PLAYBOOK) {
+      for (const id of t.permittedTools) {
+        expect(grants.has(id), `tool ${id} (${t.id}) is not an existing white grant`).toBe(true);
+      }
+    }
+  });
+
+  it('briefing lines carry evidence, tool, validation, completion, and untrusted-data segments', () => {
+    const lines = aiAdjudicationBriefing().split('\n');
+    expect(lines.length).toBe(AI_ADJUDICATION_PLAYBOOK.length);
+    lines.forEach((line, i) => {
+      const t = AI_ADJUDICATION_PLAYBOOK[i];
+      expect(line).toContain(`[${t.id}]`);
+      expect(line).toContain('evidence:');
+      expect(line).toContain('tools:');
+      for (const id of t.permittedTools) expect(line).toContain(id);
+      expect(line).toContain('grants unchanged');
+      expect(line).toContain('validation:');
+      expect(line).toContain(t.validation.slice(0, 40));
+      expect(line).toContain('done:');
+      expect(line).toContain(t.completion.slice(0, 40));
+      expect(line).toContain('untrusted-data');
+    });
   });
 });

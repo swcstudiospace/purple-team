@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Purple Team — Four Hats</title>
+<link rel="stylesheet" href="assets/tokens.css">
+</head>
+<body>
+<a class="skip" href="#content">Skip to content</a>
+<div class="shell">
+<div class="shell__sidebar" id="sidebar">
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">P</span><a class="shell__brand-name" href="overview.html">Purple Team</a></div>
+<button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
+<nav data-shell-nav aria-label="Primary"></nav>
+</div>
+<div class="shell__main">
+<main id="content" class="shell__content" aria-labelledby="pageTitle">
+<div class="page-head">
+<div class="page-head__kicker">Four Hats</div>
+<h1 class="page-head__title" id="pageTitle">Four Hats</h1>
+<p class="page-head__sub">educational vulnerability AI with equal Red, Blue, Black, and White lanes, interactive Hat tools, and composable multi-Hat skills. Analysis and adjudication do not operate a target. API base: <span class="mono" data-api-base></span></p>
+</div>
+
+<div class="context-bar" id="hatContextBar" role="region" aria-label="Active Hat Context">
+<div class="context-bar__group">
+<span>Active Hat:</span>
+<span class="hat-badge hat-badge--blue" id="activeHatBadge">[BLUE] Blue Hat</span>
+<span class="text-secondary mono" id="activeHatHint">Orchestration, Sequencing &amp; Defense</span>
+</div>
+<div class="context-bar__group">
+<span class="badge badge--neutral mono">Alt+1..4 Switch Hat · Ctrl+K Palette</span>
+<button class="btn btn--sm" type="button" id="openPaletteBtn">Command Palette</button>
+</div>
+</div>
+
+<div class="card" aria-labelledby="hatSwitcherTitle">
+<div class="card__row">
+<h2 class="card__title" id="hatSwitcherTitle">Hat Switcher &amp; Workspace Filter</h2>
+</div>
+<div class="hat-switcher" role="tablist" aria-label="Filter by Hat" id="hatFilterTabs">
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="true" data-hat-tab="all">All Hats</button>
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="false" data-hat-tab="blue"><span class="hat-badge hat-badge--blue">BLUE</span> Orchestration (3)</button>
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="false" data-hat-tab="white"><span class="hat-badge hat-badge--white">WHITE</span> Evidence &amp; Gaps (3)</button>
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="false" data-hat-tab="black"><span class="hat-badge hat-badge--black">BLACK</span> Risk &amp; Policy (3)</button>
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="false" data-hat-tab="red"><span class="hat-badge hat-badge--red">RED</span> Validation (1)</button>
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="false" data-hat-tab="shared"><span class="hat-badge hat-badge--purple">SHARED</span> Extra Tools (4)</button>
+<button type="button" role="tab" class="hat-switcher__btn" aria-selected="false" data-hat-tab="skills"><span class="hat-badge hat-badge--purple">SKILLS</span> Composable Skills (4)</button>
+</div>
+</div>
+
+<section class="card card--raised" id="hatWorkspace" aria-labelledby="workspaceTitle">
+<div class="card__row">
+<h2 class="card__title" id="workspaceTitle">Interactive 4-Hat Tool &amp; Composable Skill Runner</h2>
+<span class="badge badge--info mono" id="workspaceModeBadge">Mode: Hat Tools</span>
+</div>
+<p class="text-secondary">Select a Blue, White, Black, Red, or Shared tool — or a multi-step Composable Skill — inspect or customize the JSON payload (drafts auto-save locally), execute with deterministic guardrails, pin outputs, or forward findings via <strong>Send to Hat</strong>.</p>
+
+<div class="st-warn-box" id="forwardedBanner" hidden>
+<p><strong>Forwarded Context Ready:</strong> <span id="forwardedSummary"></span></p>
+<div class="card__row">
+<button class="btn btn--sm btn--primary" type="button" id="applyForwardedBtn">Apply Forwarded Input</button>
+<button class="btn btn--sm" type="button" id="dismissForwardedBtn">Dismiss</button>
+</div>
+</div>
+
+<div class="workspace-split">
+<div>
+<div class="form-row">
+<div>
+<label class="flabel" for="runnerModeSelect">Execution Surface</label>
+<select class="form-input" id="runnerModeSelect">
+<option value="tools">Hat Tools (14 Registered Tools)</option>
+<option value="skills">Composable Skills (4 Multi-Hat Workflows)</option>
+</select>
+</div>
+<div>
+<label class="flabel" for="toolSearchInput">Filter Tools / Skills</label>
+<input class="form-input" id="toolSearchInput" type="search" placeholder="Search by name, Hat, or id..." autocomplete="off">
+</div>
+</div>
+
+<div class="flabel">Available Tools &amp; Skills</div>
+<div class="tool-catalog-list" id="toolCatalogList" role="listbox" aria-label="Available Hat Tools and Skills"></div>
+
+<label class="flabel" for="toolInputEditor">JSON Input Payload <span class="mono text-secondary" id="selectedToolLabel"></span></label>
+<textarea class="form-input" id="toolInputEditor" rows="9" spellcheck="false" aria-describedby="toolInputHint"></textarea>
+<div class="form-hint" id="toolInputHint">Draft inputs persist across Hat switches and viewport resizes (2 MiB payload cap, prototype-pollution keys stripped).</div>
+
+<div class="card__row">
+<button class="btn btn--primary" type="button" id="runToolBtn">Run Selected</button>
+<button class="btn btn--sm" type="button" id="loadPresetBtn">Load Preset</button>
+<button class="btn btn--sm" type="button" id="loadEmptyBtn">Empty Input</button>
+<button class="btn btn--sm" type="button" id="clearDraftBtn">Reset Draft</button>
+<button class="btn btn--sm btn--danger" type="button" id="cancelToolBtn" hidden>Cancel Run</button>
+</div>
+</div>
+
+<div class="inspector-pane">
+<h3 class="card__title">Execution Inspector &amp; Cross-Hat Handoff</h3>
+<div data-state-root id="toolOutputState">
+<div data-state="loading" class="st-loading" hidden><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty"><p id="toolEmptyMsg">Select a Hat tool or composable skill and click <strong>Run Selected</strong> to inspect structured output.</p></div>
+<div data-state="error" class="st-error" hidden><p><strong>Execution Guardrail / Error:</strong> <span data-err id="toolErrorMsg"></span></p></div>
+<div data-state="success" class="st-success" hidden><p><strong id="toolSuccessTitle">Execution completed.</strong> <span data-ok id="toolSuccessMsg"></span></p></div>
+<div data-state="data" hidden>
+<div class="card__row" id="toolMetaBar">
+<span class="hat-badge hat-badge--blue" id="outHatBadge">BLUE</span>
+<span class="badge badge--ok mono" id="outStatusBadge">success</span>
+<span class="mono text-secondary" id="outTimingText">0 ms</span>
+</div>
+<p class="text-secondary" id="toolOutputSummary"></p>
+<pre class="output-box" id="toolOutputPre"></pre>
+<div class="card__row">
+<button class="btn btn--sm" type="button" id="pinOutputBtn">Pin Output</button>
+<button class="btn btn--sm" type="button" id="copyOutputBtn">Copy JSON</button>
+<button class="btn btn--sm" type="button" id="exportOutputBtn">Export JSON</button>
+</div>
+<hr>
+<div class="form-row">
+<div>
+<label class="flabel" for="sendToHatSelect">Send Output to Hat (Context Handoff)</label>
+<select class="form-input" id="sendToHatSelect">
+<option value="blue">Blue Hat — Workflow Sequencer / Decision Ledger</option>
+<option value="white">White Hat — Evidence Collector / Gap Analyzer</option>
+<option value="black">Black Hat — Risk Analyzer / Policy Validator</option>
+<option value="red">Red Hat — Scoped Surface Validator</option>
+</select>
+</div>
+<div>
+<button class="btn btn--primary" type="button" id="sendToHatBtn">Send to Hat</button>
+</div>
+</div>
+</div>
+</div>
+
+<details class="expandable" id="pinnedDrawer">
+<summary>Pinned Outputs (<span id="pinnedCount">0</span>)</summary>
+<div id="pinnedOutputsList" class="text-secondary">No pinned outputs yet.</div>
+</details>
+</div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="redTitle" data-lane-card="red">
+<div class="card__row"><span class="hat-badge hat-badge--red">[RED] Red Hat</span><h2 class="card__title" id="redTitle">Red</h2></div>
+<p class="text-secondary">Eight archetypes — recon, scanner, exploiter, infiltrator, exfiltrator, ghost, coordinator, analyst — from <span class="mono">GET /api/operators/prompts</span>. Name, description, defaultTools count, and systemPrompt length only. Analysis does not operate a target.</p>
+<p class="text-secondary mono" id="redCount" hidden></p>
+<div data-state-root id="redState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No Red archetypes in the operators payload.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Retry</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Red lane unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Red lane updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="redTable"><thead><tr><th>Archetype</th><th>Name</th><th>Description</th><th>defaultTools</th><th>systemPrompt length</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="blueTitle" data-lane-card="blue">
+<div class="card__row"><span class="hat-badge hat-badge--blue">[BLUE] Blue Hat</span><h2 class="card__title" id="blueTitle">Blue</h2></div>
+<p class="text-secondary">grants.blue plus sentinel and warden grant lists, with prompt lengths from <span class="mono">GET /api/operators/prompts</span>. Analysis does not operate a target.</p>
+<p class="text-secondary mono" id="blueCount" hidden></p>
+<div data-state-root id="blueState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No Blue grant lists or prompt lengths in the live payloads.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Retry</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Blue lane unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Blue lane updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="blueTable"><thead><tr><th>Lane</th><th>Kind</th><th>Granted tools</th><th>Grant count</th><th>systemPrompt length</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="blackTitle" data-lane-card="black">
+<div class="card__row"><span class="hat-badge hat-badge--black">[BLACK] Black Hat</span><h2 class="card__title" id="blackTitle">Black</h2></div>
+<p class="text-secondary">grants.black plus specter and wraith grant lists, with prompt lengths from <span class="mono">GET /api/operators/prompts</span>. Analysis does not operate a target.</p>
+<p class="text-secondary mono" id="blackCount" hidden></p>
+<div data-state-root id="blackState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No Black grant lists or prompt lengths in the live payloads.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Retry</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>Black lane unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>Black lane updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="blackTable"><thead><tr><th>Lane</th><th>Kind</th><th>Granted tools</th><th>Grant count</th><th>systemPrompt length</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+
+<section class="card" aria-labelledby="whiteTitle" data-lane-card="white">
+<div class="card__row"><span class="hat-badge hat-badge--white">[WHITE] White Hat</span><h2 class="card__title" id="whiteTitle">White</h2></div>
+<p class="text-secondary">grants.white plus arbiter and auditor grant lists, with prompt lengths from <span class="mono">GET /api/operators/prompts</span>. Analysis does not operate a target.</p>
+<p class="text-secondary mono" id="whiteCount" hidden></p>
+<div data-state-root id="whiteState">
+<div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
+<div data-state="empty" class="st-empty" hidden><p>No White grant lists or prompt lengths in the live payloads.</p><button class="btn btn--sm btn--primary" type="button" data-retry>Retry</button></div>
+<div data-state="error" class="st-error" hidden><p><strong>White lane unavailable.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
+<div data-state="success" class="st-success" hidden><p><strong>White lane updated.</strong> <span data-ok></span></p></div>
+<div data-state="data" hidden><div class="table-wrap"><table class="table" id="whiteTable"><thead><tr><th>Lane</th><th>Kind</th><th>Granted tools</th><th>Grant count</th><th>systemPrompt length</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+</main>
+</div>
+</div>
+<div class="toast" data-toast role="status" aria-live="polite"></div>
+<script src="assets/shell.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var RED = ['recon', 'scanner', 'exploiter', 'infiltrator', 'exfiltrator', 'ghost', 'coordinator', 'analyst'];
+  var SECTIONS = [
+    { key: 'red', root: 'redState', table: 'redTable', count: 'redCount' },
+    { key: 'blue', team: 'blue', hats: ['sentinel', 'warden'], root: 'blueState', table: 'blueTable', count: 'blueCount' },
+    { key: 'black', team: 'black', hats: ['specter', 'wraith'], root: 'blackState', table: 'blackTable', count: 'blackCount' },
+    { key: 'white', team: 'white', hats: ['arbiter', 'auditor'], root: 'whiteState', table: 'whiteTable', count: 'whiteCount' }
+  ];
+  var generation = 0;
+
+  var FALLBACK_TOOLS = [
+    {
+      id: 'blue-workflow-sequencer',
+      name: 'Blue Workflow & Playbook Sequencer',
+      hat: 'blue',
+      category: 'orchestration',
+      description: 'Runs multi-step orchestration playbooks with conditional branching, checkpoint hashes, and step-level failure isolation.',
+      presetInput: { templateId: 'incident-triage-4hat', objective: 'Coordinate 4-Hat response for edge API anomaly' }
+    },
+    {
+      id: 'blue-decision-ledger',
+      name: 'Blue Decision & Rationale Ledger',
+      hat: 'blue',
+      category: 'governance',
+      description: 'Logs session objectives, constraints, Hat transitions, and evidence-backed rationale with Markdown & JSON export.',
+      presetInput: {
+        sessionId: 'session-purple-01',
+        objective: 'Validate API gateway auth controls and close telemetry gaps',
+        constraints: ['Read-only inspection', 'Zero production disruption'],
+        decisions: [
+          { fromHat: 'white', toHat: 'black', summary: 'Confirmed missing rate-limit telemetry on /api/login', rationale: 'Log sample showed 0 waf_action fields', evidenceRefs: ['ev-log-01'], status: 'accepted' },
+          { fromHat: 'black', toHat: 'blue', summary: 'Prioritize WAF rate-limit rule deployment', rationale: 'Credential stuffing risk rated High', evidenceRefs: ['risk-01'], status: 'accepted' }
+        ]
+      }
+    },
+    {
+      id: 'blue-execution-monitor',
+      name: 'Blue Execution Monitor & Resource Budgeter',
+      hat: 'blue',
+      category: 'monitoring',
+      description: 'Tracks active/queued/completed/failed tasks across all 4 Hats, queue depth, and resource budget utilization.',
+      presetInput: {
+        budgetLimitMs: 30000,
+        maxQueueDepth: 8,
+        tasks: [
+          { id: 'task-white-1', hat: 'white', toolId: 'white-data-inspector', status: 'completed', durationMs: 420 },
+          { id: 'task-black-1', hat: 'black', toolId: 'black-risk-analyzer', status: 'active', durationMs: 1150 },
+          { id: 'task-blue-1', hat: 'blue', toolId: 'blue-workflow-sequencer', status: 'queued', durationMs: 0 }
+        ]
+      }
+    },
+    {
+      id: 'white-data-inspector',
+      name: 'White Data & Telemetry Inspector',
+      hat: 'white',
+      category: 'inspection',
+      description: 'Parses structured JSON, JSONL, and key=value logs with chunked pagination and non-destructive parse diagnostics.',
+      presetInput: {
+        format: 'jsonl',
+        rawData: '{"ts":"2026-10-15T20:00:01Z","service":"auth-proxy","event":"login_attempt","status":401,"ip":"198.51.100.12"}\n{"ts":"2026-10-15T20:00:02Z","service":"auth-proxy","event":"login_attempt","status":200,"ip":"198.51.100.12","mfa":false}'
+      }
+    },
+    {
+      id: 'white-evidence-collector',
+      name: 'White Fact & Evidence Collector',
+      hat: 'white',
+      category: 'evidence',
+      description: 'Tags facts with SHA-256 provenance and computes deterministic confidence tiers (verified, corroborated, unverified, contradicted).',
+      presetInput: {
+        facts: [
+          { id: 'fact-mfa', statement: 'Auth proxy accepted login with mfa=false on privileged route', source: 'auth-proxy.jsonl#L2', artifacts: ['sha256:9f86d081884c7d65'], corroboratedBy: ['siem-alert-402'], tags: ['auth', 'mfa'] },
+          { id: 'fact-rate', statement: 'No rate-limiting header emitted after 50 consecutive 401 responses', source: 'edge-capture.log', artifacts: ['sha256:4b227777d4dd1fc6'], tags: ['rate-limit'] }
+        ]
+      }
+    },
+    {
+      id: 'white-gap-analyzer',
+      name: 'White Missing-Context & Gap Analyzer',
+      hat: 'white',
+      category: 'adjudication',
+      description: 'Compares required variables and assumptions against verified facts to generate prioritized P1/P2/P3 resolution queries.',
+      presetInput: {
+        knownFacts: [
+          { key: 'target_scope', value: 'auth-proxy.internal', confidence: 'verified' },
+          { key: 'mfa_enforcement', value: 'disabled on legacy endpoint', confidence: 'unverified' }
+        ],
+        requiredVariables: ['target_scope', 'mfa_enforcement', 'waf_rule_version', 'egress_policy'],
+        assumptions: ['WAF blocks >20 req/min per IP', 'All admin tokens require hardware MFA']
+      }
+    },
+    {
+      id: 'black-risk-analyzer',
+      name: 'Black Risk & Failure-Mode Analyzer',
+      hat: 'black',
+      category: 'risk-analysis',
+      description: 'Evaluates system components and assumptions against SPOF, credential boundary, and operational noise failure modes.',
+      presetInput: {
+        systemName: 'Purple Team Edge Gateway',
+        components: [
+          { name: 'auth-proxy', role: 'Authentication & token issuer', singlePointOfFailure: true, externalDependency: false, privilegeLevel: 'admin', handlesUntrustedInput: true, telemetryCoverage: 'partial' },
+          { name: 'token-signer', role: 'HSM-backed JWT signer', singlePointOfFailure: false, externalDependency: true, privilegeLevel: 'root', handlesUntrustedInput: false, telemetryCoverage: 'none' }
+        ],
+        assumptions: ['Internal network traffic between auth-proxy and token-signer is mutually authenticated']
+      }
+    },
+    {
+      id: 'black-policy-validator',
+      name: 'Black Constraint & Policy Validator',
+      hat: 'black',
+      category: 'policy-audit',
+      description: 'Audits configuration JSON and ROE rules against security, boundary, and compliance baselines.',
+      presetInput: {
+        baselineId: 'zero-trust-api',
+        configJson: '{"bindHost":"127.0.0.1","requireBearerToken":true,"tlsMinVersion":"1.3","allowWildcardCors":false,"maxPayloadBytes":2097152,"auditLogEnabled":true,"roeEnforced":true}'
+      }
+    },
+    {
+      id: 'black-stress-prober',
+      name: 'Black Edge-Case & Stress Prober',
+      hat: 'black',
+      category: 'stress-testing',
+      description: 'Generates deterministic boundary, adversarial input, resource exhaustion, and dependency timeout stress scenarios.',
+      presetInput: {
+        targetSurface: 'POST /api/teams/tools/run',
+        maxConcurrency: 64,
+        payloadCapBytes: 2097152,
+        timeoutMs: 15000,
+        categories: ['boundary-values', 'adversarial-input', 'resource-exhaustion', 'dependency-timeout']
+      }
+    },
+    {
+      id: 'shared-context-transform',
+      name: 'Cross-Hat Context Transformer (Send to Hat)',
+      hat: 'shared',
+      category: 'interoperability',
+      description: 'Transforms output from any Hat into the input schema of another Hat with SHA-256 provenance.',
+      presetInput: {
+        fromHat: 'white',
+        toHat: 'black',
+        targetToolId: 'black-risk-analyzer',
+        note: 'Forwarding White Hat telemetry gaps for Black Hat failure-mode scoring',
+        payload: { missingVariables: ['waf_rule_version', 'egress_policy'], completenessScore: 38 }
+      }
+    },
+    {
+      id: 'shared-artifact-diff',
+      name: 'Cross-Hat Artifact Diff',
+      hat: 'shared',
+      category: 'interoperability',
+      description: 'Compares two JSON or text outputs across runs or Hats to highlight added, removed, Modified, and unchanged lines.',
+      presetInput: {
+        leftLabel: 'Baseline Policy Audit (Before Hardening)',
+        rightLabel: 'Post-Hardening Policy Audit (After Blue Sequencer)',
+        left: '{"passCount":4,"failCount":2,"complianceScore":67}',
+        right: '{"passCount":6,"failCount":0,"complianceScore":100}'
+      }
+    },
+    {
+      id: 'shared-snapshot-manager',
+      name: 'Versioned Workspace Snapshot Manager',
+      hat: 'shared',
+      category: 'persistence',
+      description: 'Creates, verifies, and migrates versioned (v1 -> v2) workspace snapshots with SHA-256 integrity verification.',
+      presetInput: {
+        action: 'create',
+        label: 'four-hat-checkpoint',
+        activeHat: 'blue',
+        workspaceState: { version: 2, activeHat: 'blue', toolDrafts: { 'blue-workflow-sequencer': { templateId: 'incident-triage-4hat' } } }
+      }
+    },
+    {
+      id: 'shared-batch-runner',
+      name: 'Cross-Hat Batch Runner',
+      hat: 'shared',
+      category: 'orchestration',
+      description: 'Executes a batch of Hat tool evaluations with per-item fault isolation so one failing item never aborts the batch.',
+      presetInput: {
+        batchName: '4-Hat Readiness Sweep',
+        jobs: [
+          { id: 'job-white', hat: 'white', toolId: 'white-gap-analyzer', payloadSummary: 'Verify ROE & telemetry completeness' },
+          { id: 'job-black', hat: 'black', toolId: 'black-policy-validator', payloadSummary: 'Audit zero-trust API baseline' },
+          { id: 'job-blue', hat: 'blue', toolId: 'blue-decision-ledger', payloadSummary: 'Record synthesis decision' }
+        ]
+      }
+    },
+    {
+      id: 'red-surface-validator',
+      name: 'Red Hat Scoped Surface Validator',
+      hat: 'red',
+      category: 'validation',
+      description: 'Summarizes authorized Red Hat surface validation hypotheses for handoff to White, Black, and Blue Hat tools.',
+      presetInput: {
+        target: 'auth-proxy.internal:8443',
+        hypothesis: 'Legacy token refresh endpoint accepts unsigned downgrade headers when MFA claim is omitted'
+      }
+    }
+  ];
+
+  var FALLBACK_SKILLS = [
+    {
+      id: 'skill-blue-incident-sequencer',
+      name: 'Blue Hat: Incident Triage & Decision Sequencer',
+      primaryHat: 'blue',
+      hatsInvolved: ['blue', 'white', 'black'],
+      description: 'Chains White telemetry inspection, Black risk scoring, Blue workflow sequencing, and Blue decision ledger recording.',
+      defaultParams: { objective: 'Contain and remediate anomalous auth-proxy token issuance', templateId: 'incident-triage-4hat' }
+    },
+    {
+      id: 'skill-white-roe-gap-verification',
+      name: 'White Hat: ROE & Telemetry Gap Verification',
+      primaryHat: 'white',
+      hatsInvolved: ['white', 'blue'],
+      description: 'Chains White telemetry inspection, White SHA-256 evidence collection, and White missing-context gap analysis.',
+      defaultParams: { targetScope: 'auth-proxy.internal' }
+    },
+    {
+      id: 'skill-black-predeploy-stress-audit',
+      name: 'Black Hat: Pre-Deployment Policy & Stress Audit',
+      primaryHat: 'black',
+      hatsInvolved: ['black', 'blue'],
+      description: 'Chains Black policy validation, Black failure-mode risk analysis, and Black stress scenario generation.',
+      defaultParams: { systemName: 'Purple Team Edge Gateway', baselineId: 'zero-trust-api' }
+    },
+    {
+      id: 'skill-purple-four-hat-synthesis',
+      name: 'Purple Team: 4-Hat Closed-Loop Synthesis',
+      primaryHat: 'blue',
+      hatsInvolved: ['red', 'white', 'black', 'blue'],
+      description: 'Executes a complete 4-Hat educational loop: Red hypothesis -> White gap analysis -> Black risk audit -> Blue playbook & ledger.',
+      defaultParams: { target: 'auth-proxy.internal:8443', hypothesis: 'Verify MFA enforcement and rate-limit telemetry across 4 Hats' }
+    }
+  ];
+
+  var HAT_DESCRIPTIONS = {
+    red: { badge: '[RED] Red Hat', hint: 'Adversarial Hypothesis & Surface Validation', cls: 'hat-badge--red' },
+    blue: { badge: '[BLUE] Blue Hat', hint: 'Orchestration, Sequencing & Defense', cls: 'hat-badge--blue' },
+    black: { badge: '[BLACK] Black Hat', hint: 'Stress Testing, Risk & Policy Audit', cls: 'hat-badge--black' },
+    white: { badge: '[WHITE] White Hat', hint: 'Evidence Provenance & Gap Analysis', cls: 'hat-badge--white' },
+    shared: { badge: '[SHARED] Extra Tools', hint: 'Cross-Hat Transform, Diff, Snapshots & Batch', cls: 'hat-badge--purple' },
+    skills: { badge: '[SKILLS] Composable Skills', hint: 'Multi-Hat Automated Workflows', cls: 'hat-badge--purple' },
+    all: { badge: '[4 HATS] Purple Team', hint: 'Unified Red, Blue, Black & White Workspace', cls: 'hat-badge--purple' }
+  };
+
+  var catalogTools = FALLBACK_TOOLS.slice();
+  var catalogSkills = FALLBACK_SKILLS.slice();
+  var currentMode = 'tools';
+  var currentHatFilter = 'all';
+  var selectedId = 'blue-workflow-sequencer';
+  var lastRunOutput = null;
+  var activeAbortController = null;
+  var runSeq = 0;
+
+  function updateContextBar(hatKey) {
+    var info = HAT_DESCRIPTIONS[hatKey] || HAT_DESCRIPTIONS.all;
+    var badgeEl = document.getElementById('activeHatBadge');
+    var hintEl = document.getElementById('activeHatHint');
+    if (badgeEl) {
+      badgeEl.className = 'hat-badge ' + info.cls;
+      badgeEl.textContent = info.badge;
+    }
+    if (hintEl) {
+      hintEl.textContent = info.hint;
+    }
+  }
+
+  function applyHatFilter(hatKey, skipUrl) {
+    currentHatFilter = hatKey || 'all';
+    if (currentHatFilter === 'skills') {
+      currentMode = 'skills';
+      var modeSel = document.getElementById('runnerModeSelect');
+      if (modeSel) modeSel.value = 'skills';
+    } else if (currentHatFilter === 'red' || currentHatFilter === 'blue' || currentHatFilter === 'black' || currentHatFilter === 'white') {
+      Shell.workspace.setActiveHat(currentHatFilter);
+    }
+    updateContextBar(currentHatFilter);
+
+    document.querySelectorAll('[data-hat-tab]').forEach(function (btn) {
+      var tab = btn.getAttribute('data-hat-tab');
+      btn.setAttribute('aria-selected', tab === currentHatFilter ? 'true' : 'false');
+    });
+
+    document.querySelectorAll('[data-lane-card]').forEach(function (card) {
+      var lane = card.getAttribute('data-lane-card');
+      if (currentHatFilter === 'all' || currentHatFilter === 'shared' || currentHatFilter === 'skills') {
+        card.hidden = false;
+      } else {
+        card.hidden = lane !== currentHatFilter;
+      }
+    });
+
+    if (!skipUrl) {
+      Shell.params.set({ hat: currentHatFilter === 'all' ? null : currentHatFilter });
+    }
+    renderCatalogList();
+  }
+
+  function filteredItems() {
+    var qEl = document.getElementById('toolSearchInput');
+    var q = (qEl && qEl.value ? qEl.value : '').trim().toLowerCase();
+    if (currentMode === 'skills') {
+      return catalogSkills.filter(function (sk) {
+        var hats = Array.isArray(sk.involvedHats) ? sk.involvedHats : (Array.isArray(sk.hatsInvolved) ? sk.hatsInvolved : []);
+        var matchesHat = currentHatFilter === 'all' || currentHatFilter === 'skills' || sk.primaryHat === currentHatFilter || hats.indexOf(currentHatFilter) !== -1;
+        var matchesQuery = !q || sk.id.toLowerCase().indexOf(q) !== -1 || sk.name.toLowerCase().indexOf(q) !== -1 || sk.description.toLowerCase().indexOf(q) !== -1;
+        return matchesHat && matchesQuery;
+      });
+    }
+    return catalogTools.filter(function (t) {
+      var matchesHat = currentHatFilter === 'all' || currentHatFilter === 'skills' || t.hat === currentHatFilter;
+      var matchesQuery = !q || t.id.toLowerCase().indexOf(q) !== -1 || t.name.toLowerCase().indexOf(q) !== -1 || t.description.toLowerCase().indexOf(q) !== -1;
+      return matchesHat && matchesQuery;
+    });
+  }
+
+  function findCurrentItem() {
+    var list = currentMode === 'skills' ? catalogSkills : catalogTools;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].id === selectedId) return list[i];
+    }
+    return list[0] || null;
+  }
+
+  function loadEditorForSelected(usePresetOnly) {
+    var item = findCurrentItem();
+    var editor = document.getElementById('toolInputEditor');
+    var label = document.getElementById('selectedToolLabel');
+    if (!item || !editor) return;
+    if (label) label.textContent = '(' + item.id + ')';
+    var savedDraft = !usePresetOnly ? Shell.workspace.getDraft(item.id) : null;
+    var defaultObj = currentMode === 'skills' ? (item.defaultParams || {}) : (item.defaultPreset || item.presetInput || {});
+    if (savedDraft != null && typeof savedDraft === 'string') {
+      editor.value = savedDraft;
+    } else if (savedDraft != null && typeof savedDraft === 'object') {
+      editor.value = JSON.stringify(savedDraft, null, 2);
+    } else {
+      editor.value = JSON.stringify(defaultObj, null, 2);
+    }
+  }
+
+  function renderCatalogList() {
+    var host = document.getElementById('toolCatalogList');
+    var modeBadge = document.getElementById('workspaceModeBadge');
+    if (modeBadge) {
+      modeBadge.textContent = currentMode === 'skills' ? 'Mode: Composable Skills' : 'Mode: Hat Tools';
+    }
+    if (!host) return;
+    var items = filteredItems();
+    if (!items.length) {
+      host.innerHTML = '<div class="st-empty"><p>No tools or skills match the active Hat filter.</p></div>';
+      return;
+    }
+    var hasSelected = items.some(function (it) { return it.id === selectedId; });
+    if (!hasSelected) {
+      selectedId = items[0].id;
+    }
+    host.innerHTML = items.map(function (it) {
+      var badgeHat = currentMode === 'skills' ? (it.primaryHat || 'purple') : (it.hat || 'shared');
+      var badgeClass = badgeHat === 'shared' ? 'purple' : badgeHat;
+      var active = it.id === selectedId ? ' tool-card--active' : '';
+      var aria = it.id === selectedId ? 'true' : 'false';
+      var skHats = Array.isArray(it.involvedHats) ? it.involvedHats : (Array.isArray(it.hatsInvolved) ? it.hatsInvolved : []);
+      var sub = currentMode === 'skills'
+        ? ('Hats: ' + (skHats.length ? skHats.join(' -> ') : badgeHat))
+        : ('Category: ' + (it.category || 'analysis'));
+      return '<button type="button" role="option" aria-selected="' + aria + '" class="tool-card' + active + '" data-select-id="' + Shell.escHtml(it.id) + '">'
+        + '<div class="card__row"><span class="hat-badge hat-badge--' + Shell.escHtml(badgeClass) + '">' + Shell.escHtml(badgeHat) + '</span>'
+        + '<strong>' + Shell.escHtml(it.name) + '</strong>'
+        + '<span class="mono text-secondary">' + Shell.escHtml(sub) + '</span></div>'
+        + '<span class="text-secondary">' + Shell.escHtml(it.description) + '</span>'
+        + '</button>';
+    }).join('');
+
+    host.querySelectorAll('[data-select-id]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        selectedId = btn.getAttribute('data-select-id') || selectedId;
+        renderCatalogList();
+        loadEditorForSelected(false);
+      });
+    });
+    loadEditorForSelected(false);
+  }
+
+  function renderForwardedBanner() {
+    var st = Shell.workspace.get();
+    var banner = document.getElementById('forwardedBanner');
+    var summary = document.getElementById('forwardedSummary');
+    if (!banner || !summary) return;
+    if (!st.forwardedContext) {
+      banner.hidden = true;
+      return;
+    }
+    var fc = st.forwardedContext;
+    summary.textContent = 'From ' + String(fc.fromHat || '').toUpperCase() + ' (' + String(fc.sourceToolId || 'tool') + ') -> ' + String(fc.toHat || '').toUpperCase() + (fc.targetToolId ? (' [' + fc.targetToolId + ']') : '');
+    banner.hidden = false;
+  }
+
+  function renderPinnedOutputs() {
+    var st = Shell.workspace.get();
+    var pins = Array.isArray(st.pinnedOutputs) ? st.pinnedOutputs : [];
+    var countEl = document.getElementById('pinnedCount');
+    var listEl = document.getElementById('pinnedOutputsList');
+    if (countEl) countEl.textContent = String(pins.length);
+    if (!listEl) return;
+    if (!pins.length) {
+      listEl.innerHTML = '<p class="text-secondary">No pinned outputs yet. Run a tool and click Pin Output to compare across Hats.</p>';
+      return;
+    }
+    listEl.innerHTML = pins.map(function (p) {
+      return '<div class="card" data-pin-id="' + Shell.escHtml(p.id) + '">'
+        + '<div class="card__row"><span class="hat-badge hat-badge--' + Shell.escHtml(p.hat || 'blue') + '">' + Shell.escHtml(p.hat || 'blue') + '</span>'
+        + '<strong class="mono">' + Shell.escHtml(p.toolId) + '</strong>'
+        + '<span class="text-secondary mono">' + Shell.escHtml(p.createdAt || '') + '</span>'
+        + '<button type="button" class="btn btn--sm" data-unpin="' + Shell.escHtml(p.id) + '">Remove</button></div>'
+        + '<pre class="output-box">' + Shell.escHtml(JSON.stringify(p.payload, null, 2)) + '</pre>'
+        + '</div>';
+    }).join('');
+    listEl.querySelectorAll('[data-unpin]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var pid = btn.getAttribute('data-unpin');
+        if (pid) {
+          Shell.workspace.unpinOutput(pid);
+          renderPinnedOutputs();
+        }
+      });
+    });
+  }
+
+  async function loadToolsAndSkillsCatalog() {
+    try {
+      var toolsRes = await Shell.apiGet('/api/teams/tools');
+      if (toolsRes && Array.isArray(toolsRes.tools) && toolsRes.tools.length) {
+        catalogTools = toolsRes.tools;
+      }
+    } catch (e) { /* keep FALLBACK_TOOLS */ }
+    try {
+      var skillsRes = await Shell.apiGet('/api/teams/skills');
+      if (skillsRes && Array.isArray(skillsRes.skills) && skillsRes.skills.length) {
+        catalogSkills = skillsRes.skills;
+      }
+    } catch (e) { /* keep FALLBACK_SKILLS */ }
+    renderCatalogList();
+  }
+
+  async function runSelectedToolOrSkill() {
+    var root = document.getElementById('toolOutputState');
+    var editor = document.getElementById('toolInputEditor');
+    var cancelBtn = document.getElementById('cancelToolBtn');
+    var item = findCurrentItem();
+    if (!root || !editor || !item) return;
+
+    var rawText = editor.value.trim();
+    Shell.workspace.saveDraft(item.id, rawText);
+
+    var parsedInput = {};
+    if (rawText.length > 0) {
+      try {
+        parsedInput = JSON.parse(rawText);
+      } catch (parseErr) {
+        var errSpan = document.getElementById('toolErrorMsg');
+        if (errSpan) errSpan.textContent = 'Invalid JSON in input editor: ' + (parseErr && parseErr.message ? parseErr.message : String(parseErr));
+        Shell.showState(root, 'error');
+        return;
+      }
+    }
+
+    if (activeAbortController) {
+      try { activeAbortController.abort(); } catch (e) { /* ignore */ }
+    }
+    var reqSeq = ++runSeq;
+    var reqMode = currentMode;
+    var reqItem = item;
+    var reqHat = reqMode === 'skills' ? (reqItem.primaryHat || 'blue') : (reqItem.hat || 'blue');
+    var reqController = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    activeAbortController = reqController;
+
+    Shell.showState(root, 'loading');
+    if (cancelBtn) cancelBtn.hidden = false;
+
+    try {
+      var endpoint = reqMode === 'skills' ? '/api/teams/skills/run' : '/api/teams/tools/run';
+      var body = reqMode === 'skills'
+        ? { skillId: reqItem.id, params: parsedInput }
+        : { toolId: reqItem.id, input: parsedInput };
+
+      var res = await fetch(Shell.apiBase() + endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: reqController ? reqController.signal : undefined
+      });
+      var payload = await res.json();
+      if (reqSeq !== runSeq) return;
+      if (cancelBtn) cancelBtn.hidden = true;
+
+      if (!res.ok || !payload || payload.ok === false || payload.error) {
+        var errObj = payload && payload.error;
+        var errText = '';
+        if (typeof errObj === 'string') {
+          errText = errObj;
+        } else if (errObj && typeof errObj === 'object') {
+          errText = '[' + (errObj.code || 'ERROR') + '] ' + (errObj.message || 'Execution failed');
+        } else {
+          errText = 'HTTP ' + res.status;
+        }
+        var gErr = document.getElementById('toolErrorMsg');
+        if (gErr) gErr.textContent = errText;
+        Shell.showState(root, 'error');
+        return;
+      }
+
+      lastRunOutput = {
+        id: reqItem.id,
+        hat: reqHat,
+        mode: reqMode,
+        envelope: payload
+      };
+
+      var resultData = reqMode === 'skills' ? payload : (payload && payload.data ? payload.data : payload);
+      if (resultData && resultData.state === 'empty') {
+        var emptyEl = document.getElementById('toolEmptyMsg');
+        if (emptyEl) emptyEl.textContent = resultData.summary || 'Tool returned an empty state for the provided input.';
+        Shell.showState(root, 'empty');
+        return;
+      }
+
+      var outHatBadge = document.getElementById('outHatBadge');
+      var outStatusBadge = document.getElementById('outStatusBadge');
+      var outTimingText = document.getElementById('outTimingText');
+      var summaryEl = document.getElementById('toolOutputSummary');
+      var preEl = document.getElementById('toolOutputPre');
+
+      var badgeHat = lastRunOutput.hat === 'shared' ? 'purple' : lastRunOutput.hat;
+      if (outHatBadge) {
+        outHatBadge.className = 'hat-badge hat-badge--' + badgeHat;
+        outHatBadge.textContent = lastRunOutput.hat.toUpperCase();
+      }
+      if (outStatusBadge) {
+        outStatusBadge.textContent = (resultData && resultData.state) || (payload && payload.status) || 'success';
+      }
+      if (outTimingText) {
+        var dur = (payload && payload.durationMs != null) ? payload.durationMs : 1;
+        outTimingText.textContent = dur + ' ms';
+      }
+      if (summaryEl) {
+        summaryEl.textContent = (resultData && resultData.summary) || 'Execution completed with deterministic guardrails.';
+      }
+      if (preEl) {
+        preEl.textContent = JSON.stringify(resultData, null, 2);
+      }
+      Shell.showState(root, 'data');
+      Shell.announce('Completed ' + reqItem.name);
+    } catch (err) {
+      if (reqSeq !== runSeq) return;
+      if (cancelBtn) cancelBtn.hidden = true;
+      var msg = (err && err.name === 'AbortError') ? 'Stopped waiting for response; server execution may still finish.' : ((err && err.message) || String(err));
+      var errEl = document.getElementById('toolErrorMsg');
+      if (errEl) errEl.textContent = msg;
+      Shell.showState(root, 'error');
+    }
+  }
+
+  async function handleSendToHat() {
+    if (!lastRunOutput) {
+      Shell.toast('Run a tool or skill first before forwarding context.', 'warning');
+      return;
+    }
+    var selectEl = document.getElementById('sendToHatSelect');
+    var toHat = (selectEl && selectEl.value) ? selectEl.value : 'blue';
+    var fromHat = lastRunOutput.hat === 'shared' ? 'blue' : lastRunOutput.hat;
+    var rawData = lastRunOutput.envelope && lastRunOutput.envelope.data ? lastRunOutput.envelope.data : lastRunOutput.envelope;
+
+    try {
+      var res = await Shell.apiPost('/api/teams/tools/run', {
+        toolId: 'shared-context-transform',
+        input: {
+          fromHat: fromHat,
+          toHat: toHat,
+          sourceToolId: lastRunOutput.id,
+          payload: rawData
+        }
+      });
+      var transformed = (res && res.data) ? res.data : res;
+      var targetToolId = (transformed && transformed.targetToolId) || (toHat + '-workflow-sequencer');
+      var nextInput = (transformed && transformed.transformedInput) || { forwardedPayload: rawData };
+
+      Shell.workspace.forwardContext({
+        fromHat: fromHat,
+        toHat: toHat,
+        sourceToolId: lastRunOutput.id,
+        targetToolId: targetToolId,
+        payload: nextInput
+      });
+      Shell.workspace.saveDraft(targetToolId, JSON.stringify(nextInput, null, 2));
+      renderForwardedBanner();
+      if (nextInput && nextInput.requiresTargetSelection) {
+        Shell.toast('Forwarded to ' + toHat.toUpperCase() + ' (' + targetToolId + ') — select an explicit target host before running.', 'warning');
+      } else {
+        Shell.toast('Forwarded output from ' + fromHat.toUpperCase() + ' to ' + toHat.toUpperCase() + ' (' + targetToolId + ')', 'success');
+      }
+      Shell.announce('Context forwarded to ' + toHat.toUpperCase() + ' Hat');
+    } catch (err) {
+      Shell.toast('Failed to transform context: ' + ((err && err.message) || String(err)), 'error');
+    }
+  }
+
+  function sectionBy(key) {
+    for (var i = 0; i < SECTIONS.length; i++) {
+      if (SECTIONS[i].key === key) return SECTIONS[i];
+    }
+    return null;
+  }
+
+  function tbodyOf(section) {
+    var table = document.getElementById(section.table);
+    return table ? table.querySelector('tbody') : null;
+  }
+
+  function clearCount(section) {
+    var count = document.getElementById(section.count);
+    if (!count) return;
+    count.hidden = true;
+    count.textContent = '';
+  }
+
+  function begin(section) {
+    clearCount(section);
+    var tbody = tbodyOf(section);
+    if (tbody) tbody.textContent = '';
+    var root = document.getElementById(section.root);
+    if (root) Shell.showState(root, 'loading');
+  }
+
+  function fail(section, message) {
+    clearCount(section);
+    var tbody = tbodyOf(section);
+    if (tbody) tbody.textContent = '';
+    var root = document.getElementById(section.root);
+    if (!root) return;
+    var err = root.querySelector('[data-err]');
+    if (err) err.textContent = message || 'Request failed';
+    Shell.showState(root, 'error');
+  }
+
+  function showEmpty(section) {
+    clearCount(section);
+    var tbody = tbodyOf(section);
+    if (tbody) tbody.textContent = '';
+    var root = document.getElementById(section.root);
+    if (root) Shell.showState(root, 'empty');
+  }
+
+  function indexOps(payload) {
+    var list = payload && payload.operators;
+    if (!Array.isArray(list)) return null;
+    var map = {};
+    list.forEach(function (op) {
+      if (!op || typeof op !== 'object') return;
+      var id = op.archetype || op.id;
+      if (typeof id === 'string' && id) map[id] = op;
+    });
+    return map;
+  }
+
+  function indexGrants(payload) {
+    var grants = payload && payload.grants;
+    if (!grants || typeof grants !== 'object' || Array.isArray(grants)) return null;
+    return grants;
+  }
+
+  function promptLength(op) {
+    if (!op || typeof op.systemPrompt !== 'string') return null;
+    return op.systemPrompt.length;
+  }
+
+  function toolCount(op) {
+    if (!op || !Array.isArray(op.defaultTools)) return null;
+    return op.defaultTools.length;
+  }
+
+  function grantList(grants, id) {
+    if (!grants || !Object.prototype.hasOwnProperty.call(grants, id)) return null;
+    var list = grants[id];
+    if (!Array.isArray(list)) return null;
+    return list;
+  }
+
+  function numText(n) {
+    return n == null ? 'unavailable' : String(n);
+  }
+
+  function listText(list) {
+    if (list == null) return 'unavailable';
+    if (!list.length) return '(none)';
+    return list.map(function (id) { return String(id); }).join(', ');
+  }
+
+  function metric(name, known, expected, sum) {
+    if (!known) return name + ' unavailable';
+    if (known === expected) return name + ' ' + sum;
+    return name + ' ' + sum + ' (' + known + ' of ' + expected + ' observed)';
+  }
+
+  function writeCount(section, text) {
+    var count = document.getElementById(section.count);
+    if (!count) return;
+    count.textContent = text;
+    count.hidden = false;
+  }
+
+  function renderRed(ops) {
+    var section = sectionBy('red');
+    var tbody = tbodyOf(section);
+    var root = document.getElementById(section.root);
+    if (!tbody || !root) return;
+    var observed = 0;
+    var toolKnown = 0;
+    var toolSum = 0;
+    var promptKnown = 0;
+    var promptSum = 0;
+    tbody.innerHTML = RED.map(function (id) {
+      var op = ops[id];
+      var tools = toolCount(op);
+      var plen = promptLength(op);
+      if (op) observed += 1;
+      if (tools != null) { toolKnown += 1; toolSum += tools; }
+      if (plen != null) { promptKnown += 1; promptSum += plen; }
+      var name = op && typeof op.name === 'string' && op.name ? op.name : 'unavailable';
+      var description = op && typeof op.description === 'string' ? op.description : 'unavailable';
+      return '<tr><td class="mono">' + Shell.escHtml(id) + '</td>'
+        + '<td>' + Shell.escHtml(name) + '</td>'
+        + '<td>' + Shell.escHtml(description) + '</td>'
+        + '<td class="mono">' + Shell.escHtml(numText(tools)) + '</td>'
+        + '<td class="mono">' + Shell.escHtml(numText(plen)) + '</td></tr>';
+    }).join('');
+    if (!observed) {
+      showEmpty(section);
+      return;
+    }
+    writeCount(section, 'lanes ' + observed + '/' + RED.length
+      + ' · ' + metric('defaultTools', toolKnown, RED.length, toolSum)
+      + ' · ' + metric('prompt chars', promptKnown, RED.length, promptSum));
+    Shell.showState(root, 'data');
+  }
+
+  function renderLane(section, ops, grants) {
+    var tbody = tbodyOf(section);
+    var root = document.getElementById(section.root);
+    if (!tbody || !root) return;
+    var ids = [section.team].concat(section.hats);
+    var observed = 0;
+    var grantKnown = 0;
+    var grantSum = 0;
+    var promptKnown = 0;
+    var promptSum = 0;
+    tbody.innerHTML = ids.map(function (id) {
+      var op = ops[id];
+      var list = grantList(grants, id);
+      var plen = promptLength(op);
+      if (list != null || plen != null) observed += 1;
+      if (list != null) { grantKnown += 1; grantSum += list.length; }
+      if (plen != null) { promptKnown += 1; promptSum += plen; }
+      var kind = id === section.team ? 'grants.' + section.team : section.team + ' hat';
+      var label = id === section.team ? 'grants.' + section.team : id;
+      return '<tr><td class="mono">' + Shell.escHtml(label) + '</td>'
+        + '<td class="mono">' + Shell.escHtml(kind) + '</td>'
+        + '<td class="mono">' + Shell.escHtml(listText(list)) + '</td>'
+        + '<td class="mono">' + Shell.escHtml(numText(list == null ? null : list.length)) + '</td>'
+        + '<td class="mono">' + Shell.escHtml(numText(plen)) + '</td></tr>';
+    }).join('');
+    if (!observed) {
+      showEmpty(section);
+      return;
+    }
+    var parentList = grantList(grants, section.team);
+    var parentGrants = parentList == null ? 'unavailable' : String(parentList.length);
+    writeCount(section, 'lanes ' + observed + '/' + ids.length
+      + ' · parent grants ' + parentGrants
+      + ' · ' + metric('prompt chars', promptKnown, ids.length, promptSum));
+    Shell.showState(root, 'data');
+  }
+
+  function joinErr(a, b) {
+    if (a && b && a !== b) return a + ' ' + b;
+    return a || b || 'Request failed';
+  }
+
+  async function loadAll() {
+    var gen = ++generation;
+    SECTIONS.forEach(begin);
+    var prompts = null;
+    var grantsPayload = null;
+    var promptsError = '';
+    var grantsError = '';
+    try {
+      prompts = await Shell.apiGet('/api/operators/prompts');
+    } catch (e) {
+      promptsError = (e && e.message) || String(e);
+    }
+    if (gen !== generation) return;
+    try {
+      grantsPayload = await Shell.apiGet('/api/teams/tool-grants');
+    } catch (e) {
+      grantsError = (e && e.message) || String(e);
+    }
+    if (gen !== generation) return;
+
+    var ops = promptsError ? null : indexOps(prompts);
+    var grants = grantsError ? null : indexGrants(grantsPayload);
+    var red = sectionBy('red');
+    if (promptsError) fail(red, promptsError);
+    else if (!ops) fail(red, 'Operators payload did not include an operators list.');
+    else renderRed(ops);
+
+    SECTIONS.forEach(function (section) {
+      if (section.key === 'red') return;
+      if (promptsError || grantsError) {
+        fail(section, joinErr(promptsError, grantsError));
+        return;
+      }
+      if (!ops) {
+        fail(section, 'Operators payload did not include an operators list.');
+        return;
+      }
+      if (!grants) {
+        fail(section, 'Tool-grants payload did not include a grants object.');
+        return;
+      }
+      renderLane(section, ops, grants);
+    });
+  }
+
+  // Wire UI controls
+  document.querySelectorAll('[data-hat-tab]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var target = btn.getAttribute('data-hat-tab') || 'all';
+      if (target !== 'skills' && currentMode === 'skills') {
+        currentMode = 'tools';
+        var mSel = document.getElementById('runnerModeSelect');
+        if (mSel) mSel.value = 'tools';
+      }
+      applyHatFilter(target, false);
+    });
+  });
+
+  var runnerModeSelect = document.getElementById('runnerModeSelect');
+  if (runnerModeSelect) {
+    runnerModeSelect.addEventListener('change', function () {
+      currentMode = runnerModeSelect.value === 'skills' ? 'skills' : 'tools';
+      renderCatalogList();
+    });
+  }
+
+  var toolSearchInput = document.getElementById('toolSearchInput');
+  if (toolSearchInput) {
+    toolSearchInput.addEventListener('input', renderCatalogList);
+  }
+
+  var toolInputEditor = document.getElementById('toolInputEditor');
+  if (toolInputEditor) {
+    toolInputEditor.addEventListener('input', function () {
+      var item = findCurrentItem();
+      if (item) Shell.workspace.saveDraft(item.id, toolInputEditor.value);
+    });
+  }
+
+  var runBtn = document.getElementById('runToolBtn');
+  if (runBtn) runBtn.addEventListener('click', runSelectedToolOrSkill);
+
+  var presetBtn = document.getElementById('loadPresetBtn');
+  if (presetBtn) {
+    presetBtn.addEventListener('click', function () {
+      var item = findCurrentItem();
+      if (item) {
+        Shell.workspace.saveDraft(item.id, null);
+        loadEditorForSelected(true);
+      }
+    });
+  }
+
+  var emptyBtn = document.getElementById('loadEmptyBtn');
+  if (emptyBtn) {
+    emptyBtn.addEventListener('click', function () {
+      var editor = document.getElementById('toolInputEditor');
+      if (editor) editor.value = '{}';
+    });
+  }
+
+  var clearDraftBtn = document.getElementById('clearDraftBtn');
+  if (clearDraftBtn) {
+    clearDraftBtn.addEventListener('click', function () {
+      var item = findCurrentItem();
+      if (item) {
+        Shell.workspace.saveDraft(item.id, null);
+        loadEditorForSelected(true);
+        Shell.toast('Reset draft to preset default.', 'info');
+      }
+    });
+  }
+
+  var cancelBtn = document.getElementById('cancelToolBtn');
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function () {
+      if (activeAbortController) activeAbortController.abort();
+    });
+  }
+
+  var pinBtn = document.getElementById('pinOutputBtn');
+  if (pinBtn) {
+    pinBtn.addEventListener('click', function () {
+      if (!lastRunOutput) return;
+      var data = lastRunOutput.envelope && lastRunOutput.envelope.data ? lastRunOutput.envelope.data : lastRunOutput.envelope;
+      Shell.workspace.pinOutput({
+        hat: lastRunOutput.hat,
+        toolId: lastRunOutput.id,
+        title: lastRunOutput.id,
+        payload: data
+      });
+      renderPinnedOutputs();
+      Shell.toast('Pinned output for ' + lastRunOutput.id, 'success');
+    });
+  }
+
+  var copyBtn = document.getElementById('copyOutputBtn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function () {
+      var preEl = document.getElementById('toolOutputPre');
+      if (preEl) Shell.copyText(preEl.textContent || '');
+    });
+  }
+
+  var exportBtn = document.getElementById('exportOutputBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', function () {
+      if (!lastRunOutput) return;
+      var data = lastRunOutput.envelope && lastRunOutput.envelope.data ? lastRunOutput.envelope.data : lastRunOutput.envelope;
+      Shell.exportArtifact('purpleteam-' + lastRunOutput.id + '.json', data);
+    });
+  }
+
+  var sendBtn = document.getElementById('sendToHatBtn');
+  if (sendBtn) sendBtn.addEventListener('click', handleSendToHat);
+
+  var applyFwdBtn = document.getElementById('applyForwardedBtn');
+  if (applyFwdBtn) {
+    applyFwdBtn.addEventListener('click', function () {
+      var st = Shell.workspace.get();
+      if (!st.forwardedContext) return;
+      var fc = st.forwardedContext;
+      currentMode = 'tools';
+      var mSel = document.getElementById('runnerModeSelect');
+      if (mSel) mSel.value = 'tools';
+      if (fc.targetToolId) selectedId = fc.targetToolId;
+      applyHatFilter(fc.toHat || 'blue', false);
+      var editor = document.getElementById('toolInputEditor');
+      if (editor && fc.payload) {
+        editor.value = JSON.stringify(fc.payload, null, 2);
+      }
+      Shell.workspace.clearForwardedContext();
+      renderForwardedBanner();
+      Shell.toast('Applied forwarded context to ' + selectedId, 'success');
+    });
+  }
+
+  var dismissFwdBtn = document.getElementById('dismissForwardedBtn');
+  if (dismissFwdBtn) {
+    dismissFwdBtn.addEventListener('click', function () {
+      Shell.workspace.clearForwardedContext();
+      renderForwardedBanner();
+    });
+  }
+
+  var openPaletteBtn = document.getElementById('openPaletteBtn');
+  if (openPaletteBtn) {
+    openPaletteBtn.addEventListener('click', function () {
+      if (Shell.openCommandPalette) Shell.openCommandPalette();
+    });
+  }
+
+  window.__onShellHatSwitch = function (targetHat) {
+    applyHatFilter(targetHat, false);
+  };
+
+  // Restore query-param state (hat, mode, tool, skill)
+  var initParams = Shell.params.get();
+  var qMode = initParams.get('mode');
+  var qSkill = initParams.get('skill');
+  var qTool = initParams.get('tool');
+  var qHat = initParams.get('hat');
+  if (qMode === 'skills' || qSkill) {
+    currentMode = 'skills';
+    if (runnerModeSelect) runnerModeSelect.value = 'skills';
+    if (qSkill) selectedId = qSkill;
+  } else if (qTool) {
+    currentMode = 'tools';
+    selectedId = qTool;
+  }
+  applyHatFilter(qHat || 'all', true);
+  renderForwardedBanner();
+  renderPinnedOutputs();
+
+  document.querySelectorAll('[data-retry]').forEach(function (b) {
+    b.addEventListener('click', loadAll);
+  });
+
+  loadToolsAndSkillsCatalog();
+  loadAll();
+})();
+</script>
+</body>
+</html>

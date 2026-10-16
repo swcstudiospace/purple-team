@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>T3MP3ST — Mission</title>
+<title>Purple Team — Mission</title>
 <link rel="stylesheet" href="assets/tokens.css">
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
 <div class="shell__sidebar" id="sidebar">
-<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">P</span><a class="shell__brand-name" href="overview.html">Purple Team</a></div>
 <button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
 <nav data-shell-nav aria-label="Primary"></nav>
 </div>
@@ -68,12 +68,95 @@
 <div data-state="data" hidden><table class="table" id="receiptsTable"><thead><tr><th>ID</th><th>Action</th><th>Target</th><th>Status</th><th></th></tr></thead><tbody></tbody></table></div>
 </div>
 </section>
+
+<section class="card" aria-labelledby="missionStageTitle">
+<h2 class="card__title" id="missionStageTitle">Stage review</h2>
+<style>#missionBlackReview :focus-visible,#missionWhiteStage :focus-visible,#missionStageId:focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>
+<p class="text-secondary">Black plan review and White ROE stage for this mission. Empty plans are insufficient. Empty allow-lists are out of scope.</p>
+<div class="form-row">
+<div><label class="flabel" for="missionStageId">Mission id</label><input class="form-input" id="missionStageId" name="missionId" value="ui-mission" autocomplete="off" aria-describedby="missionBlackReviewResult"></div>
+</div>
+<form class="form-row" id="missionBlackReview" aria-label="Review a supplied black plan">
+<div><label class="flabel" for="missionBlackActions">Actions</label><input class="form-input" id="missionBlackActions" name="actions" autocomplete="off" aria-describedby="missionBlackReviewResult"></div>
+<div><label class="flabel" for="missionBlackPaths">Paths</label><input class="form-input" id="missionBlackPaths" name="paths" autocomplete="off" aria-describedby="missionBlackReviewResult"></div>
+<div><label class="flabel" for="missionBlackReviewSubmit">Review</label><button class="btn btn--sm btn--primary" id="missionBlackReviewSubmit" type="submit">Review plan</button></div>
+<div><label class="flabel" for="missionBlackReviewRetry">Retry</label><button class="btn btn--sm" id="missionBlackReviewRetry" type="button">Retry</button></div>
+</form>
+<p id="missionBlackReviewResult" role="status" aria-live="polite" class="text-secondary"></p>
+<form class="form-row" id="missionWhiteStage" aria-label="Stage ROE text and one action">
+<div><label class="flabel" for="missionWhiteRoe">ROE text</label><input class="form-input" id="missionWhiteRoe" name="roeText" autocomplete="off" required aria-describedby="missionWhiteStageResult"></div>
+<div><label class="flabel" for="missionWhiteAction">Action</label><input class="form-input" id="missionWhiteAction" name="action" autocomplete="off" required aria-describedby="missionWhiteStageResult"></div>
+<div><label class="flabel" for="missionWhiteTarget">Target</label><input class="form-input" id="missionWhiteTarget" name="target" autocomplete="off" aria-describedby="missionWhiteStageResult"></div>
+<div><label class="flabel" for="missionWhiteStageSubmit">Stage</label><button class="btn btn--sm btn--primary" id="missionWhiteStageSubmit" type="submit">Stage ROE</button></div>
+<div><label class="flabel" for="missionWhiteStageRetry">Retry</label><button class="btn btn--sm" id="missionWhiteStageRetry" type="button">Retry</button></div>
+</form>
+<p id="missionWhiteStageResult" role="status" aria-live="polite" class="text-secondary"></p>
+</section>
 </main>
-<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+<footer class="shell__footer"><span>Purple Team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
 </div>
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 <script src="assets/shell.js"></script>
+<script>
+(function () {
+  function splitLines(value) {
+    return String(value || '').split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+
+  function currentMissionId() {
+    var el = document.getElementById('missionStageId');
+    var value = el && String(el.value || '').trim();
+    return value || 'ui-mission';
+  }
+
+  var blackForm = document.getElementById('missionBlackReview');
+  async function submitBlack() {
+    var result = document.getElementById('missionBlackReviewResult');
+    var missionId = currentMissionId();
+    var actions = splitLines(document.getElementById('missionBlackActions').value);
+    var paths = splitLines(document.getElementById('missionBlackPaths').value).map(function (p) { return { id: p, channel: p }; });
+    result.textContent = 'Reviewing…';
+    try {
+      var reviewed = await Shell.apiPost('/api/teams/black/workflow', { actions: actions, paths: paths, egress: [] });
+      var outcome = (reviewed && reviewed.outcome) || 'unknown';
+      var n = ((reviewed && reviewed.effects) || []).length;
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/black/workflow: mission ' + missionId + ': ' + outcome + '. Effects: ' + n + '. ' + (outcome === 'insufficient' ? 'not a clean bill' : ''));
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/black/workflow: mission ' + missionId + ': ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (blackForm) {
+    blackForm.addEventListener('submit', function (event) { event.preventDefault(); submitBlack(); });
+    var blackRetry = document.getElementById('missionBlackReviewRetry');
+    if (blackRetry) blackRetry.addEventListener('click', function () { submitBlack(); });
+  }
+
+  var whiteForm = document.getElementById('missionWhiteStage');
+  async function submitWhite() {
+    var result = document.getElementById('missionWhiteStageResult');
+    var missionId = currentMissionId();
+    var roeText = document.getElementById('missionWhiteRoe').value;
+    var command = document.getElementById('missionWhiteAction').value;
+    var target = document.getElementById('missionWhiteTarget').value;
+    result.textContent = 'Staging…';
+    try {
+      var staged = await Shell.apiPost('/api/teams/white/stage', { roeText: roeText, actions: [{ command: command, target: target }] });
+      var verdictOrRefused = (staged && staged.ok === false)
+        ? (staged.reason === 'roe-scope-empty' ? 'out of scope' : 'refused')
+        : ((staged && staged.verdicts && staged.verdicts[0] && staged.verdicts[0].verdict) || (staged && staged.verdict) || 'unknown');
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/white/stage: mission ' + missionId + ': ' + verdictOrRefused + '. An approved flag alone is not a receipt.');
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/white/stage: mission ' + missionId + ': ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (whiteForm) {
+    whiteForm.addEventListener('submit', function (event) { event.preventDefault(); submitWhite(); });
+    var whiteRetry = document.getElementById('missionWhiteStageRetry');
+    if (whiteRetry) whiteRetry.addEventListener('click', function () { submitWhite(); });
+  }
+})();
+</script>
 <script>
 // Mission page: live scan (GET /api/mission/status) + receipts (GET /api/approvals).
 var receiptsCache = [];

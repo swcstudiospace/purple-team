@@ -1,4 +1,4 @@
-# Roadmap: T3MP3ST — Red Team AI
+# Roadmap: Purple Team — 4-Hat Vulnerability AI
 
 ## Milestones
 
@@ -7,10 +7,33 @@
 - ✅ **v1.2 Re-home Completion: Tauri Bundling & Remote Hardening** — Phases 11-14 (shipped 2026-10-10)
 - ✅ **v1.3 Color Team Suites at Red Parity** — Phases 15-20 (shipped 2026-10-10)
 - ✅ **v1.4 Hardening & Validation** — Phases 21-25 (shipped 2026-10-13)
+- ✅ **v1.5 Four-Hat Runtime Parity** — Phases 26-29 (archived 2026-10-15, override closeout)
+- ✅ **v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization** — Phases 30-33 (completed 2026-10-15)
 
-Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREMENTS.md` / `v*-STATE.md`, phase dirs in `v*-phases/`).
+Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREMENTS.md`, phase dirs in `v*-phases/`).
 
-## Phases
+## Current Milestone
+
+✅ **v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization (Phases 30-33)** — Completed 2026-10-15 (`SPE-14018`..`SPE-14024`)
+
+- [x] Phase 30: Four-Hat Architecture Audit & Milestone Alignment (`SPE-14018`, `SPE-14023`) — completed 2026-10-15
+- [x] Phase 31: Unified 4-Hat Tool Registry, Blue/White/Black Tools, Extra Utilities & Composable Skills (`SPE-14019`, `SPE-14022`) — completed 2026-10-15
+- [x] Phase 32: Upgraded 4-Hat UI Shell, WCAG 2.1 AA Hat Theming, Command Palette & Interactive Workspace (`SPE-14020`) — completed 2026-10-15
+- [x] Phase 33: Desktop Multi-Pane & Native Mobile / PWA Ergonomics + Automated Verification (`SPE-14021`, `SPE-14024`) — completed 2026-10-15
+
+<details>
+<summary>✅ v1.5 Four-Hat Runtime Parity (Phases 26-29) — archived 2026-10-15, override closeout</summary>
+
+- [x] Phase 26: Runtime Authority, Bound Inputs and Retained Execution (2/2 plans) — completed 2026-10-15
+- [x] Phase 27: Blue, Black and White Substantive Capability Parity (5/5 plans) — completed 2026-10-15
+- [x] Phase 28: Runtime-connected Four-Hat UI, MCP, Skills and Explicit Synthesis (5/5 plans) — completed 2026-10-15
+- [ ] Phase 29: Integrated Acceptance and Governed Closure — owner accepted the gap on 2026-10-15; not a passed verification
+
+Full phase text: `.planning/milestones/v1.5-ROADMAP.md`. Requirements snapshot: `.planning/milestones/v1.5-REQUIREMENTS.md`. Audit: `.planning/milestones/v1.5-MILESTONE-AUDIT.md` (`gaps_found`, accepted).
+
+Known gaps carried forward: FH-EXEC-4 unmounted; all 72 AC/NFR rows still Pending in the archived requirements; no hostile-input matrix; no TaskStore gate transition; uncommitted rebrand WIP was not part of the archive commit.
+
+</details>
 
 <details>
 <summary>✅ v1.4 Hardening & Validation (Phases 21-25) — SHIPPED 2026-10-13</summary>
@@ -23,13 +46,6 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 
 </details>
 
-## Next milestone
+## Deferred milestone candidates
 
-Not started. Candidate scope is recorded in `.planning/PROJECT.md` (Next Milestone section):
-the five v1.4 audit tech-debt follow-ups (F-20-01 prompt-audit divergence; stale v1.3 audit
-Nyquist prose; operators.html Tier-cell browser render + 23-VERIFICATION status-field
-reconciliation; F-25-01 lint-scope widening; stray repo-root artifact file) plus the deferred
-v2 requirements (persisted ROE verdict ledger and revision history, purple auto-consumption of
-recorded verdicts, ROE text provenance, install-and-launch verification of the built
-`.deb`/AppImage, per-rule lint budgets + doctor-integrated lint gate). Bootstrap the next
-milestone with `/gsd:new-milestone`.
+The five v1.4 audit follow-ups, the deferred v2 requirements, FH-EXEC-4, and the still-Pending v1.5 requirement rows. Do not treat this archive as proof those rows passed.

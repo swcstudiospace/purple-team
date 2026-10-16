@@ -57,18 +57,30 @@ import { initGrammars } from './recon/ts-grammars.js';
 import { redactCredential } from './evidence/index.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
+import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, artifactHash, ArtifactValidationError, RED_ARCHETYPES } from './teams/contracts.js';
+import type { BoundInlineArtifact } from './types/index.js';
 import { synthesize, type DarkPurpleSynthesis, type PurpleVerdictByFinding } from './teams/purple.js';
-import { hardeningPlan, type DetectionGap } from './teams/blue.js';
+import { hardeningPlan, type DetectionGap, type ObservedArtifactIds } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
 import { sigmaRulepack } from './teams/blue/rulepacks.js';
 import { registryTelemetry } from './teams/blue/telemetry.js';
+import { runBlueCoverageStage } from './teams/blue/workflow.js';
 import { opsecReview } from './teams/black/checklist.js';
-import { exfilCostModel } from './teams/black/exfil.js';
+import { exfilCostModel, type RouteEvidence } from './teams/black/exfil.js';
 import { structuredNoiseBudget } from './teams/black/noise.js';
+import { runBlackWorkflow, type BlackWorkflowInput } from './teams/black/workflow.js';
 import { parseRoe } from './teams/white/roe-parser.js';
 import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
 import { roeAudit, type AuditedAction, type RoeVerdict } from './teams/white.js';
+import { stageRoeAudit, type ApprovalBearingAction, type RoeStageMeta } from './teams/white/workflow.js';
+import {
+  listRegisteredHatTools,
+  executeRegisteredHatTool,
+  listComposableSkills,
+  runComposableSkill,
+} from './teams/skills.js';
+import { type ToolHatScope, type HatDomain } from './teams/guardrails.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -364,14 +376,14 @@ async function initLLM(): Promise<LLMBackbone | null> {
       else if (hasOAuth('openai')) llmConfig = config.getLLMConfig('chatgpt');
     }
     if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
-      console.warn('[T3MP3ST] No API key configured - LLM features disabled');
+      console.warn('[purple-team] No API key configured - LLM features disabled');
       return null;
     }
     const backbone = new LLMBackbone(llmConfig);
-    console.log(`[T3MP3ST] LLM initialized: ${llmConfig.provider}/${llmConfig.model}`);
+    console.log(`[purple-team] LLM initialized: ${llmConfig.provider}/${llmConfig.model}`);
     return backbone;
   } catch (error) {
-    console.error('[T3MP3ST] Failed to initialize LLM:', error);
+    console.error('[purple-team] Failed to initialize LLM:', error);
     return null;
   }
 }
@@ -436,9 +448,43 @@ function createTempestCommandInstance(missionName: string, apiKey: string | unde
   // Evidence Vault (/api/findings) reflects the run instead of showing 0 afterward.
   tempestCommand.on('finding:discovered', ({ finding }) => {
     try {
-      upsertMissionFindingToLedger(finding as any, tempestCommand?.mission.getActiveMission()?.id);
+      const findingShape: {
+        id?: string;
+        title?: string;
+        description?: string;
+        severity?: unknown;
+        targetId?: string;
+      } = finding;
+      upsertMissionFindingToLedger(findingShape, tempestCommand?.mission.getActiveMission()?.id);
     } catch (err) {
-      console.error('[T3MP3ST] failed to persist mission finding to ledger:', err instanceof Error ? err.message : err);
+      console.error('[purple-team] failed to persist mission finding to ledger:', err instanceof Error ? err.message : err);
+    }
+  });
+
+  tempestCommand.on('scan:progress', (event) => {
+    if (!event.taskId) return;
+    const activeMissionId = tempestCommand?.mission.getActiveMission()?.id || 'active';
+    if (event.kind === 'task_started') {
+      updateOperatorTaskRunByTaskId(event.taskId, {
+        status: 'running',
+        specialist: event.archetype,
+        missionId: activeMissionId,
+      });
+    } else if (event.kind === 'task_completed') {
+      updateOperatorTaskRunByTaskId(event.taskId, {
+        status: event.success === false ? 'failed' : 'completed',
+        output: event.detail,
+        ...(event.success === false ? { error: event.detail } : {}),
+        specialist: event.archetype,
+        missionId: activeMissionId,
+      });
+    } else if (event.kind === 'task_failed') {
+      updateOperatorTaskRunByTaskId(event.taskId, {
+        status: 'failed',
+        error: event.detail,
+        specialist: event.archetype,
+        missionId: activeMissionId,
+      });
     }
   });
 
@@ -620,7 +666,7 @@ function rejectDuplicateLedgerId<T>(res: Response, ledger: Map<string, T>, id: u
   res.status(409).json({
     error: `${label} already exists`,
     id: id.trim(),
-    next: `Use PATCH ${collectionPath}/${id.trim()} to update an existing record, or omit id to let T3MP3ST mint one.`,
+    next: `Use PATCH ${collectionPath}/${id.trim()} to update an existing record, or omit id to let Purple Team mint one.`,
   });
   return true;
 }
@@ -928,6 +974,173 @@ interface RoeRecord {
 const roeRecords = new Map<string, RoeRecord>();
 
 /**
+ * Observed receipts (Phase 26, D-receipts): written ONLY by the private
+ * recordReceipt writer below, after a real computation returns — never by an
+ * HTTP route. Public POST /api/evidence cannot set origin; rows without
+ * origin stay unlabeled with no backfill. Restore drops any origin:observed
+ * row lacking its full observation binding.
+ */
+interface ObservedReceipt {
+  id: string;
+  origin: 'observed';
+  runId: string;
+  missionId: string;
+  stage: string;
+  tool: string;
+  inputSha256: string;
+  itemId: string;
+  createdAt: string;
+}
+const observedReceipts = new Map<string, ObservedReceipt>();
+
+/**
+ * Retained operator task runs (Phase 26, D-lifecycle): every string leaving
+ * the process passes redactSecrets/redactLedgerText and raw artifact bytes
+ * are never persisted here. Pending/running rows at process loss become
+ * interrupted with executionSettled:true — never resumed.
+ */
+interface OperatorTaskRun {
+  id: string;
+  runId: string;
+  missionId: string;
+  hat: string;
+  specialist: string;
+  taskId: string;
+  inputSha256: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
+  executionSettled: boolean;
+  output?: string;
+  error?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+const operatorTaskRuns = new Map<string, OperatorTaskRun>();
+
+function hatForSpecialistRole(role: string): string {
+  if (role === 'blue' || role === 'sentinel' || role === 'warden') return 'blue';
+  if (role === 'black' || role === 'specter' || role === 'wraith') return 'black';
+  if (role === 'white' || role === 'arbiter' || role === 'auditor') return 'white';
+  return 'red';
+}
+
+function recordOperatorTaskRun(entry: {
+  id?: string;
+  runId: string;
+  missionId: string;
+  specialist: string;
+  taskId: string;
+  inputText: string;
+  status?: OperatorTaskRun['status'];
+}): OperatorTaskRun {
+  const now = nowIso();
+  const id = entry.id || entry.taskId || randomUUID();
+  const status = entry.status ?? 'pending';
+  const row: OperatorTaskRun = {
+    id,
+    runId: entry.runId,
+    missionId: entry.missionId,
+    hat: hatForSpecialistRole(entry.specialist),
+    specialist: entry.specialist,
+    taskId: entry.taskId,
+    inputSha256: artifactHash(entry.inputText),
+    status,
+    executionSettled: status === 'completed' || status === 'failed',
+    createdAt: now,
+    updatedAt: now,
+  };
+  operatorTaskRuns.set(row.id, row);
+  schedulePersist('operatorTaskRuns');
+  return row;
+}
+
+function updateOperatorTaskRunByTaskId(
+  taskId: string,
+  patch: {
+    status: OperatorTaskRun['status'];
+    output?: string;
+    error?: string;
+    specialist?: string;
+    missionId?: string;
+  },
+): void {
+  if (!taskId) return;
+  const now = nowIso();
+  let row = operatorTaskRuns.get(taskId);
+  if (!row) {
+    for (const candidate of operatorTaskRuns.values()) {
+      if (candidate.taskId === taskId) {
+        row = candidate;
+        break;
+      }
+    }
+  }
+  if (!row) {
+    const specialist = patch.specialist || 'recon';
+    row = {
+      id: taskId,
+      runId: taskId,
+      missionId: patch.missionId || 'active',
+      hat: hatForSpecialistRole(specialist),
+      specialist,
+      taskId,
+      inputSha256: artifactHash(taskId),
+      status: patch.status,
+      executionSettled: patch.status === 'completed' || patch.status === 'failed',
+      createdAt: now,
+      updatedAt: now,
+    };
+  } else {
+    row.status = patch.status;
+    row.executionSettled = patch.status === 'completed' || patch.status === 'failed';
+    row.updatedAt = now;
+  }
+  if (typeof patch.output === 'string' && patch.output.trim()) {
+    row.output = redactLedgerText(patch.output, 2000);
+  }
+  if (typeof patch.error === 'string' && patch.error.trim()) {
+    row.error = redactLedgerText(patch.error, 1000);
+  }
+  operatorTaskRuns.set(row.id, row);
+  schedulePersist('operatorTaskRuns');
+}
+/**
+ * Private receipt writer — the ONLY path that mints origin:observed. Call
+ * only after a real computation returns, with the full run/mission/stage/
+ * tool/input-hash/item binding. No HTTP route calls this with caller input.
+ */
+function recordReceipt(binding: {
+  runId: string;
+  missionId: string;
+  stage: string;
+  tool: string;
+  inputSha256: string;
+  itemId: string;
+}): ObservedReceipt {
+  const receipt: ObservedReceipt = {
+    id: randomUUID(),
+    origin: 'observed',
+    ...binding,
+    createdAt: nowIso(),
+  };
+  observedReceipts.set(receipt.id, receipt);
+  return receipt;
+}
+
+/** Observation binding is complete only with tool, stage, input hash, run, and mission. */
+function isForgedObservedReceipt(value: unknown): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return true;
+  const row = value as Record<string, unknown>;
+  if (row.origin !== 'observed') return false;
+  return !(
+    typeof row.tool === 'string' && row.tool &&
+    typeof row.stage === 'string' && row.stage &&
+    typeof row.inputSha256 === 'string' && row.inputSha256 &&
+    typeof row.runId === 'string' && row.runId &&
+    typeof row.missionId === 'string' && row.missionId
+  );
+}
+
+/**
  * Mirror a live mission finding into the persistent findingsLedger (the one the
  * Evidence Vault reads via /api/findings). Mission findings otherwise live only in
  * the ephemeral vault (/api/mission/findings) and vanish from the Vault after a run.
@@ -1139,8 +1352,29 @@ function normalizeMemoryStatus(value: unknown, fallback: MemoryProposalStatus): 
     : fallback;
 }
 
+const MAX_STAGE_LIST_ITEMS = 1000;
+
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+function normalizeLedgerEvidenceIds(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string' && value.trim()
+      ? value.split(/[\n,]/)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (let i = 0; i < raw.length; i++) {
+    const item = String(raw[i] ?? '').trim();
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    if (evidenceLedger.has(item)) {
+      out.push(item);
+    }
+  }
+  return out;
 }
 
 function canonicalMemoryContent(content: string): string {
@@ -1202,6 +1436,8 @@ function buildStateSnapshot(): Record<string, unknown> {
     memoryProposals: [...memoryProposals.values()],
     purpleSyntheses: [...purpleSyntheses.values()],
     roeRecords: [...roeRecords.values()],
+    observedReceipts: [...observedReceipts.values()],
+    operatorTaskRuns: [...operatorTaskRuns.values()],
   };
 }
 
@@ -1231,7 +1467,7 @@ function schedulePersist(reason: string): void {
     if (!persistPending) return;
     persistPending = false;
     void persistState(persistReason).catch(error => {
-      console.warn(`[T3MP3ST] State persistence failed: ${error.message || error}`);
+      console.warn(`[purple-team] State persistence failed: ${error.message || error}`);
     });
   }, PERSIST_DEBOUNCE_MS);
 }
@@ -1239,7 +1475,7 @@ function schedulePersist(reason: string): void {
 // Flush any pending debounced snapshot NOW (used on graceful shutdown so the debounce window
 // can't drop the last <1s of state on SIGTERM/SIGINT — Ctrl-C, docker stop, systemctl restart).
 // state.json is the only restore source, so this closes the data-loss gap the debounce opened.
-export async function flushPersist(): Promise<void> {
+async function flushPersist(): Promise<void> {
   if (persistTimer) { clearTimeout(persistTimer); persistTimer = null; }
   if (persistPending) {
     persistPending = false;
@@ -1266,18 +1502,58 @@ async function loadPersistedState(): Promise<void> {
     replaceMapContents(approvalRequests, state.approvalRequests);
     replaceMapContents(evidenceLedger, state.evidenceLedger);
     replaceMapContents(findingsLedger, state.findingsLedger);
+    for (const finding of findingsLedger.values()) {
+      if (Array.isArray(finding.evidenceIds)) {
+        finding.evidenceIds = uniqueStrings(normalizeStringList(finding.evidenceIds));
+      }
+    }
     replaceMapContents(retestLedger, state.retestLedger);
+    for (const retest of retestLedger.values()) {
+      if (Array.isArray(retest.evidenceIds)) {
+        retest.evidenceIds = uniqueStrings(normalizeStringList(retest.evidenceIds));
+      }
+    }
     replaceMapContents(hypothesisLedger, state.hypothesisLedger);
+    for (const hypothesis of hypothesisLedger.values()) {
+      if (Array.isArray(hypothesis.evidenceForIds)) {
+        hypothesis.evidenceForIds = uniqueStrings(normalizeStringList(hypothesis.evidenceForIds));
+      }
+      if (Array.isArray(hypothesis.evidenceAgainstIds)) {
+        hypothesis.evidenceAgainstIds = uniqueStrings(normalizeStringList(hypothesis.evidenceAgainstIds));
+      }
+    }
     replaceMapContents(workOrderLedger, state.workOrderLedger);
+    for (const order of workOrderLedger.values()) {
+      if (Array.isArray(order.evidenceIds)) {
+        order.evidenceIds = uniqueStrings(normalizeStringList(order.evidenceIds));
+      }
+    }
     replaceMapContents(watchCycleLedger, state.watchCycleLedger);
     replaceMapContents(memoryCapsule, state.memoryCapsule);
     replaceMapContents(memoryProposals, state.memoryProposals);
     replaceMapContents(purpleSyntheses, state.purpleSyntheses);
     replaceMapContents(roeRecords, state.roeRecords);
-    console.log(`[T3MP3ST] State restored from ${file}`);
+    // Observed receipts: drop any forged origin:observed row lacking its full
+    // observation binding (tool, stage, inputSha256, runId, missionId). Absent
+    // slot restores as empty — the replace is absent-tolerant.
+    replaceMapContents(observedReceipts, state.observedReceipts);
+    for (const [id, row] of [...observedReceipts]) {
+      if (isForgedObservedReceipt(row)) observedReceipts.delete(id);
+    }
+    // Retained runs keep original attribution; pending/running rows at process
+    // loss become interrupted with executionSettled:true — never resumed.
+    replaceMapContents(operatorTaskRuns, state.operatorTaskRuns);
+    for (const row of operatorTaskRuns.values()) {
+      if (row.status === 'pending' || row.status === 'running' || (row.status === 'interrupted' && !row.executionSettled)) {
+        row.status = 'interrupted';
+        row.executionSettled = true;
+        row.updatedAt = nowIso();
+      }
+    }
+    console.log(`[purple-team] State restored from ${file}`);
   } catch (error: any) {
     if (error?.code !== 'ENOENT') {
-      console.warn(`[T3MP3ST] State restore skipped: ${error.message || error}`);
+      console.warn(`[purple-team] State restore skipped: ${error.message || error}`);
     }
   }
 }
@@ -1289,6 +1565,16 @@ function normalizeTargetValue(value: unknown): string {
     return String(record.host || record.locator || record.label || record.address || 'local-lab');
   }
   return 'local-lab';
+}
+
+/** Host string for a mission-start target entry (string or { host } record). */
+function missionTargetHost(value: unknown): string {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (value && typeof value === 'object' && 'host' in value) {
+    const host = value.host;
+    if (typeof host === 'string' && host.trim()) return host.trim();
+  }
+  return String(value);
 }
 
 function hostFromTarget(target: string): string {
@@ -1519,7 +1805,7 @@ function buildRoutePreview(draft: MissionDraft): RoutePreview {
     : ['s3r4ph1m_scope_review'];
   const warnings = draft.scope.length ? [] : ['No explicit target scope supplied; defaulting to local-lab draft mode.'];
   const opsecLevel = draft.opsecPreference === 'overt' ? 'loud' : draft.opsecPreference === 'normal' ? 'covert' : 'silent';
-  const missionName = draft.title || `T3MP3ST ${family.replace(/_/g, ' ')}`;
+  const missionName = draft.title || `Purple Team ${family.replace(/_/g, ' ')}`;
 
   return {
     draftId: draft.id,
@@ -2038,7 +2324,7 @@ function createWorkOrder(input: Partial<WorkOrderRecord> & Record<string, unknow
     requiresReceipt,
     toolHints: normalizeStringList(input.toolHints).length ? normalizeStringList(input.toolHints) : workOrderToolHints(hypothesis.family, kind),
     status: normalizeWorkOrderStatus(input.status, requiresReceipt ? 'needs_receipt' : defaultWorkOrderStatus(target, kind)),
-    evidenceIds: normalizeStringList(input.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: normalizeLedgerEvidenceIds(input.evidenceIds),
     resultSummary: typeof input.resultSummary === 'string' ? redactLedgerText(input.resultSummary) : undefined,
     createdAt: now,
     updatedAt: now,
@@ -4361,9 +4647,9 @@ function createMemoryProposal(input: Partial<MemoryProposal> & Record<string, un
   const fingerprint = typeof input.fingerprint === 'string' && input.fingerprint.trim()
     ? input.fingerprint.trim()
     : memoryFingerprint(type, content);
-  const sourceEvidenceIds = normalizeStringList(input.sourceEvidenceIds).filter(id => evidenceLedger.has(id));
-  const sourceFindingIds = normalizeStringList(input.sourceFindingIds).filter(id => findingsLedger.has(id));
-  const sourceRetestIds = normalizeStringList(input.sourceRetestIds).filter(id => retestLedger.has(id));
+  const sourceEvidenceIds = normalizeLedgerEvidenceIds(input.sourceEvidenceIds);
+  const sourceFindingIds = uniqueStrings(normalizeStringList(input.sourceFindingIds)).filter(id => findingsLedger.has(id));
+  const sourceRetestIds = uniqueStrings(normalizeStringList(input.sourceRetestIds)).filter(id => retestLedger.has(id));
   const duplicateCandidates = [...memoryProposals.values()]
     .filter(proposal => proposalFingerprint(proposal) === fingerprint)
     .sort((a, b) => {
@@ -4899,7 +5185,7 @@ function emitContractEvent(type: string, payload: Record<string, unknown>): void
     ...payload,
   });
   void appendStateEvent(type, payload).catch(error => {
-    console.warn(`[T3MP3ST] Event persistence failed: ${error.message || error}`);
+    console.warn(`[purple-team] Event persistence failed: ${error.message || error}`);
   });
   schedulePersist(type);
 }
@@ -5405,9 +5691,9 @@ app.get('/api/hypotheses', (req: Request, res: Response) => {
 app.post('/api/hypotheses', (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   if (rejectDuplicateLedgerId(res, hypothesisLedger, body.id, 'Hypothesis', '/api/hypotheses')) return;
-  const evidenceForIds = normalizeStringList(body.evidenceForIds).filter(id => evidenceLedger.has(id));
-  const evidenceAgainstIds = normalizeStringList(body.evidenceAgainstIds).filter(id => evidenceLedger.has(id));
-  const findingIds = normalizeStringList(body.findingIds).filter(id => findingsLedger.has(id));
+  const evidenceForIds = normalizeLedgerEvidenceIds(body.evidenceForIds);
+  const evidenceAgainstIds = normalizeLedgerEvidenceIds(body.evidenceAgainstIds);
+  const findingIds = uniqueStrings(normalizeStringList(body.findingIds)).filter(id => findingsLedger.has(id));
   const now = nowIso();
   const hypothesis: HypothesisRecord = {
     id: clientLedgerId(body.id, 'hypothesis'),
@@ -5440,10 +5726,10 @@ app.patch('/api/hypotheses/:id', (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const evidenceForIds = body.evidenceForIds === undefined
     ? existing.evidenceForIds
-    : normalizeStringList(body.evidenceForIds).filter(id => evidenceLedger.has(id));
+    : normalizeLedgerEvidenceIds(body.evidenceForIds);
   const evidenceAgainstIds = body.evidenceAgainstIds === undefined
     ? existing.evidenceAgainstIds
-    : normalizeStringList(body.evidenceAgainstIds).filter(id => evidenceLedger.has(id));
+    : normalizeLedgerEvidenceIds(body.evidenceAgainstIds);
   let updated: HypothesisRecord = {
     ...existing,
     missionId: typeof body.missionId === 'string' ? body.missionId : existing.missionId,
@@ -5456,7 +5742,7 @@ app.patch('/api/hypotheses/:id', (req: Request, res: Response) => {
     confidence: body.confidence === undefined ? existing.confidence : clampConfidence(body.confidence),
     evidenceForIds,
     evidenceAgainstIds,
-    findingIds: body.findingIds === undefined ? existing.findingIds : normalizeStringList(body.findingIds).filter(id => findingsLedger.has(id)),
+    findingIds: body.findingIds === undefined ? existing.findingIds : uniqueStrings(normalizeStringList(body.findingIds)).filter(id => findingsLedger.has(id)),
     nextTests: body.nextTests === undefined ? existing.nextTests : normalizeStringList(body.nextTests).map(item => redactLedgerText(item, 500)),
     updatedAt: nowIso(),
   };
@@ -5483,7 +5769,7 @@ app.post('/api/hypotheses/:id/promote', (req: Request, res: Response) => {
   const now = nowIso();
   const evidenceIds = uniqueStrings([
     ...hypothesis.evidenceForIds,
-    ...normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    ...normalizeLedgerEvidenceIds(body.evidenceIds),
   ]);
   const finding: FindingRecord = {
     id: clientLedgerId(body.id, 'finding'),
@@ -5643,7 +5929,7 @@ app.patch('/api/work-orders/:id', (req: Request, res: Response) => {
     requiresReceipt: body.requiresReceipt === undefined ? existing.requiresReceipt : Boolean(body.requiresReceipt),
     toolHints: body.toolHints === undefined ? existing.toolHints : normalizeStringList(body.toolHints),
     status: body.status === undefined ? existing.status : normalizeWorkOrderStatus(body.status, existing.status),
-    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeLedgerEvidenceIds(body.evidenceIds),
     resultSummary: typeof body.resultSummary === 'string' ? redactLedgerText(body.resultSummary) : existing.resultSummary,
     updatedAt: nowIso(),
     completedAt: typeof body.completedAt === 'string' ? body.completedAt : existing.completedAt,
@@ -5670,7 +5956,7 @@ app.post('/api/work-orders/:id/complete', (req: Request, res: Response) => {
   const resultSummary = typeof body.resultSummary === 'string' && body.resultSummary.trim()
     ? redactLedgerText(body.resultSummary.trim())
     : `Work order completed: ${existing.objective}`;
-  let evidenceIds = normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id));
+  let evidenceIds = normalizeLedgerEvidenceIds(body.evidenceIds);
   if (body.createEvidence !== false) {
     const evidence: EvidenceEntry = {
       id: clientLedgerId(body.evidenceId, 'evidence'),
@@ -5772,6 +6058,10 @@ app.get('/api/evidence', (req: Request, res: Response) => {
 app.post('/api/evidence', (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   if (rejectDuplicateLedgerId(res, evidenceLedger, body.id, 'Evidence', '/api/evidence')) return;
+  // Claimed-versus-observed boundary (Phase 26, D-receipts): the public path
+  // can never set origin — body.origin is ignored and every row stays
+  // claimed (unlabeled, no backfill). Only the private recordReceipt writer
+  // mints origin:observed after a real computation.
   const evidence: EvidenceEntry = {
     id: clientLedgerId(body.id, 'evidence'),
     missionId: typeof body.missionId === 'string' ? body.missionId : undefined,
@@ -5824,7 +6114,7 @@ app.post('/api/findings', (req: Request, res: Response) => {
     severity: normalizeSeverity(body.severity),
     confidence: clampConfidence(body.confidence),
     status: normalizeFindingStatus(body.status, 'open'),
-    evidenceIds: normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: normalizeLedgerEvidenceIds(body.evidenceIds),
     resourceIds: normalizeResourceIds(body.resourceIds),
     recommendedFix: typeof body.recommendedFix === 'string' ? redactLedgerText(body.recommendedFix) : '',
     acceptanceCriteria: normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)),
@@ -5860,7 +6150,7 @@ app.patch('/api/findings/:id', (req: Request, res: Response) => {
     severity: body.severity === undefined ? existing.severity : normalizeSeverity(body.severity),
     confidence: body.confidence === undefined ? existing.confidence : clampConfidence(body.confidence),
     status: body.status === undefined ? existing.status : normalizeFindingStatus(body.status, existing.status),
-    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeLedgerEvidenceIds(body.evidenceIds),
     resourceIds: body.resourceIds === undefined ? existing.resourceIds : normalizeResourceIds(body.resourceIds),
     recommendedFix: typeof body.recommendedFix === 'string' ? redactLedgerText(body.recommendedFix) : existing.recommendedFix,
     acceptanceCriteria: body.acceptanceCriteria === undefined ? existing.acceptanceCriteria : normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)),
@@ -5889,7 +6179,7 @@ app.post('/api/findings/:id/retest', (req: Request, res: Response) => {
     status: normalizeRetestStatus(body.status, 'queued'),
     method: typeof body.method === 'string' && body.method.trim() ? redactLedgerText(body.method.trim()) : 'Verify the acceptance criteria and attach fresh evidence.',
     acceptanceCriteria: normalizeStringList(body.acceptanceCriteria).length ? normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)) : finding.acceptanceCriteria,
-    evidenceIds: normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: normalizeLedgerEvidenceIds(body.evidenceIds),
     resultSummary: typeof body.resultSummary === 'string' ? redactLedgerText(body.resultSummary) : undefined,
     createdAt: now,
     updatedAt: now,
@@ -5927,7 +6217,7 @@ app.patch('/api/retests/:id', (req: Request, res: Response) => {
     status: body.status === undefined ? existing.status : normalizeRetestStatus(body.status, existing.status),
     method: typeof body.method === 'string' && body.method.trim() ? redactLedgerText(body.method.trim()) : existing.method,
     acceptanceCriteria: body.acceptanceCriteria === undefined ? existing.acceptanceCriteria : normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)),
-    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeLedgerEvidenceIds(body.evidenceIds),
     resultSummary: typeof body.resultSummary === 'string' ? redactLedgerText(body.resultSummary) : existing.resultSummary,
     updatedAt: nowIso(),
   };
@@ -5947,7 +6237,7 @@ app.post('/api/mission-drafts', (req: Request, res: Response) => {
   const body = req.body as Partial<MissionDraft> & Record<string, unknown>;
   const draft: MissionDraft = {
     id: typeof body.id === 'string' ? body.id : newId('draft'),
-    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled T3MP3ST Mission',
+    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Untitled Purple Team Mission',
     objective: typeof body.objective === 'string' && body.objective.trim() ? body.objective.trim() : 'Draft an authorized security mission.',
     scope: normalizeStringList(body.scope),
     constraints: typeof body.constraints === 'string' ? body.constraints : '',
@@ -6010,7 +6300,7 @@ app.post('/api/route-preview', (req: Request, res: Response) => {
   const draft = body.draftId ? missionDrafts.get(body.draftId) : undefined;
   const fallbackDraft: MissionDraft = draft || {
     id: newId('draft'),
-    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'T3MP3ST Route Preview',
+    title: typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Purple Team Route Preview',
     objective: typeof body.objective === 'string' && body.objective.trim() ? body.objective.trim() : 'Preview an authorized mission route.',
     scope: normalizeStringList(body.scope),
     constraints: typeof body.constraints === 'string' ? body.constraints : '',
@@ -6408,6 +6698,19 @@ app.get('/api/teams/tool-grants', (_req: Request, res: Response) => {
  * event log via emitContractEvent, and the LATEST synthesis persists through the
  * same snapshot machinery (purpleSyntheses slot in buildStateSnapshot).
  */
+app.get('/api/teams/purple/synthesize', (_req: Request, res: Response): void => {
+  const latest = purpleSyntheses.get('latest');
+  if (!latest) {
+    res.json({ synthesis: null });
+    return;
+  }
+  res.json(redactSecrets({
+    synthesis: latest.synthesis,
+    createdAt: latest.createdAt,
+    correlation: latest.correlation,
+  }));
+});
+
 app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const findings = body.findings;
@@ -6582,18 +6885,15 @@ app.get('/api/teams/black/noise', (_req: Request, res: Response): void => {
 // security code; PUT is in STATE_CHANGING_METHODS so the loopback
 // CSRF/Origin guard covers it too.
 const ROE_BODY_CAP_BYTES = 64 * 1024;
-// Action elements roeAudit can safely consume: objects whose audited fields are
-// strings when present. Shared by the PUT 400 gate and the GET restore ladder
-// so a bad record can never persist in the single slot (a non-string target
-// would throw inside roeAudit's trim call on the next GET).
-function isRoeActionElementValid(value: unknown): boolean {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  const action = value as Record<string, unknown>;
-  if (action.command !== undefined && typeof action.command !== 'string') return false;
-  if (action.target !== undefined && typeof action.target !== 'string') return false;
+function isValidRoeAction(a: unknown): a is AuditedAction {
+  if (!a || typeof a !== 'object' || Array.isArray(a)) return false;
+  const rec = a as Record<string, unknown>;
+  if (rec.command !== undefined && typeof rec.command !== 'string') return false;
+  if (rec.target !== undefined && typeof rec.target !== 'string') return false;
+  if (rec.approved !== undefined && typeof rec.approved !== 'boolean') return false;
+  if (rec.scope !== undefined && (!Array.isArray(rec.scope) || rec.scope.some((s) => typeof s !== 'string'))) return false;
   return true;
 }
-
 app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const text = body.text;
@@ -6602,8 +6902,8 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     res.status(400).json({ error: 'text must be a non-empty string' });
     return;
   }
-  if (!Array.isArray(actions) || actions.some((a) => !isRoeActionElementValid(a))) {
-    res.status(400).json({ error: 'actions must be an array of action objects with string command/target fields' });
+  if (!Array.isArray(actions) || actions.some((a) => !a || typeof a !== 'object' || Array.isArray(a) || !isValidRoeAction(a))) {
+    res.status(400).json({ error: 'actions must be an array of action objects' });
     return;
   }
   if (Buffer.byteLength(text, 'utf8') > ROE_BODY_CAP_BYTES) {
@@ -6632,6 +6932,20 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
     actions: record.actions.length,
   });
   const putParse = parseRoe(record.text);
+  // First honest observed-receipt hook (Phase 26, D-receipts): a successful
+  // parseRoe IS a real computation returning, so it mints one observed
+  // receipt bound to the parsed text. Parse failure mints nothing; GET
+  // handlers never mint.
+  if (putParse.ok) {
+    recordReceipt({
+      runId: `roe-rev-${record.revision}`,
+      missionId: 'roe-record',
+      stage: 'parse',
+      tool: 'parseRoe',
+      inputSha256: record.textHash,
+      itemId: record.id,
+    });
+  }
   res.json(redactSecrets({ revision: record.revision, textHash: record.textHash, ok: putParse.ok, summary: putParse.summary }));
 });
 
@@ -6639,12 +6953,10 @@ app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
 // (teams/white/roe-parser.ts parseRoe) plus roeAudit verdicts over the stored
 // actions when and only when the parse is ok:true. Fail-closed ladder, always
 // 200: no record or a shapeless record (text not a string, actions not an
-// element-valid array of objects with string command/target fields,
-// revision/timestamps not finite scalars —
+// element-valid array of objects, revision/timestamps not finite scalars —
 // the replaceMapContents restore silently drops id-less rows into this same
 // state) returns the honest zeroed parse; a record whose stored
-// textHash/actionsHash no longer matches the stored text/actions
-// (write-time-redaction drift rewrites action strings such as ?token= URLs)
+// textHash no longer matches the stored text (write-time-redaction drift)
 // returns the same cannot-derive report with no verdicts member; an ok:false
 // parse returns parse plus provenance with no verdicts member; only an
 // ok:true parse returns parse plus provenance plus verdicts, each stamped
@@ -6655,7 +6967,8 @@ app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
   const storedActions: unknown = record?.actions;
   const actionsOk =
     Array.isArray(storedActions) &&
-    (storedActions as unknown[]).every((a) => isRoeActionElementValid(a));
+    !(storedActions as unknown[]).some((a) => !a || typeof a !== 'object' || Array.isArray(a)) &&
+    (storedActions as unknown[]).every(isValidRoeAction);
   const revisionOk = typeof record?.revision === 'number' && Number.isFinite(record.revision);
   const timestampsOk = typeof record?.createdAt === 'string' && typeof record?.updatedAt === 'string';
   if (!record || typeof record.text !== 'string' || !actionsOk || !revisionOk || !timestampsOk) {
@@ -6710,6 +7023,287 @@ app.get('/api/teams/white/report-audit', (_req: Request, res: Response): void =>
   res.json(redactSecrets(auditReport(findings, entries)));
 });
 
+// POST /api/teams/blue/coverage — artifact-bound coverage stage for one family
+// Resolve staged evidence associations against live server ledgers before
+// running the Blue/Black/White staged helpers so unbacked caller labels do not
+// pass as verified/observed/approved proof.
+function resolveStagedBlueInput(rawBody: unknown): void {
+  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) return;
+  const body = rawBody as Record<string, unknown>;
+  if (!Array.isArray(body.artifactIds) || !Array.isArray(body.findings)) return;
+  if (body.artifactIds.length > MAX_STAGE_LIST_ITEMS) {
+    throw new Error(`blue workflow: artifactIds exceeds maximum of ${MAX_STAGE_LIST_ITEMS} entries`);
+  }
+  if (body.findings.length > MAX_STAGE_LIST_ITEMS) {
+    throw new Error(`blue workflow blue-coverage: findings exceeds maximum of ${MAX_STAGE_LIST_ITEMS} entries`);
+  }
+  if (Array.isArray(body.telemetry) && body.telemetry.length > MAX_STAGE_LIST_ITEMS) {
+    throw new Error(`blue workflow blue-coverage: telemetry exceeds maximum of ${MAX_STAGE_LIST_ITEMS} entries`);
+  }
+
+  const uniqueArtifactIds = new Set<string>();
+  for (const id of body.artifactIds) {
+    if (typeof id === 'string') {
+      const trimmed = id.trim();
+      if (trimmed) uniqueArtifactIds.add(trimmed);
+    }
+  }
+
+  const universalIds: string[] = [];
+  const idsByFindingId = new Map<string, Set<string>>();
+  const knownArtifactIds = new Set<string>();
+
+  for (const artId of uniqueArtifactIds) {
+    const receipt = observedReceipts.get(artId);
+    if (receipt) {
+      knownArtifactIds.add(artId);
+      if (receipt.itemId) {
+        let bucket = idsByFindingId.get(receipt.itemId);
+        if (!bucket) {
+          bucket = new Set<string>();
+          idsByFindingId.set(receipt.itemId, bucket);
+        }
+        bucket.add(artId);
+      }
+    }
+    const ev = evidenceLedger.get(artId);
+    if (ev) {
+      knownArtifactIds.add(artId);
+      if (ev.source === 'tool' || ev.provenanceStrength === 'replayable' || ev.provenanceStrength === 'tool') {
+        if (!ev.findingId) {
+          universalIds.push(artId);
+        } else {
+          let bucket = idsByFindingId.get(ev.findingId);
+          if (!bucket) {
+            bucket = new Set<string>();
+            idsByFindingId.set(ev.findingId, bucket);
+          }
+          bucket.add(artId);
+        }
+      }
+    }
+  }
+
+  const observedByFinding: Record<string, readonly string[]> = {};
+  const resolvedFindingIds = new Set<string>();
+  for (const rawFinding of body.findings) {
+    if (!rawFinding || typeof rawFinding !== 'object' || Array.isArray(rawFinding)) continue;
+    const findingRec = rawFinding as Record<string, unknown>;
+    const findingId = typeof findingRec.id === 'string' ? findingRec.id : '';
+    if (!findingId || resolvedFindingIds.has(findingId)) continue;
+    resolvedFindingIds.add(findingId);
+
+    const matchedSet = new Set<string>(universalIds);
+    const directBucket = idsByFindingId.get(findingId);
+    if (directBucket) {
+      for (const artId of directBucket) matchedSet.add(artId);
+    }
+    if (matchedSet.size < knownArtifactIds.size) {
+      const ledgerFinding = findingsLedger.get(findingId);
+      if (ledgerFinding && Array.isArray(ledgerFinding.evidenceIds)) {
+        const evidenceRefs = uniqueStrings(ledgerFinding.evidenceIds);
+        if (evidenceRefs.length !== ledgerFinding.evidenceIds.length) {
+          ledgerFinding.evidenceIds = evidenceRefs;
+        }
+        for (let i = 0; i < evidenceRefs.length; i++) {
+          const evId = evidenceRefs[i];
+          if (knownArtifactIds.has(evId)) {
+            matchedSet.add(evId);
+            if (matchedSet.size >= knownArtifactIds.size) break;
+          }
+        }
+      }
+    }
+    observedByFinding[findingId] = [...matchedSet];
+  }
+  const typedObserved: ObservedArtifactIds = observedByFinding;
+  body.observedByFinding = typedObserved;
+}
+
+function resolveStagedBlackInput(rawBody: unknown): BlackWorkflowInput {
+  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+    return {};
+  }
+  const body = rawBody as Record<string, unknown>;
+  if (!Array.isArray(body.routeEvidence)) {
+    return body as BlackWorkflowInput;
+  }
+  const resolvedRouteEvidence: RouteEvidence[] = body.routeEvidence.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { pathId: '', evidenceId: '', observed: false };
+    }
+    const rec = item as Record<string, unknown>;
+    const pathId = typeof rec.pathId === 'string' ? rec.pathId : '';
+    const evidenceId = typeof rec.evidenceId === 'string' ? rec.evidenceId.trim() : '';
+    const claimedObserved = rec.observed === true;
+    if (!claimedObserved || !pathId || !evidenceId) {
+      return { pathId, evidenceId, observed: false };
+    }
+    const receipt = observedReceipts.get(evidenceId);
+    const ledgerEntry = evidenceLedger.get(evidenceId);
+    const verifiedByReceipt = Boolean(receipt && receipt.origin === 'observed' && receipt.itemId === pathId);
+    const verifiedByLedger = Boolean(
+      ledgerEntry &&
+      (ledgerEntry.source === 'tool' || ledgerEntry.provenanceStrength === 'replayable' || ledgerEntry.provenanceStrength === 'tool') &&
+      (ledgerEntry.resourceIds.includes(pathId) || ledgerEntry.title.includes(pathId) || ledgerEntry.summary.includes(pathId)),
+    );
+    return {
+      pathId,
+      evidenceId,
+      observed: verifiedByReceipt || verifiedByLedger,
+    };
+  });
+  return {
+    ...(body as BlackWorkflowInput),
+    routeEvidence: resolvedRouteEvidence,
+  };
+}
+
+interface ResolvedWhiteStageBody {
+  roeText: string;
+  actions: ApprovalBearingAction[];
+  meta?: RoeStageMeta;
+}
+
+function resolveStagedWhiteInput(rawBody: unknown): ResolvedWhiteStageBody {
+  const body = (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+    ? rawBody
+    : {}) as Record<string, unknown>;
+  const roeText = typeof body.roeText === 'string' ? body.roeText : (body.roeText as unknown as string);
+  const rawActions = Array.isArray(body.actions) ? (body.actions as ApprovalBearingAction[]) : (body.actions as unknown as ApprovalBearingAction[]);
+  const actions = Array.isArray(rawActions)
+    ? rawActions.map((act) => {
+        if (!act || typeof act !== 'object') return act;
+        const approvalId = typeof act.approvalEvidenceId === 'string' ? act.approvalEvidenceId.trim() : '';
+        if (!approvalId) return act;
+        const approvedReq = approvalRequests.get(approvalId);
+        const receipt = observedReceipts.get(approvalId);
+        const ev = evidenceLedger.get(approvalId);
+        const validApproval = Boolean(
+          (approvedReq && approvedReq.status === 'approved' && (!act.target || approvedReq.target === act.target)) ||
+          (receipt && receipt.origin === 'observed') ||
+          (ev && (ev.type === 'receipt' || ev.provenanceStrength === 'replayable')),
+        );
+        if (validApproval) return act;
+        const copy: ApprovalBearingAction = { ...act };
+        delete copy.approvalEvidenceId;
+        return copy;
+      })
+    : rawActions;
+  return {
+    roeText,
+    actions,
+    meta: body.meta as RoeStageMeta | undefined,
+  };
+}
+
+function extractInlineArtifactRaw(inlineArtifacts: unknown): string | undefined {
+  if (Array.isArray(inlineArtifacts) && inlineArtifacts.length > 0) {
+    const first: unknown = inlineArtifacts[0];
+    if (first && typeof first === 'object') {
+      if ('data' in first && typeof first.data === 'string' && first.data.trim()) {
+        return first.data;
+      }
+      if ('raw' in first && typeof first.raw === 'string' && first.raw.trim()) {
+        return first.raw;
+      }
+    }
+  }
+  if (inlineArtifacts && typeof inlineArtifacts === 'object' && !Array.isArray(inlineArtifacts)) {
+    if ('data' in inlineArtifacts && typeof inlineArtifacts.data === 'string' && inlineArtifacts.data.trim()) {
+      return inlineArtifacts.data;
+    }
+    if ('raw' in inlineArtifacts && typeof inlineArtifacts.raw === 'string' && inlineArtifacts.raw.trim()) {
+      return inlineArtifacts.raw;
+    }
+  }
+  return undefined;
+}
+
+// (teams/blue/workflow.ts runBlueCoverageStage). The body passes straight
+// through: missing artifacts fail closed inside the workflow as
+// insufficient-evidence, never covered. Validation throws answer 400.
+app.post('/api/teams/blue/coverage', (req: Request, res: Response): void => {
+  try {
+    resolveStagedBlueInput(req.body);
+    res.json(redactSecrets(runBlueCoverageStage(req.body)));
+  } catch (err) {
+    res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// POST /api/teams/black/workflow — analysis-only staged workflow
+// (teams/black/workflow.ts runBlackWorkflow). The body IS the workflow input;
+// caller-supplied paths pass through untouched (never defaulted to []).
+app.post('/api/teams/black/workflow', (req: Request, res: Response): void => {
+  const input = resolveStagedBlackInput(req.body);
+  res.json(redactSecrets(runBlackWorkflow(input)));
+});
+
+// POST /api/teams/white/stage — stage an ROE audit without minting a receipt
+// (teams/white/workflow.ts stageRoeAudit). Body: { roeText, actions, meta }.
+// No receipt-mint route lives here: stamps are echoed from caller meta only.
+app.post('/api/teams/white/stage', (req: Request, res: Response): void => {
+  const body = resolveStagedWhiteInput(req.body);
+  res.json(redactSecrets(stageRoeAudit(body.roeText, body.actions, body.meta)));
+});
+
+// GET /api/teams/tools — catalog of registered 4-Hat and shared utility tools
+app.get('/api/teams/tools', (req: Request, res: Response): void => {
+  const hatParam = typeof req.query.hat === 'string' ? req.query.hat.trim() : '';
+  const validHat: ToolHatScope | undefined =
+    hatParam === 'red' || hatParam === 'blue' || hatParam === 'black' || hatParam === 'white' || hatParam === 'shared'
+      ? hatParam
+      : undefined;
+  res.json(redactSecrets({ tools: listRegisteredHatTools(validHat) }));
+});
+
+// POST /api/teams/tools/run — execute a registered 4-Hat or shared utility tool inside runGuardedTool
+app.post('/api/teams/tools/run', async (req: Request, res: Response): Promise<void> => {
+  const body = (req.body ?? {}) as { toolId?: unknown; input?: unknown };
+  const toolId = typeof body.toolId === 'string' ? body.toolId.trim() : '';
+  if (!toolId) {
+    res.status(400).json({ error: 'toolId is required' });
+    return;
+  }
+  const controller = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  const envelope = await executeRegisteredHatTool(toolId, body.input ?? {}, controller.signal);
+  if (res.writableEnded) return;
+  res.status(envelope.error?.code === 'PAYLOAD_CAP_EXCEEDED' ? 413 : 200).json(redactSecrets(envelope));
+});
+
+// GET /api/teams/skills — catalog of composable multi-Hat skills
+app.get('/api/teams/skills', (req: Request, res: Response): void => {
+  const hatParam = typeof req.query.hat === 'string' ? req.query.hat.trim() : '';
+  const validHat: HatDomain | undefined =
+    hatParam === 'red' || hatParam === 'blue' || hatParam === 'black' || hatParam === 'white'
+      ? hatParam
+      : undefined;
+  res.json(redactSecrets({ skills: listComposableSkills(validHat) }));
+});
+
+// POST /api/teams/skills/run — execute a composable multi-Hat skill pipeline
+app.post('/api/teams/skills/run', async (req: Request, res: Response): Promise<void> => {
+  const body = (req.body ?? {}) as { skillId?: unknown; params?: unknown };
+  const skillId = typeof body.skillId === 'string' ? body.skillId.trim() : '';
+  if (!skillId) {
+    res.status(400).json({ error: 'skillId is required' });
+    return;
+  }
+  const params = typeof body.params === 'object' && body.params !== null
+    ? (body.params as Record<string, unknown>)
+    : {};
+  const controller = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  const envelope = await runComposableSkill(skillId, params, controller.signal);
+  if (res.writableEnded) return;
+  res.json(redactSecrets(envelope));
+});
 // POST /api/models — live model list for the Universal API Config panel (#90).
 // POST (not GET) so the browser can pass its own localStorage-held key/baseUrl in the body — the
 // standalone UI holds the key, not the server (consistent with the existing per-request mission key,
@@ -6857,6 +7451,153 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     }
   }
 
+  // Phase 26 tracer — legacy-versus-structured discriminator: the presence of
+  // roleInputs, family, or targetContext flips the branch. inlineArtifacts
+  // alone never flips it (the hunt form already posts it on ordinary starts).
+  const startBody: Record<string, unknown> = req.body as Record<string, unknown>;
+  const structured = isStructuredStart(startBody);
+
+  // Bounded inline artifact on either branch: validated and hashed server-side
+  // BEFORE any mission state exists. Invalid input ends here with 400/413 and
+  // no mission is created.
+  let stagedArtifact: BoundInlineArtifact | undefined;
+  try {
+    stagedArtifact = bindInlineArtifacts(startBody.inlineArtifacts);
+  } catch (e) {
+    if (e instanceof ArtifactValidationError) { res.status(e.status).json({ error: e.message }); return; }
+    throw e;
+  }
+
+  // Structured role-bound start: validate objective, role membership, and
+  // uniqueness before createTempestCommandInstance; 400 names the role.
+  if (structured) {
+    let start;
+    try {
+      start = validateStructuredStart({
+        objective: startBody.objective,
+        operators: startBody.operators,
+        roleInputs: startBody.roleInputs,
+        targetContext: startBody.targetContext,
+        family: startBody.family,
+      });
+    } catch (e) {
+      if (e instanceof StructuredStartError) { res.status(400).json({ error: e.message }); return; }
+      throw e;
+    }
+
+    const structuredTargets: unknown[] = Array.isArray(targets) ? targets : [];
+    if (!start.artifactOnly && structuredTargets.length === 0) {
+      res.status(400).json({ error: 'At least one target required' });
+      return;
+    }
+    for (const target of structuredTargets) {
+      const targetValue = normalizeTargetValue(target);
+      const guard = guardAction(req.body as Record<string, unknown>, 'mission_execution', targetValue, `Start mission ${name} against ${targetValue}`);
+      if (!guard.allowed) { blockForApproval(res, guard); return; }
+    }
+
+    try {
+      const cmd = createTempestCommandInstance(
+        name,
+        effectiveKey,
+        missionLLMConfig.provider,
+        missionLLMConfig.model,
+        missionLLMConfig.baseUrl,
+      );
+
+      // Artifact-only binds bytes, never targets: no local-lab or pending
+      // targets are inserted and generateTasksForTarget is never called here;
+      // the staged hash is consumed in this same synchronous turn, before the
+      // tick interval arms in cmd.start() below.
+      for (const t of structuredTargets) {
+        const host = missionTargetHost(t);
+        if (host.startsWith('http://') || host.startsWith('https://')) {
+          cmd.targetEnv.addTarget(createTargetFromUrl(host));
+        } else if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) {
+          cmd.targetEnv.addTarget(createTargetFromIP(host));
+        } else {
+          cmd.targetEnv.addTarget(createTargetFromUrl(`http://${host}`));
+        }
+      }
+
+      const spawnedOps: Array<{ id: string; callsign: string; archetype: string }> = [];
+      const spawnedRoles: OperatorArchetype[] = [];
+      const unavailable: Array<{ role: string; status: string; runId: string }> = [];
+      for (const role of start.roles) {
+        const callsign = role.charAt(0).toUpperCase() + role.slice(1) + '-1';
+        try {
+          const op = cmd.spawnOperator(callsign, role);
+          spawnedOps.push({ id: op.id, callsign: op.callsign, archetype: role });
+          spawnedRoles.push(role);
+        } catch {
+          // Unregistered hat executor: unavailable with a retained run id —
+          // never model prose as the hat result.
+          unavailable.push({ role, status: 'unavailable', runId: start.runId });
+        }
+      }
+
+      const rawArtifactText = extractInlineArtifactRaw(startBody.inlineArtifacts);
+      const seededTasks = cmd.configureStructuredRun({
+        runId: start.runId,
+        objective: start.objective,
+        roles: spawnedRoles,
+        artifactOnly: start.artifactOnly,
+        stagedArtifact: stagedArtifact ? { ...stagedArtifact, raw: rawArtifactText } : null,
+        roleInputs: startBody.roleInputs,
+        family: startBody.family,
+      });
+
+      const activeMissionId = cmd.mission.getActiveMission()?.id || start.runId;
+      for (const seeded of seededTasks) {
+        recordOperatorTaskRun({
+          id: seeded.id,
+          runId: start.runId,
+          missionId: activeMissionId,
+          specialist: seeded.role,
+          taskId: seeded.id,
+          inputText: `${start.objective}\n${stagedArtifact?.hash ?? ''}\n${seeded.description}`,
+          status: 'pending',
+        });
+      }
+      for (const unavail of unavailable) {
+        recordOperatorTaskRun({
+          id: `${start.runId}:${unavail.role}`,
+          runId: start.runId,
+          missionId: activeMissionId,
+          specialist: unavail.role,
+          taskId: `${start.runId}:${unavail.role}`,
+          inputText: `${start.objective}\n${unavail.role}`,
+          status: 'failed',
+        });
+      }
+
+      cmd.start();
+      broadcastEvent('mission:started', {
+        name,
+        runId: start.runId,
+        targets: structuredTargets.map((t) => missionTargetHost(t)),
+        operators: spawnedOps,
+        timestamp: Date.now(),
+      });
+
+      res.json({
+        success: true,
+        runId: start.runId,
+        missionName: name,
+        objective: start.objective,
+        operators: spawnedOps,
+        ...(unavailable.length > 0 ? { unavailable } : {}),
+        ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
+        targets: cmd.targetEnv.getAllTargets().map(t => ({ id: t.id, address: t.address, type: t.type })),
+        status: cmd.getStatus(),
+      });
+    } catch (error: unknown) {
+      console.error('[purple-team] Structured mission start failed:', error);
+      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to start mission' });
+    }
+    return;
+  }
+
   if (targets.length === 0) {
     res.status(400).json({ error: 'At least one target required' });
     return;
@@ -6875,7 +7616,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     } catch (e) {
       if (e instanceof RepoPathError) { res.status(400).json({ error: `repoPath rejected: ${e.message}` }); return; }
       if (e instanceof RepoCloneError) { res.status(400).json({ error: e.message }); return; }
-      console.error('[T3MP3ST] repo source validation error:', e);
+      console.error('[purple-team] repo source validation error:', e);
       res.status(500).json({ error: 'repo source validation failed' });
       return;
     }
@@ -6915,7 +7656,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
           spawnedOps.push({ id: op.id, callsign: op.callsign, archetype });
         } catch (e: any) {
           // Duplicate callsign — skip
-          console.warn(`[T3MP3ST] Skipping duplicate operator: ${callsign}`);
+          console.warn(`[purple-team] Skipping duplicate operator: ${callsign}`);
         }
       }
     }
@@ -6947,12 +7688,13 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       success: true,
       missionName: name,
       operators: spawnedOps,
+      ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
       targets: cmd.targetEnv.getAllTargets().map(t => ({ id: t.id, address: t.address, type: t.type })),
       status: cmd.getStatus(),
       ...(whitebox ? { whitebox } : {}),
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] Mission start failed:', error);
+    console.error('[purple-team] Mission start failed:', error);
     res.status(500).json({ error: error.message || 'Failed to start mission' });
   } finally {
     repoSource?.cleanup();
@@ -6987,7 +7729,7 @@ app.post('/api/whitebox/analyze', async (req: Request, res: Response): Promise<v
     });
     res.json(result);
   } catch (error: any) {
-    console.error('[T3MP3ST] White-box analysis failed:', error);
+    console.error('[purple-team] White-box analysis failed:', error);
     if (error instanceof RepoPathError || error instanceof RepoCloneError) {
       res.status(400).json({ error: error.message });
       return;
@@ -7030,11 +7772,26 @@ app.post('/api/mission/stop', (_req: Request, res: Response) => {
   }
 
   cmd.stop();
+  for (const row of operatorTaskRuns.values()) {
+    if (row.status === 'pending') {
+      row.status = 'interrupted';
+      row.executionSettled = true;
+      row.updatedAt = nowIso();
+    } else if (row.status === 'running') {
+      row.status = 'interrupted';
+      row.executionSettled = false;
+      row.updatedAt = nowIso();
+    }
+  }
+  schedulePersist('operatorTaskRuns');
   // Stop the General's sitrep interval too — otherwise startMonitoring's setInterval
   // leaks and keeps firing against a dead mission.
   if (activeGeneral) activeGeneral.stopMonitoring();
   broadcastEvent('mission:stopped', { timestamp: Date.now() });
-  res.json({ success: true, message: 'Mission stopped' });
+  // Honest cancellation (Phase 26, AC-FH-020): a transport stop halts the
+  // tick loop — it is never an acknowledged cancel or resume. No cancel
+  // route exists; in-flight work is left interrupted, not acknowledged.
+  res.json({ success: true, message: 'Mission stopped', cancelAcknowledged: false });
 });
 
 /**
@@ -7104,6 +7861,7 @@ app.get('/api/mission/status', (_req: Request, res: Response) => {
     vault: status.vault,
     opsec: status.opsec,
     tasks: status.tasks,
+    operatorTaskRuns: [...operatorTaskRuns.values()].map(r => redactSecrets(r)),
     progress: status.progress,
     findings: findings.map(f => ({
       id: f.id,
@@ -7282,13 +8040,31 @@ app.post('/api/operators/:id/task', async (req: Request, res: Response): Promise
 
   // Execute asynchronously — return immediately with task ID
   const targets = cmd.targetEnv.getAllTargets();
-  if (targets.length === 0) {
+  const requiresTarget = (RED_ARCHETYPES as readonly string[]).includes(operator.archetype);
+  if (targets.length === 0 && requiresTarget) {
     res.status(400).json({ error: 'No targets available for task dispatch' });
     return;
   }
   const target = targets[0];
 
+  recordOperatorTaskRun({
+    id: task.id,
+    runId: task.id,
+    missionId: task.missionId,
+    specialist: operator.archetype,
+    taskId: task.id,
+    inputText: `${taskName}\n${taskDescription}`,
+    status: 'running',
+  });
+
   operator.assignTask(task, target).then((result) => {
+    updateOperatorTaskRunByTaskId(task.id, {
+      status: result.success === false ? 'failed' : 'completed',
+      output: result.output,
+      error: result.error,
+      specialist: operator.archetype,
+      missionId: task.missionId,
+    });
     broadcastEvent('task:completed', {
       taskId: task.id,
       operatorId: operator.id,
@@ -7297,15 +8073,21 @@ app.post('/api/operators/:id/task', async (req: Request, res: Response): Promise
       output: (result.output || '').substring(0, 2000),
       ...(result.findings && { findings: result.findings }),
     });
-  }).catch((error: any) => {
+  }).catch((error: unknown) => {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    updateOperatorTaskRunByTaskId(task.id, {
+      status: 'failed',
+      error: errMsg,
+      specialist: operator.archetype,
+      missionId: task.missionId,
+    });
     broadcastEvent('task:failed', {
       taskId: task.id,
       operatorId: operator.id,
       callsign: operator.callsign,
-      error: error.message,
+      error: errMsg,
     });
   });
-
   res.json({
     success: true,
     taskId: task.id,
@@ -7520,7 +8302,7 @@ function codexUnavailable(res: Response, error: any): void {
     available: false,
     provider: 'codex',
     error: error?.message || 'Codex CLI unavailable',
-    hint: 'Install/login to Codex CLI, then retry. T3MP3ST does not need your account token.',
+    hint: 'Install/login to Codex CLI, then retry. Purple Team does not need your account token.',
   });
 }
 
@@ -7535,7 +8317,7 @@ app.get('/api/codex/status', async (_req: Request, res: Response): Promise<void>
       available: true,
       provider: 'codex',
       authMode: 'local-codex-account',
-      tokenHandling: 'no token is accepted by or returned from T3MP3ST',
+      tokenHandling: 'no token is accepted by or returned from Purple Team',
       command,
       version: stdout.trim(),
       executionMode: 'codex exec --ephemeral --sandbox read-only',
@@ -7667,7 +8449,7 @@ app.post('/api/llm/local', async (req: Request, res: Response): Promise<void> =>
       choices: [{ message: { role: 'assistant', content: result.content } }],
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] /api/llm/chat failed:', error);
+    console.error('[purple-team] /api/llm/chat failed:', error);
     if (!res.headersSent) res.status(502).json({ error: error?.message || 'Local LLM request failed' });
   }
 });
@@ -7736,7 +8518,7 @@ app.post('/api/general/plan', async (req: Request, res: Response): Promise<void>
       missionGate: plan.missionGate,
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] General planning failed:', error);
+    console.error('[purple-team] General planning failed:', error);
     const message = error.message || 'Planning failed';
     res.status(/API key required|Unknown provider|sign-in required/.test(message) ? 400 : 500).json({ error: message });
   }
@@ -7858,7 +8640,7 @@ app.post('/api/general/execute', async (req: Request, res: Response): Promise<vo
       status: cmd.getStatus(),
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] General execution failed:', error);
+    console.error('[purple-team] General execution failed:', error);
     res.status(500).json({ error: error.message || 'Execution failed' });
   }
 });
@@ -8001,7 +8783,7 @@ app.post('/api/general/auto', async (req: Request, res: Response): Promise<void>
       status: cmd.getStatus(),
     });
   } catch (error: any) {
-    console.error('[T3MP3ST] General auto mode failed:', error);
+    console.error('[purple-team] General auto mode failed:', error);
     res.status(500).json({ error: error.message || 'Auto mode failed' });
   }
 });
@@ -8522,7 +9304,7 @@ app.use('/ui', express.static('docs'));
 // =============================================================================
 
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[T3MP3ST] Error:', err);
+  console.error('[purple-team] Error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });
 
@@ -8533,25 +9315,25 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 // Crash net: a stray rejected promise or thrown error must never take the whole
 // server down mid-mission. Log it and keep the process alive.
 process.on('unhandledRejection', (reason) => {
-  console.error('[T3MP3ST] unhandledRejection (process kept alive):', reason instanceof Error ? reason.stack || reason.message : reason);
+  console.error('[purple-team] unhandledRejection (process kept alive):', reason instanceof Error ? reason.stack || reason.message : reason);
 });
 process.on('uncaughtException', (err) => {
-  console.error('[T3MP3ST] uncaughtException (process kept alive):', err instanceof Error ? err.stack || err.message : err);
+  console.error('[purple-team] uncaughtException (process kept alive):', err instanceof Error ? err.stack || err.message : err);
 });
 
 async function startServer() {
   if (!HOST_IS_LOOPBACK && !bearerLoad.ok) {
     const where = bearerLoad.reason === 'unreadable' && bearerLoad.file ? ` (unreadable file ${bearerLoad.file})` : '';
     console.error(
-      `[T3MP3ST] Refusing to bind non-loopback host "${HOST}" without a bearer token${where}. ` +
+      `[purple-team] Refusing to bind non-loopback host "${HOST}" without a bearer token${where}. ` +
       'Set T3MP3ST_BEARER_TOKEN or T3MP3ST_BEARER_TOKEN_FILE and restart.',
     );
     process.exit(1);
   }
   console.log('');
   console.log('╔════════════════════════════════════════════════════════════════╗');
-  console.log('║                     T3MP3ST API Server v2.0                    ║');
-  console.log('║                 Offensive-Security Operations                 ║');
+  console.log('║                  Purple Team API Server v2.0                   ║');
+  console.log('║       Four-hat educational vulnerability AI                    ║');
   console.log('╚════════════════════════════════════════════════════════════════╝');
   console.log('');
 
@@ -8561,11 +9343,11 @@ async function startServer() {
   // BEFORE anything makes outbound calls, so all test/attack fetch() egress is covered.
   const proxyStatus = initProxyFromConfig();
   if (proxyStatus.enabled) {
-    console.log(`[T3MP3ST] Outbound proxy ENABLED → ${proxyStatus.url} (loopback bypassed)`);
+    console.log(`[purple-team] Outbound proxy ENABLED → ${proxyStatus.url} (loopback bypassed)`);
   } else if (proxyStatus.error) {
-    console.warn(`[T3MP3ST] Outbound proxy misconfigured, egress is DIRECT: ${proxyStatus.error}`);
+    console.warn(`[purple-team] Outbound proxy misconfigured, egress is DIRECT: ${proxyStatus.error}`);
   } else {
-    console.log('[T3MP3ST] Outbound proxy disabled — egress from local IP.');
+    console.log('[purple-team] Outbound proxy disabled — egress from local IP.');
   }
 
   llm = await initLLM();
@@ -8584,15 +9366,15 @@ async function startServer() {
   const flushAndExit = (signal: NodeJS.Signals): void => {
     if (shuttingDown) return;
     shuttingDown = true;
-    console.log(`[T3MP3ST] ${signal} received — flushing state, shutting down…`);
+    console.log(`[purple-team] ${signal} received — flushing state, shutting down…`);
     void flushPersist().catch(() => { /* best-effort */ }).finally(() => process.exit(0));
   };
   process.once('SIGTERM', flushAndExit);
   process.once('SIGINT', flushAndExit);
 
   app.listen(Number(PORT), HOST, () => {
-    console.log(`[T3MP3ST] Server running at http://${HOST}:${PORT}`);
-    console.log(`[T3MP3ST] Web UI available at http://${HOST}:${PORT}/ui`);
+    console.log(`[purple-team] Server running at http://${HOST}:${PORT}`);
+    console.log(`[purple-team] Web UI available at http://${HOST}:${PORT}/ui`);
     if (!HOST_IS_LOOPBACK) {
       console.warn('');
       console.warn(`  ⚠️  EXPOSURE WARNING: bound to NON-LOOPBACK host "${HOST}". This API executes`);
@@ -8603,7 +9385,7 @@ async function startServer() {
       console.warn('');
     }
     console.log('');
-    console.log('[T3MP3ST] Mission Dispatch (NEW):');
+    console.log('[purple-team] Mission Dispatch (NEW):');
     console.log('  POST /api/mission/start              - Start mission with real operators');
     console.log('  POST /api/mission/stop               - Stop active mission');
     console.log('  POST /api/mission/pause              - Pause mission');
@@ -8621,7 +9403,7 @@ async function startServer() {
     console.log('  POST /api/operators/:id/task         - Dispatch task to operator');
     console.log('  GET  /api/events                     - SSE real-time event stream');
     console.log('');
-    console.log('[T3MP3ST] Op General (Autonomous Orchestrator):');
+    console.log('[purple-team] Op General (Autonomous Orchestrator):');
     console.log('  POST /api/general/plan              - Plan operation from directive');
     console.log('  POST /api/general/execute            - Execute planned operation');
     console.log('  POST /api/general/auto               - Full auto: plan + execute');
@@ -8630,22 +9412,22 @@ async function startServer() {
     console.log('  POST /api/general/sitrep             - Force situation report');
     console.log('  POST /api/general/assess             - Final strategic assessment');
     console.log('');
-    console.log('[T3MP3ST] Attack Graph (recon-generated, one renderer):');
+    console.log('[purple-team] Attack Graph (recon-generated, one renderer):');
     console.log('  POST /api/attack-graph               - Scaffold a graph for a target (varies by family)');
     console.log('  POST /api/attack-graph/ingest        - Validate a recon-supplied graph');
     console.log('');
-    console.log('[T3MP3ST] The Admiral (conversational intake):');
+    console.log('[purple-team] The Admiral (conversational intake):');
     console.log('  POST /api/admiral/converse           - Talk to the Admiral; it drafts the mission brief');
     console.log('  POST /api/admiral/launch             - Hand the brief to Op General (dry-run plans; live executes)');
     console.log('');
-    console.log('[T3MP3ST] Bounty Platforms:');
+    console.log('[purple-team] Bounty Platforms:');
     console.log('  GET  /api/bounty/platforms           - List supported platforms');
     console.log('  POST /api/bounty/format              - Format finding for a platform');
     console.log('  POST /api/bounty/submit              - Submit report (dry-run default)');
     console.log('  GET  /api/bounty/programs/:platform  - Search programs');
     console.log('  GET  /api/bounty/credentials         - Check configured credentials');
     console.log('');
-    console.log('[T3MP3ST] Payload DB: 200+ payloads | Secret Patterns: 15+ | Privesc: 50+ techniques');
+    console.log('[purple-team] Payload DB: 200+ payloads | Secret Patterns: 15+ | Privesc: 50+ techniques');
     console.log('');
   });
 }

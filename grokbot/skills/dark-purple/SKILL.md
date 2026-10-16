@@ -123,7 +123,7 @@ Off loopback, every curl needs
 
 If the backend is unreachable at any step, say so in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this loop is
+> Purple Team backend unreachable — start it with npm run server; this loop is
 > parked under its mission id and resumes when the backend answers.
 
 — and never present guesses as results. The seat never opens a browser

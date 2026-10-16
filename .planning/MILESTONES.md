@@ -1,5 +1,19 @@
 # Milestones
 
+## v1.5 Four-Hat Runtime Parity (Archived: 2026-10-15)
+
+**Closeout:** `override_closeout`. Owner selected `Accept gaps and archive` on 2026-10-15. Phase 29 verification stays `human_needed`. Audit status `gaps_found`.
+
+**Known gaps:** FH-EXEC-4 unmounted. All 72 AC-FH/NFR-FH rows remain Pending in the archived requirements. No hostile-input matrix. No TaskStore gate transition. Uncommitted rebrand WIP was not included.
+
+**Observed, not acceptance:** `npx vitest run src` 107 files / 1239 tests, exit 0; `npx tsc --noEmit` exit 0. Staged routes fail closed on loopback. Record: `.planning/milestones/v1.5-phases/29-integrated-acceptance-and-governed-closure/29-EVIDENCE.md`.
+
+**Phases archived:** 4 phase directories, 12 plans. Phase 26 and 27 verifications passed. Phase 28 verification passed for staged consumers. Phase 29 was not passed.
+
+**What's next:** `/gsd:new-milestone`. Do not treat this archive as a clean ship of the 72 criteria.
+
+---
+
 ## v1.4 Hardening & Validation (Shipped: 2026-10-13)
 
 **Delivered:** Evidence quality, not capability — v1.3's phases retroactively validated against a frozen boundary, ROE verdicts given provenance, the purple risk signal collapsed to one, ops claims executed for real with receipts, and the lint baseline re-measured and pinned.

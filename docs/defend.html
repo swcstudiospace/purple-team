@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>T3MP3ST — Defend</title>
+<title>Purple Team — Defend</title>
 <link rel="stylesheet" href="assets/tokens.css">
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
 <div class="shell__sidebar" id="sidebar">
-<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">P</span><a class="shell__brand-name" href="overview.html">Purple Team</a></div>
 <button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
 <nav data-shell-nav aria-label="Primary"></nav>
 </div>
@@ -25,11 +25,20 @@
 
 <section class="card" aria-labelledby="coverageTitle">
 <h2 class="card__title" id="coverageTitle">Detection coverage (blue)</h2>
+<style>#coverageBind :focus-visible,#blackReview :focus-visible,#whiteStage :focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>
 <p class="text-secondary">D3FEND-keyed gap matrix over the findings ledger — <span class="mono">GET /api/teams/blue/gaps</span>. Countermeasure ids absent from the vendored ontology are shown as unresolved, never dropped.</p>
 <div class="form-row">
 <div><label class="flabel" for="coverageSel">Coverage</label><select class="form-input" id="coverageSel"><option value="all">all</option><option value="none">none</option><option value="partial">partial</option><option value="covered">covered</option></select></div>
 <div><label class="flabel" for="coverageRefresh">Refresh</label><button class="btn btn--sm" id="coverageRefresh" type="button">Reload gaps</button></div>
 </div>
+<form class="form-row" id="coverageBind" aria-label="Bind an observed artifact to a finding">
+<div><label class="flabel" for="coverageFinding">Finding id</label><input class="form-input" id="coverageFinding" name="findingId" autocomplete="off" required aria-describedby="coverageBindResult"></div>
+<div><label class="flabel" for="coverageArtifact">Artifact id</label><input class="form-input" id="coverageArtifact" name="artifactId" autocomplete="off" required aria-describedby="coverageBindResult"></div>
+<div><label class="flabel" for="coverageFamily">Family</label><input class="form-input" id="coverageFamily" name="family" value="web_api" autocomplete="off" aria-describedby="coverageBindResult"></div>
+<div><label class="flabel" for="coverageBytes">Artifact bytes</label><textarea class="form-input" id="coverageBytes" name="artifactBytes" rows="1" aria-describedby="coverageBindResult"></textarea></div>
+<div><label class="flabel" for="coverageBindSubmit">Score</label><button class="btn btn--sm btn--primary" id="coverageBindSubmit" type="submit">Score artifact</button></div>
+</form>
+<p id="coverageBindResult" class="text-secondary" role="status" aria-live="polite"></p>
 <div data-state-root id="coverageState">
 <div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div><div class="skeleton"></div></div>
 <div data-state="empty" class="st-empty" hidden><p>No coverage rows to show — the findings ledger is empty or nothing matches the filter.</p><a class="btn btn--sm btn--primary" href="overview.html">Run a mission</a></div>
@@ -42,6 +51,12 @@
 <section class="card" aria-labelledby="noiseTitle">
 <h2 class="card__title" id="noiseTitle">Noise budget (black)</h2>
 <p class="text-secondary">Structured noise ledger over the most recent RED plan draft — <span class="mono">GET /api/teams/black/noise</span>. No active draft is an empty, quiet ledger, not an error.</p>
+<form class="form-row" id="blackReview" aria-label="Review a supplied black plan">
+<div><label class="flabel" for="blackActions">Actions</label><input class="form-input" id="blackActions" name="actions" autocomplete="off" placeholder="one action" aria-describedby="blackReviewResult"></div>
+<div><label class="flabel" for="blackPaths">Paths</label><input class="form-input" id="blackPaths" name="paths" autocomplete="off" placeholder="path id" aria-describedby="blackReviewResult"></div>
+<div><label class="flabel" for="blackReviewSubmit">Review</label><button class="btn btn--sm btn--primary" id="blackReviewSubmit" type="submit">Review plan</button></div>
+</form>
+<p id="blackReviewResult" class="text-secondary" role="status" aria-live="polite"></p>
 <div class="card__row" id="noiseSummary" hidden></div>
 <div class="st-warn-box" id="noiseViolations" hidden><p><strong>Doctrine violations.</strong></p><ul class="feed" id="noiseViolationList"></ul></div>
 <div data-state-root id="noiseState">
@@ -56,6 +71,13 @@
 <section class="card" aria-labelledby="chainTitle">
 <h2 class="card__title" id="chainTitle">Evidence chain (white)</h2>
 <p class="text-secondary">Replay-chain audit over the evidence ledger — <span class="mono">GET /api/teams/white/evidence</span>. A link is intact only at tool-grade provenance or better with a replay hook attached.</p>
+<form class="form-row" id="whiteStage" aria-label="Stage ROE text and one action">
+<div><label class="flabel" for="whiteRoe">ROE text</label><input class="form-input" id="whiteRoe" name="roeText" autocomplete="off" required aria-describedby="whiteStageResult"></div>
+<div><label class="flabel" for="whiteAction">Action</label><input class="form-input" id="whiteAction" name="action" autocomplete="off" required aria-describedby="whiteStageResult"></div>
+<div><label class="flabel" for="whiteTarget">Target</label><input class="form-input" id="whiteTarget" name="target" autocomplete="off" aria-describedby="whiteStageResult"></div>
+<div><label class="flabel" for="whiteStageSubmit">Stage</label><button class="btn btn--sm btn--primary" id="whiteStageSubmit" type="submit">Stage ROE</button></div>
+</form>
+<p id="whiteStageResult" class="text-secondary" role="status" aria-live="polite"></p>
 <div class="card__row" id="chainSummary" hidden></div>
 <div data-state-root id="chainState">
 <div data-state="loading" class="st-loading"><div class="skeleton skeleton--title"></div><div class="skeleton skeleton--row"></div></div>
@@ -83,7 +105,7 @@
 </div>
 </section>
 </main>
-<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+<footer class="shell__footer"><span>Purple Team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
 </div>
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
@@ -156,6 +178,64 @@ async function loadCoverage() {
     failState(root, e);
   }
 }
+
+document.getElementById('coverageBind').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var result = document.getElementById('coverageBindResult');
+  var findingId = document.getElementById('coverageFinding').value.trim();
+  var artifactId = document.getElementById('coverageArtifact').value.trim();
+  var family = document.getElementById('coverageFamily').value.trim() || 'web_api';
+  var bytes = document.getElementById('coverageBytes').value;
+  result.textContent = 'Scoring…';
+  try {
+    var scored = await Shell.apiPost('/api/teams/blue/coverage', {
+      runId: 'ui-' + Date.now(),
+      missionId: 'ui-defend',
+      family: family,
+      artifactIds: artifactId ? [artifactId] : [],
+      artifactBytes: bytes,
+      findings: [{ id: findingId }],
+      telemetry: []
+    });
+    var gaps = Array.isArray(scored.gaps) ? scored.gaps : [];
+    var row = gaps.find(function (gap) { return gap.findingId === findingId; });
+    result.textContent = row
+      ? findingId + ' is ' + row.coverage + '. An id list alone is not coverage.'
+      : 'No row returned for ' + findingId + '.';
+  } catch (err) {
+    result.textContent = err && err.message ? err.message : 'Coverage request failed.';
+  }
+});
+
+document.getElementById('blackReview').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var result = document.getElementById('blackReviewResult');
+  var actions = document.getElementById('blackActions').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  var paths = document.getElementById('blackPaths').value.split('\n').map(function (line) { return line.trim(); }).filter(Boolean).map(function (p) { return { id: p, channel: p }; });
+  result.textContent = 'Reviewing…';
+  try {
+    var reviewed = await Shell.apiPost('/api/teams/black/workflow', { actions: actions, paths: paths, egress: [] });
+    result.textContent = 'Black outcome: ' + (reviewed.outcome || 'unknown') + '. Effects: ' + ((reviewed.effects || []).length) + '.';
+  } catch (err) {
+    result.textContent = err && err.message ? err.message : 'Black review failed.';
+  }
+});
+
+document.getElementById('whiteStage').addEventListener('submit', async function (event) {
+  event.preventDefault();
+  var result = document.getElementById('whiteStageResult');
+  result.textContent = 'Staging…';
+  try {
+    var staged = await Shell.apiPost('/api/teams/white/stage', {
+      roeText: document.getElementById('whiteRoe').value,
+      actions: [{ command: document.getElementById('whiteAction').value, target: document.getElementById('whiteTarget').value }]
+    });
+    var verdict = staged && staged.verdicts && staged.verdicts[0] ? staged.verdicts[0].verdict : (staged.ok === false ? 'refused' : 'unknown');
+    result.textContent = 'White standing: ' + verdict + '. An approved flag alone is not a receipt.';
+  } catch (err) {
+    result.textContent = err && err.message ? err.message : 'White stage failed.';
+  }
+});
 
 async function loadNoise() {
   var root = document.getElementById('noiseState');

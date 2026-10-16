@@ -16,6 +16,7 @@
 
 import { detectionGaps, type DetectionGap, type RedFindingShape, type TelemetrySourceShape } from './blue.js';
 import { roeAudit, type AuditedAction, type RoeSpec, type RoeVerdict } from './white.js';
+import type { CoverageGap } from './blue/coverage.js';
 
 /** One white verdict keyed by finding id — the v2 id-keyed correlation input. */
 export interface PurpleVerdictByFinding {
@@ -34,6 +35,8 @@ export interface DarkPurpleSynthesis {
     findingId: string;
     detection: 'none' | 'partial' | 'covered';
     verdict?: string;
+    /** Present only when the joined verdict carried a rationale. */
+    rationale?: string;
     /** Deterministic f(severity, detection coverage, verdict); see the RISK_TIER_* constants. */
     riskTier: PurpleRiskTier;
     residualRisk: string;
@@ -107,7 +110,13 @@ function residualRiskTier(
  */
 export function synthesize(input: {
   findings: Array<{ id: string; title?: string; severity?: string }>;
-  detections: DetectionGap[];
+  /**
+   * Detection standings joined by finding id — DetectionGap rows from the
+   * detection stage or CoverageGap rows from the artifact-bound coverage
+   * stage. Only findingId and coverage are consumed; Purple is not a fifth
+   * hat and never re-derives coverage, it only correlates standings by id.
+   */
+  detections: Array<DetectionGap | Pick<CoverageGap, 'findingId' | 'coverage'>>;
   verdicts: RoeVerdict[];
   verdictsByFinding?: Record<string, PurpleVerdictByFinding>;
 }): DarkPurpleSynthesis {
@@ -120,13 +129,17 @@ export function synthesize(input: {
 
   const coverageMatrix = input.findings.map((finding, index) => {
     const detection = coverageByFinding.get(finding.id) || 'none';
-    const verdict = verdictById
-      ? verdictById[finding.id]?.verdict
-      : input.verdicts[index]?.verdict;
+    const joined = verdictById
+      ? (Object.prototype.hasOwnProperty.call(verdictById, finding.id) ? verdictById[finding.id] : undefined)
+      : input.verdicts[index];
+    const verdict = joined?.verdict;
+    const rationale = joined && 'rationale' in joined && joined.rationale ? joined.rationale : undefined;
     const subject = finding.title ? ` (${finding.title})` : '';
     const riskTier = residualRiskTier(finding.severity, detection, verdict);
     const residualRisk = RISK_PROSE_BY_TIER[riskTier](finding.id, subject);
-    return { findingId: finding.id, detection, verdict, riskTier, residualRisk };
+    return rationale
+      ? { findingId: finding.id, detection, verdict, rationale, riskTier, residualRisk }
+      : { findingId: finding.id, detection, verdict, riskTier, residualRisk };
   });
 
   const unresolved: string[] = [];

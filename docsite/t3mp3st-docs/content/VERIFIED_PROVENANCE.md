@@ -11,7 +11,7 @@ updated: "2026-07-20"
 ---
 # Verified Provenance
 
-T3MP3ST is evidence-first: a finding should say whether it is backed by tool
+Purple Team is evidence-first: a finding should say whether it is backed by tool
 output, context, or only model reasoning.
 
 If the evidence vault says `Provenance: none` or `model-asserted`, the finding is
@@ -23,7 +23,7 @@ operator-supplied artifact backs the claim.
 A finding becomes tool-proven when all of these are true:
 
 - The agent requests an Arsenal tool.
-- T3MP3ST executes that tool through the harness.
+- Purple Team executes that tool through the harness.
 - The returned output is captured as evidence.
 - The finding records the tool name or evidence reference that supports it.
 
@@ -35,7 +35,7 @@ tool-backed evidence.
 For keyless runs, connect a local agent in the War Room Settings first: Claude
 Code, Codex, Hermes, or another supported local-agent backend.
 
-The local agent must request tools through T3MP3ST. If it only writes a final
+The local agent must request tools through Purple Team. If it only writes a final
 answer in prose, the harness has no tool output to attach and findings should stay
 unverified/model-asserted.
 

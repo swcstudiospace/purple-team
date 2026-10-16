@@ -9,9 +9,9 @@ source: "T3MP3ST repository"
 sourcePath: "docs/README.md"
 updated: "2026-07-20"
 ---
-# T3MP3ST Documentation
+# Purple Team Documentation
 
-Start here when you want to install, run, integrate, or contribute to T3MP3ST.
+Start here when you want to install, run, integrate, or contribute to Purple Team.
 
 ## For Operators
 
@@ -43,7 +43,7 @@ npm run docs:serve
 
 | Doc | Use it for |
 |---|---|
-| [Verified Provenance](#verified-provenance) | How T3MP3ST ties findings to tool evidence |
+| [Verified Provenance](#verified-provenance) | How Purple Team ties findings to tool evidence |
 | [XBOW Baseline](#xbow-baseline) | XBEN benchmark notes |
 | [Cybench](#cybench) | Cybench benchmark notes |
 | [Wall Forensics](#wall-forensics) | Per-challenge misses and benchmark analysis |

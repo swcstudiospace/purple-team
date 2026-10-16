@@ -6,7 +6,7 @@
  *
  * @example
  * ```typescript
- * import { createTempest } from 't3mp3st';
+ * import { createTempest } from 'purple-team';
  *
  * const tempest = createTempest({
  *   name: 'Operation Midnight',
@@ -249,6 +249,8 @@ import { LLMBackbone } from './llm/index.js';
 import { getLLMConfig } from './config/index.js';
 import { AgentLoop } from './agent/index.js';
 import { OpGeneral } from './general/index.js';
+import { RED_ARCHETYPES, resolveRunAllowlist } from './teams/contracts.js';
+import { buildSpecialistWorkflowTools } from './teams/skills.js';
 
 // Stubs for advanced modules
 import {
@@ -806,10 +808,11 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     this.ensureMission();
 
     // Reset the seed flag so the first tick generates tasks for targets added
-    // BEFORE start(). A pre-mission target:added event leaves taskSeeded stale-true
-    // (generateTasksForTarget no-ops with no active mission), which would otherwise
-    // skip seeding forever and leave every operator idle.
-    this.taskSeeded = false;
+    // BEFORE start() on legacy runs. Structured launches pre-seed tasks per
+    // selected role via configureStructuredRun() before start().
+    if (!this.structuredRun) {
+      this.taskSeeded = false;
+    }
 
     this.running = true;
     this.paused = false;
@@ -818,12 +821,18 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     // Start tick loop (1 second interval). Catch any tick error so a single bad tick
     // (e.g. a spawn hitting the pool cap) can never take down the whole server process.
     this.tickInterval = setInterval(() => {
-      this.tick().catch(err => console.error('[T3MP3ST] tick error (mission continues):', err instanceof Error ? err.message : err));
+      this.tick().catch(err => console.error('[purple-team] tick error (mission continues):', err instanceof Error ? err.message : err));
     }, 1000);
   }
 
   /**
    * Ensure an active mission exists. Creates and starts one if needed.
+   *
+   * Called only from start(): the tick dispatch path never creates a
+   * mission. The 'pending targets' label is a display fallback for an empty
+   * environment — it is never inserted as an artifact-only target, and the
+   * staged artifact binds before start() in the server handler, consumed in
+   * the same synchronous turn before the tick interval arms.
    */
   private ensureMission(): void {
     if (this.mission.getActiveMission()) return;
@@ -847,11 +856,101 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
 
     this.running = false;
     this.taskSeeded = false;
+    this.structuredRun = false;
+    this.structuredArtifactOnly = false;
     if (this.tickInterval) {
       clearInterval(this.tickInterval);
       this.tickInterval = null;
     }
     this.emit('command:stopped');
+  }
+
+  /**
+   * Configure a structured multi-hat launch before start(): creates and starts
+   * the mission with the submitted objective, binds any staged artifact into
+   * white-box source context, and seeds one Task per selected role.
+   */
+  public configureStructuredRun(options: {
+    runId: string;
+    objective: string;
+    roles: OperatorArchetype[];
+    artifactOnly: boolean;
+    stagedArtifact?: { artifactId: string; hash: string; byteLength: number; raw?: string } | null;
+    roleInputs?: unknown;
+    family?: unknown;
+  }): Array<{ id: string; role: OperatorArchetype; description: string }> {
+    this.structuredRun = true;
+    this.structuredArtifactOnly = options.artifactOnly;
+
+    let activeMission = this.mission.getActiveMission();
+    if (!activeMission) {
+      const created = this.mission.createMission({
+        name: `${this.name} — ${options.objective.slice(0, 60)}`,
+        description: options.objective,
+        objectives: [options.objective],
+      });
+      this.mission.startMission(created.id);
+      activeMission = this.mission.getActiveMission() ?? created;
+    }
+
+    if (options.stagedArtifact?.raw) {
+      this.setWhiteboxSource(options.stagedArtifact.raw);
+    }
+
+    const targets = this.targetEnv.getAllTargets();
+    const targetSummary = targets.length > 0
+      ? `Targets: ${targets.map((t) => t.address).join(', ')}`
+      : 'Target mode: artifact-only';
+    const artifactSummary = options.stagedArtifact
+      ? `Staged artifact: id=${options.stagedArtifact.artifactId} hash=${options.stagedArtifact.hash} (${options.stagedArtifact.byteLength} bytes)`
+      : 'Staged artifact: none';
+    const familySummary = typeof options.family === 'string' && options.family.trim()
+      ? `Family: ${options.family.trim()}`
+      : '';
+
+    const roleInputMap = new Map<string, Record<string, unknown>>();
+    if (Array.isArray(options.roleInputs)) {
+      for (const entry of options.roleInputs) {
+        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+          const rec = entry as Record<string, unknown>;
+          if (typeof rec.archetype === 'string') {
+            roleInputMap.set(rec.archetype, rec);
+          }
+        }
+      }
+    }
+
+    const taskQueue = this.mission.getTaskQueue();
+    const createdTasks: Array<{ id: string; role: OperatorArchetype; description: string }> = [];
+    for (const role of options.roles) {
+      const roleSpec = roleInputMap.get(role);
+      const roleSpecific = roleSpec ? `Role input: ${JSON.stringify(roleSpec)}` : '';
+      const description = [
+        `[Structured Run ${options.runId}] Role: ${role}`,
+        `Objective: ${options.objective}`,
+        targetSummary,
+        artifactSummary,
+        familySummary,
+        roleSpecific,
+      ].filter(Boolean).join('\n');
+      const task: Task = {
+        id: randomUUID(),
+        missionId: activeMission.id,
+        phase: activeMission.currentPhase,
+        name: `${role.toUpperCase()} — ${options.objective.slice(0, 48)}`,
+        description,
+        operatorType: role,
+        status: 'pending',
+        priority: 10,
+        dependencies: [],
+        createdAt: Date.now(),
+      };
+      taskQueue.add(task);
+      createdTasks.push({ id: task.id, role, description });
+    }
+
+    this.taskSeeded = true;
+    return createdTasks;
   }
 
   /**
@@ -922,10 +1021,11 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
 
   /** Track whether we've seeded initial tasks for the current mission */
   private taskSeeded: boolean = false;
+  private structuredRun: boolean = false;
+  private structuredArtifactOnly: boolean = false;
 
   /** Human-readable reason a mission was paused because required work failed. */
   private stallReason: string | null = null;
-
   /**
    * Main tick loop — seeds tasks, dispatches to operators, advances phases
    */
@@ -949,8 +1049,8 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     const taskQueue = this.mission.getTaskQueue();
     if (!taskQueue) return;
 
-    // ── Auto-seed tasks from targets if queue is empty ──
-    if (!this.taskSeeded) {
+    // ── Auto-seed tasks from targets if queue is empty (legacy runs only) ──
+    if (!this.taskSeeded && !this.structuredRun) {
       const targets = this.targetEnv.getAllTargets();
       if (targets.length > 0) {
         for (const target of targets) {
@@ -965,7 +1065,6 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
         }
       }
     }
-
     // ── Backstop: force-resolve any wedged dispatch so the phase can advance ──
     // Runs BEFORE the phase/completion check below so a timed-out task drops out of
     // pendingOrActive/inFlight in the SAME tick it is reaped.
@@ -991,6 +1090,11 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
           (firstError ? ` — ${firstError}` : '');
         this.paused = true;
         this.emit('command:paused');
+        return;
+      }
+
+      if (this.structuredRun) {
+        this.mission.completeMission(mission.id);
         return;
       }
 
@@ -1066,8 +1170,8 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
       // activeDispatches with no completion path to clear it).
       const allTargets = this.targetEnv.getAllTargets();
       const target = allTargets.find(t => task.description.includes(t.address)) || allTargets[0];
-      if (!target) continue; // No targets available — leave task pending, skip dispatch
-
+      const requiresTarget = (RED_ARCHETYPES as readonly string[]).includes(task.operatorType) && !this.structuredArtifactOnly;
+      if (!target && requiresTarget) continue; // No targets available — leave task pending, skip dispatch
       // Dispatch task (fire and forget — don't block the tick loop)
       this.activeDispatches.add(task.id);
       // Record wall-clock start + owning operator so checkDispatchTimeouts() can reap
@@ -1162,7 +1266,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
         : `dispatch timed out after ${Math.round(elapsed / 1000)}s (backstop ${Math.round(this.taskTimeoutMs / 1000)}s)`;
 
       // Clear a CLEAR event/log so a timed-out dispatch is never silent.
-      console.warn(`[T3MP3ST] task ${taskId} force-resolved as timeout — ${reason}`);
+      console.warn(`[purple-team] task ${taskId} force-resolved as timeout — ${reason}`);
 
       // 1) Mark the task failed/timed-out via the queue (idempotent enough: fail()
       //    just stamps status:'failed'; if it somehow already completed, this is a
@@ -1259,6 +1363,31 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     // Attach the agent loop scoped to this archetype's SPECIALIZED role toolkit (defaultTools =
     // the curated per-operator tool allowlist). toolCategories stays as a coarse fallback.
     const profile = ARCHETYPE_PROFILES[archetype];
+    if (!(RED_ARCHETYPES as readonly string[]).includes(archetype)) {
+      let permittedNames: Set<string>;
+      try {
+        permittedNames = new Set(resolveRunAllowlist(archetype, profile.defaultTools));
+      } catch {
+        permittedNames = new Set();
+      }
+      const permittedAdapters = TOOL_ADAPTERS.filter((a) => permittedNames.has(a.id));
+      if (permittedAdapters.length > 0) {
+        const deps = {
+          runSubprocess,
+          isToolAvailable,
+          scopeOk: (target: string) => scopeViolation(this.arsenal.getScope(), { parameters: { target } }) === null,
+          createReportWorkspace: createPrivateReportWorkspace,
+          readToolReport: readPrivateToolReport,
+        };
+        const existing = new Set(this.arsenal.getAllTools().map((t) => t.name));
+        this.arsenal.registerMany(buildAdapterTools(permittedAdapters, deps, existing));
+      }
+      const existingAfterAdapters = new Set(this.arsenal.getAllTools().map((t) => t.name));
+      const workflowTools = buildSpecialistWorkflowTools(permittedNames, existingAfterAdapters);
+      if (workflowTools.length > 0) {
+        this.arsenal.registerMany(workflowTools);
+      }
+    }
     const maxIterations = operatorLLM.getProvider() === 'local-agent'
       ? LOCAL_AGENT_MAX_ITERATIONS
       : DEFAULT_AGENT_MAX_ITERATIONS;
@@ -1267,6 +1396,8 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
       maxTokens: 50000,
       toolCategories: profile.toolCategories,
       tools: profile.defaultTools,
+      role: archetype,
+      redDefaultTools: profile.defaultTools,
     });
     operator.attachArsenal(this.arsenal, agentLoop);
     // [Phase-2] Give the operator the shared board ONLY when swarm coordination is on — so the
@@ -1609,10 +1740,10 @@ export function getBanner(): string {
    ░         ░   ░      ░   ░░          ░   ░  ░  ░    ░
              ░  ░       ░               ░  ░      ░
 
-  T3MP3ST - Tactical Execution Multi-agent Platform
-            for Elite Security Testing
+  Purple Team: a four-hat educational vulnerability AI
+            (Red, Blue, White, Black)
 
-  Multi-Agent Red Team / Penetration Testing Framework
+  Multi-Agent Purple Team / Penetration Testing Framework
 `;
 }
 

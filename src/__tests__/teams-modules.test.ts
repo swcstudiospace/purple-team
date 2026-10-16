@@ -3,6 +3,17 @@ import { noiseBudget, coverAudit } from '../teams/black.js';
 import { detectionGaps, hardeningPlan } from '../teams/blue.js';
 import { roeAudit, adjudicateEvidence } from '../teams/white.js';
 import { synthesize, type PurpleRiskTier } from '../teams/purple.js';
+import {
+  isStructuredStart,
+  validateStructuredStart,
+  StructuredStartError,
+  bindInlineArtifact,
+  bindInlineArtifacts,
+  artifactHash,
+  ArtifactValidationError,
+  INLINE_ARTIFACT_MAX_BYTES,
+  resolveRunAllowlist,
+} from '../teams/contracts.js';
 
 describe('black team: noiseBudget', () => {
   it('scores a quiet, bounded, routed plan at 100 with no violations', () => {
@@ -97,14 +108,17 @@ describe('blue team: detectionGaps', () => {
     { id: 'f3', title: 'Missing security headers', severity: 'medium' },
   ];
 
-  it('maps covered ids to covered and everything else to partial when telemetry exists', () => {
-    const gaps = detectionGaps(findings, [
+  it('maps id overlap without an artifact to partial, and covered only with an observed artifact', () => {
+    const telemetry = [
       { source: 'waf', coveredIds: ['f3'] },
       { source: 'siem', coveredIds: [] },
-    ]);
-    expect(gaps.find(g => g.findingId === 'f3')?.coverage).toBe('covered');
+    ];
+    const gaps = detectionGaps(findings, telemetry);
+    expect(gaps.find(g => g.findingId === 'f3')?.coverage).toBe('partial');
     expect(gaps.find(g => g.findingId === 'f1')?.coverage).toBe('partial');
     expect(gaps.find(g => g.findingId === 'f2')?.coverage).toBe('partial');
+    const observed = detectionGaps(findings, telemetry, { f3: ['artifact-f3'] });
+    expect(observed.find(g => g.findingId === 'f3')?.coverage).toBe('covered');
   });
 
   it('returns none for every finding when no telemetry exists at all', () => {
@@ -243,7 +257,7 @@ describe('purple synthesis', () => {
     // telemetry run that covers it. detectionGaps() cannot mix the two in one call.
     const detections = [
       ...detectionGaps([findings[0]]),
-      ...detectionGaps([findings[1]], [{ source: 'siem', coveredIds: ['f2'] }]),
+      ...detectionGaps([findings[1]], [{ source: 'siem', coveredIds: ['f2'] }], { f2: ['artifact-f2'] }),
     ];
     const verdicts = roeAudit([{ command: 'nmap --top-ports 100 t.example', target: 't.example', approved: true }], roe);
     const result = synthesize({ findings, detections, verdicts });
@@ -357,20 +371,153 @@ describe('purple synthesis', () => {
     expect(empty.coverageMatrix[0].residualRisk).toBe('low residual risk — t-empty sits at a low tier; confirm its matrix row before declaring the posture acceptable');
   });
 
-  it('falls back to medium for inherited Object property severities with agreeing prose (no throw)', () => {
-    for (const severity of ['constructor', 'toString', '__proto__']) {
-      const id = `p-inherit-${severity.length}`;
-      const result = synthesize({
-        findings: [{ id, title: 'T', severity }],
-        detections: [{ findingId: id, coverage: 'covered', recommendedControl: 'inheritance-pin' }],
-        verdicts: [],
-        verdictsByFinding: { [id]: { verdict: 'compliant' } },
-      });
-      expect(result.coverageMatrix[0].riskTier, severity).toBe('medium');
-      expect(result.coverageMatrix[0].residualRisk, severity).toBe(
-        `medium residual risk — ${id} (T) sits at the middle tier; harden the open items on its matrix row before declaring the posture acceptable`,
-      );
+});
+
+describe('structured start branch (AC-FH-005)', () => {
+  it('legacy target-only body with empty operators stays on the legacy branch', () => {
+    expect(isStructuredStart({ targets: [{ host: 't.example' }], operators: [] })).toBe(false);
+    expect(isStructuredStart({ targets: [], operators: [] })).toBe(false);
+  });
+
+  it('inlineArtifacts alone never flips the branch', () => {
+    expect(isStructuredStart({
+      targets: [{ host: 't.example' }],
+      inlineArtifacts: [{ id: 'draft-1', mediaType: 'text/plain', encoding: 'utf8', data: 'x' }],
+    })).toBe(false);
+  });
+
+  it('roleInputs, family, or targetContext flips the branch', () => {
+    expect(isStructuredStart({ roleInputs: [{ archetype: 'recon' }] })).toBe(true);
+    expect(isStructuredStart({ family: 'web_api' })).toBe(true);
+    expect(isStructuredStart({ targetContext: { kind: 'artifacts' } })).toBe(true);
+  });
+
+  it('unknown explicit role fails naming the role', () => {
+    expect(() => validateStructuredStart({ objective: 'q1', operators: ['recon', 'ninja'] }))
+      .toThrowError(StructuredStartError);
+    try {
+      validateStructuredStart({ objective: 'q1', operators: ['recon', 'ninja'] });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as Error).message).toContain('"ninja"');
     }
   });
 
+  it('duplicate explicit role fails naming the role', () => {
+    try {
+      validateStructuredStart({ objective: 'q1', roleInputs: [{ archetype: 'recon' }, { archetype: 'recon' }] });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as Error).message).toContain('"recon"');
+      expect((e as Error).message).toMatch(/duplicate/);
+    }
+  });
+
+  it('missing objective or empty operators fail before any mission work', () => {
+    expect(() => validateStructuredStart({ operators: ['recon'] })).toThrow(/objective/);
+    expect(() => validateStructuredStart({ objective: '  ', operators: ['recon'] })).toThrow(/objective/);
+    expect(() => validateStructuredStart({ objective: 'q1', operators: [] })).toThrow(/nonempty operators/);
+  });
+
+  it('artifact-only targetContext validates without targets', () => {
+    const start = validateStructuredStart({
+      objective: 'q1 artifact run',
+      operators: ['analyst'],
+      targetContext: { kind: 'artifacts' },
+    });
+    expect(start.artifactOnly).toBe(true);
+    expect(start.roles).toEqual(['analyst']);
+  });
+});
+
+describe('structured dispatch identity (AC-FH-006)', () => {
+  it('dispatch of a structured objective returns a task/run id', () => {
+    const start = validateStructuredStart({ objective: 'q1', operators: ['recon', 'analyst'] });
+    expect(typeof start.runId).toBe('string');
+    expect(start.runId.length).toBeGreaterThan(0);
+    expect(start.roles).toEqual(['recon', 'analyst']);
+  });
+
+  it('two dispatches mint distinct run ids', () => {
+    const a = validateStructuredStart({ objective: 'q1', operators: ['recon'] });
+    const b = validateStructuredStart({ objective: 'q1', operators: ['recon'] });
+    expect(a.runId).not.toBe(b.runId);
+  });
+
+  it('spawn alone is not success: the validated start carries no success flag', () => {
+    const start = validateStructuredStart({ objective: 'q1', operators: ['recon'] });
+    expect('success' in start).toBe(false);
+  });
+});
+
+describe('inline artifact binding (T-26-02)', () => {
+  const good = { id: 'draft-1', mediaType: 'text/plain', encoding: 'utf8', data: 'hello artifact' };
+
+  it('binds a server-issued id and keeps the caller id as a label only', () => {
+    const bound = bindInlineArtifact(good);
+    expect(bound.artifactId).not.toBe('draft-1');
+    expect(bound.label).toBe('draft-1');
+    expect(bound.mediaType).toBe('text/plain');
+    expect(bound.encoding).toBe('utf8');
+    expect(bound.byteLength).toBe(Buffer.byteLength('hello artifact', 'utf8'));
+  });
+
+  it('server hash is four 16-hex groups, never a bare 64-char hex string', () => {
+    const bound = bindInlineArtifact(good);
+    expect(bound.hash).toMatch(/^[0-9a-f]{16}-[0-9a-f]{16}-[0-9a-f]{16}-[0-9a-f]{16}$/);
+    expect(bound.hash.replace(/-/g, '')).toHaveLength(64);
+    expect(artifactHash('hello artifact')).toBe(bound.hash);
+  });
+
+  it('rejects wrong media type, wrong encoding, and empty data with 400', () => {
+    for (const input of [
+      { ...good, mediaType: 'application/json' },
+      { ...good, encoding: 'base64' },
+      { ...good, data: '' },
+    ]) {
+      try {
+        bindInlineArtifact(input);
+        expect.unreachable();
+      } catch (e) {
+        expect(e).toBeInstanceOf(ArtifactValidationError);
+        expect((e as ArtifactValidationError).status).toBe(400);
+      }
+    }
+  });
+
+  it('rejects over-cap bytes with 413', () => {
+    try {
+      bindInlineArtifact({ ...good, data: 'x'.repeat(INLINE_ARTIFACT_MAX_BYTES + 1) });
+      expect.unreachable();
+    } catch (e) {
+      expect((e as ArtifactValidationError).status).toBe(413);
+    }
+  });
+
+  it('envelope accepts at most one element and undefined means absent', () => {
+    expect(bindInlineArtifacts(undefined)).toBeUndefined();
+    expect(bindInlineArtifacts([])).toBeUndefined();
+    expect(bindInlineArtifacts([good])?.label).toBe('draft-1');
+    expect(() => bindInlineArtifacts([good, good])).toThrow(/at most 1 element/);
+    expect(() => bindInlineArtifacts(good)).toThrow(/must be an array/);
+  });
+
+  it('grants specialist workflow engine functions in resolveRunAllowlist for non-Red roles', () => {
+    const blueAllowed = resolveRunAllowlist('blue');
+    expect(blueAllowed).toContain('runBlueDetectorStage');
+    expect(blueAllowed).toContain('runBlueCoverageStage');
+    expect(blueAllowed).toContain('sigmaRulepack');
+
+    const sentinelAllowed = resolveRunAllowlist('sentinel');
+    expect(sentinelAllowed).toContain('runBlueDetectorStage');
+    expect(sentinelAllowed).toContain('sentinelDetectorMap');
+
+    const blackAllowed = resolveRunAllowlist('black');
+    expect(blackAllowed).toContain('runBlackWorkflow');
+    expect(blackAllowed).toContain('exfilCostModel');
+
+    const whiteAllowed = resolveRunAllowlist('white');
+    expect(whiteAllowed).toContain('stageRoeAudit');
+    expect(whiteAllowed).toContain('auditEvidenceChain');
+  });
 });

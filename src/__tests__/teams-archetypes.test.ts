@@ -111,3 +111,28 @@ describe('family-team mapping', () => {
     expect(FAMILY_TEAM_MAPPING.blue).toContain('reporting_remediation');
   });
 });
+
+describe('phase 26 family routing without grant change', () => {
+  it('blue is selectable for ai_red_team and agent_warfare without gaining an offensive tool', () => {
+    expect(FAMILY_TEAM_MAPPING.blue).toContain('ai_red_team');
+    expect(FAMILY_TEAM_MAPPING.blue).toContain('agent_warfare');
+    expect(FAMILY_TEAM_MAPPING.black).toContain('ai_red_team');
+    expect(FAMILY_TEAM_MAPPING.black).toContain('agent_warfare');
+    // A family label never grants a tool: blue grants are unchanged
+    // read/inspect-grade ids only.
+    for (const id of teamToolGrants('blue')) {
+      expect(['local_read', 'passive']).toContain(RISK_BY_ID.get(id));
+    }
+  });
+
+  it('blue/white probe-grade profile tools stay denied: profiles are not authority', () => {
+    // The operator defaultTools profiles list probe-grade http_request and
+    // curl_request, but the frozen per-run allowlist resolves from the
+    // catalog grant tables — never from defaultTools.
+    for (const archetype of ['blue', 'white'] as const) {
+      const grants = new Set(teamToolGrants(archetype));
+      expect(grants.has('http_request')).toBe(false);
+      expect(grants.has('curl_request')).toBe(false);
+    }
+  });
+});

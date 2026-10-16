@@ -9,7 +9,7 @@ source: "T3MP3ST repository"
 sourcePath: "docs/API_REFERENCE.md"
 updated: "2026-07-20"
 ---
-# T3MP3ST API Reference
+# Purple Team API Reference
 
 The API server is implemented in `src/server.ts`.
 
@@ -270,7 +270,8 @@ loopback trust as every other route (see Security Model above).
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/teams/tool-grants` | Per-team arsenal grant table (`{ grants: { black, blue, white } }`) |
-| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger |
+| `GET` | `/api/teams/purple/synthesize` | Latest stored synthesis (`{ synthesis, createdAt }`; none stored → `{ synthesis: null }`). Does not write a receipt |
+| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger, store the latest synthesis, and emit `purple.synthesize` (does not mint a receipt) |
 | `GET` | `/api/teams/blue/gaps` | Read-only v2 D3FEND coverage report over the findings ledger (`{ gaps }`, per-gap `unresolvedCountermeasures` surfaced) |
 | `GET` | `/api/teams/blue/hardening` | Read-only severity-tiered hardening plan over the findings ledger (`{ items }`) |
 | `GET` | `/api/teams/blue/rules` | Read-only Sigma rule pack from ledger coverage gaps (`{ rules, yaml }`, experimental rules) |
@@ -281,6 +282,9 @@ loopback trust as every other route (see Security Model above).
 | `PUT` | `/api/teams/white/roe` | Record sanctioned ROE text plus the actions to adjudicate (`{ text, actions }`; `text` capped at 64 KiB utf8 bytes via `Buffer.byteLength`; missing/empty/non-string `text` or non-array `actions` → `400`, oversize text → `413`; stamps monotonic `revision` plus 16-char sha256 `textHash`, answers `200` with `{ revision, textHash, ok, summary }`; replace-latest single slot) |
 | `GET` | `/api/teams/white/evidence` | Read-only replay-chain audit over the receipt ledger (`{ links, intact, broken, summary }`; replayable entries must carry a command/uri hook, duplicate ids break the chain) |
 | `GET` | `/api/teams/white/report-audit` | Read-only findings ↔ evidence coverage audit (`{ findings, reportReady, withGaps, unclaimedEvidence, summary }`; gaps named exactly, unclaimed ledger entries surfaced) |
+| `POST` | `/api/teams/blue/coverage` | Artifact-bound coverage stage. Body requires string `runId`, string `missionId`, family, string `artifactBytes`, string array `artifactIds`, array `findings`, and array `telemetry`. Empty artifact ids or empty `artifactBytes` returns `200` with `status: insufficient-evidence` and does not mark a finding covered. A non-string `artifactBytes` or a non-array `findings` or `telemetry` returns `400`. Does not mint a receipt. |
+| `POST` | `/api/teams/black/workflow` | Analysis-only staged review. Body arrays `actions`, `paths`, and `egress`. Empty actions and empty paths return `200` with `outcome: insufficient` and `effects: []`, not a clean bill. Destructive concealment, an unapproved live probe, and live bulk exfil return `outcome: refused` with `effects: []`. Does not mint a receipt. |
+| `POST` | `/api/teams/white/stage` | Stage an ROE audit without storing a receipt. Body `roeText`, `actions`, optional `meta`. An empty allow-list returns `200` with `ok: false` and `reason: roe-scope-empty` (out of scope). `approved: true` without `approvalEvidenceId` is not a receipt and is not compliant. Does not mint a receipt. |
 
 `POST /api/teams/purple/synthesize` body:
 

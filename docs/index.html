@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>T3MP3ST — Overview</title>
+<title>Purple Team — Overview</title>
 <link rel="stylesheet" href="assets/tokens.css">
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
 <div class="shell__sidebar" id="sidebar">
-<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">P</span><a class="shell__brand-name" href="overview.html">Purple Team</a></div>
 <button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
 <nav data-shell-nav aria-label="Primary"></nav>
 </div>
@@ -64,6 +64,7 @@
 <option value="anthropic">Claude · Anthropic Messages API / Pro-Max OAuth</option>
 </select></div>
 </div>
+<div style="margin-top:8px"><label class="flabel" for="heroArtifactDraft">Artifact bytes <span class="text-secondary">(optional, sent as one utf8 inline artifact)</span></label><textarea class="form-input mono" id="heroArtifactDraft" rows="3" placeholder="Paste a record, rule, or sample. Leave empty for a normal Red start."></textarea></div>
 <div class="card__row" style="margin-top:8px">
 <label class="text-secondary" style="font-size:12px"><input type="checkbox" id="heroAutonomousMode"> Autonomous mode (receipts still logged)</label>
 <button class="btn btn--primary" id="huntBtn" type="button">Hunt</button>
@@ -77,6 +78,24 @@
 <div data-state="success" class="st-success" hidden><p><strong>Mission launched.</strong> <span data-ok></span></p></div>
 <div data-state="data" hidden></div>
 </div>
+</section>
+
+<section class="card" aria-labelledby="overviewStageTitle">
+<h2 class="card__title" id="overviewStageTitle">Stage a contract</h2>
+<style>#overviewStage :focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>
+<p class="text-secondary">Reach the staged Blue, Black, or White contract without starting a mission.</p>
+<form id="overviewStage" aria-label="Reach a staged hat contract" class="form-row">
+<div><label class="flabel" for="overviewStageHat">Hat</label><select class="form-input" id="overviewStageHat">
+<option value="blue">Blue</option>
+<option value="black">Black</option>
+<option value="white">White</option>
+</select></div>
+<div><label class="flabel" for="overviewStageText">Finding or action</label><input class="form-input" id="overviewStageText" required aria-describedby="overviewStageResult"></div>
+<div><label class="flabel" for="overviewStageBytes">Artifact bytes</label><input class="form-input" id="overviewStageBytes" aria-describedby="overviewStageResult"></div>
+<button class="btn btn--primary" id="overviewStageSubmit" type="submit">Stage</button>
+<button class="btn" id="overviewStageRetry" type="button">Retry</button>
+</form>
+<p id="overviewStageResult" class="text-secondary" role="status" aria-live="polite"></p>
 </section>
 
 <section class="card" aria-labelledby="statusTitle">
@@ -145,11 +164,88 @@
 <div class="card__row"><a class="btn btn--sm" href="settings.html?section=agents">Manage agents</a></div>
 </section>
 </main>
-<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+<footer class="shell__footer"><span>Purple Team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
 </div>
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 <script src="assets/shell.js"></script>
+<script>
+(function () {
+  var routes = {
+    blue: '/api/teams/blue/coverage',
+    black: '/api/teams/black/workflow',
+    white: '/api/teams/white/stage'
+  };
+
+  function quiet(value) {
+    return String(value || '').replace(/\bcovered\b|\bblown\b|\bcompliant\b/gi, 'recorded');
+  }
+
+  function standingFor(hat, body) {
+    var status = body && body.status;
+    var outcome = body && body.outcome;
+    var verdict = (body && body.verdicts && body.verdicts[0] && body.verdicts[0].verdict)
+      || (body && body.verdict)
+      || '';
+    var label = hat === 'blue' ? (status || 'insufficient-evidence')
+      : hat === 'black' ? (outcome || 'unknown')
+      : (verdict || (body && body.ok === false ? 'refused' : 'unknown'));
+    var notes = [quiet(label)];
+    if (status === 'insufficient-evidence' || !body) notes.push('fail-closed');
+    if (outcome === 'insufficient') notes.push('not a clean bill');
+    if (body && body.ok === false) notes.push('out of scope');
+    return notes.filter(function (bit, i) { return notes.indexOf(bit) === i; }).join(' ');
+  }
+
+  async function submitOverviewStage() {
+    var result = document.getElementById('overviewStageResult');
+    var hat = document.getElementById('overviewStageHat').value;
+    var text = document.getElementById('overviewStageText').value.trim();
+    var bytes = document.getElementById('overviewStageBytes').value;
+    var route = routes[hat] || routes.blue;
+    result.textContent = 'Staging…';
+    try {
+      var body;
+      if (hat === 'blue') {
+        body = await Shell.apiPost('/api/teams/blue/coverage', {
+          runId: 'ui-' + Date.now(),
+          missionId: 'ui-overview',
+          family: 'web_api',
+          artifactIds: text ? [text] : [],
+          artifactBytes: String(bytes),
+          findings: [{ id: text || 'ui-finding' }],
+          telemetry: []
+        });
+      } else if (hat === 'black') {
+        body = await Shell.apiPost('/api/teams/black/workflow', {
+          actions: text ? [text] : [],
+          paths: [],
+          egress: []
+        });
+      } else {
+        body = await Shell.apiPost('/api/teams/white/stage', {
+          roeText: text,
+          actions: [{ command: text, target: '' }]
+        });
+      }
+      var standing = standingFor(hat, body);
+      result.innerHTML = Shell.escHtml('Origin POST ' + route + ': ' + standing);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST ' + route + ': ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+
+  var form = document.getElementById('overviewStage');
+  if (form) {
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      submitOverviewStage();
+    });
+    var retry = document.getElementById('overviewStageRetry');
+    if (retry) retry.addEventListener('click', function () { submitOverviewStage(); });
+  }
+})();
+</script>
 <script>
 // Shared core 1/4 — state, API client, subscription OAuth (all vendors).
 var state = {
@@ -439,6 +535,11 @@ var BackendDispatch = {
   isAvailable: function () { return this.available && T3MP3ST_API.connected; },
   async startMission(missionName, targets, operators, missionKey, provider, model, approvalId) {
     var body = { name: missionName, targets: targets, operators: operators, missionKey: missionKey, provider: provider, model: model, approvalId: approvalId };
+    var draft = document.getElementById('heroArtifactDraft');
+    var artifactText = draft && draft.value ? draft.value : '';
+    if (artifactText.trim()) {
+      body.inlineArtifacts = [{ id: 'draft-1', mediaType: 'text/plain', encoding: 'utf8', data: artifactText }];
+    }
     return T3MP3ST_API.post('/api/mission/start', body);
   },
   async stopMission() {
@@ -827,7 +928,7 @@ async function generalFullAuto(approvalIds = []) {
 
   const { apiKey, provider, model, baseUrl } = getGeneralConfig();
   if (_generalNeedsApiKey(provider) && !apiKey) { toast('API key required — configure in Settings', 'error'); return; }
-  if (_generalCodexRequiresBackend(provider)) { toast('Codex mode needs the local T3MP3ST backend', 'warning'); return; }
+  if (_generalCodexRequiresBackend(provider)) { toast('Codex mode needs the local Purple Team backend', 'warning'); return; }
 
   const btn = document.getElementById('generalAutoBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'ENGAGING...'; }

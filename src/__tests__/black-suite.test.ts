@@ -9,6 +9,8 @@ import {
 import { structuredNoiseBudget } from '../teams/black/noise.js';
 import { EXFIL_CHANNELS, exfilCostModel } from '../teams/black/exfil.js';
 import { opsecChecklist, opsecReview, OPSEC_PHASES } from '../teams/black/checklist.js';
+import { runBlackWorkflow } from '../teams/black/workflow.js';
+import { BLACK_PROMPTS } from '../prompts/black.js';
 
 describe('black suite: vendored ATT&CK subset integrity', () => {
   it('vendors at least 60 techniques into a complete id-keyed lookup', () => {
@@ -185,5 +187,165 @@ describe('black suite: opsecReview', () => {
     expect(review.phases).toEqual([]);
     expect(review.itemCount).toBe(0);
     expect(review.egressNotes).toEqual([]);
+  });
+});
+
+describe('black suite: empty-plan honesty', () => {
+  it('returns insufficient for an empty plan, never blown and never holds', () => {
+    const result = runBlackWorkflow({ actions: [], paths: [], egress: ['egress.internal:443'] });
+    expect(result.outcome).toBe('insufficient');
+    expect(result.effects).toEqual([]);
+    expect(JSON.stringify(result)).not.toMatch(/blown/);
+    expect(JSON.stringify(result)).not.toMatch(/holds/);
+    expect(result.evidence?.tool).toBe('opsecReview');
+    expect(result.evidence?.inputHash.length).toBeGreaterThan(0);
+  });
+
+  it('returns insufficient for an empty plan with any egress, including none', () => {
+    const result = runBlackWorkflow({ actions: [], egress: [] });
+    expect(result.outcome).toBe('insufficient');
+    expect(result.effects).toEqual([]);
+  });
+
+  it('reports an empty exfil path set as insufficient, not zero-cost feasible', () => {
+    const report = exfilCostModel({ paths: [], egress: ['egress.internal:443'] });
+    expect(report.sufficient).toBe(false);
+    expect(report.paths).toEqual([]);
+    expect(report.totalCost).toBe(0);
+  });
+});
+
+describe('black suite: every supplied path is costed', () => {
+  it('includes every element of the supplied paths array in the cost totals', () => {
+    const report = exfilCostModel({
+      egress: ['egress.internal:443'],
+      paths: [
+        { id: 'p1', channel: 'api-response', volumeMb: 50 },
+        { id: 'p2', channel: 'cloud-storage-put', volumeMb: 150 },
+        { id: 'p3', channel: 'dns-tunnel', volumeMb: 10 },
+      ],
+    });
+    expect(report.sufficient).toBe(true);
+    expect(report.paths).toHaveLength(3);
+    expect(report.paths.map(path => path.pathId)).toEqual(['p1', 'p2', 'p3']);
+    expect(report.totalCost).toBe(report.paths.reduce((sum, path) => sum + path.totalCost, 0));
+    expect(report.totalVolumeMb).toBe(210);
+  });
+});
+
+describe('black suite: route standing without the string-verifies lie', () => {
+  it('yields declared standing for a nonempty egress string, never verified and no egressVerified flag', () => {
+    const report = exfilCostModel({
+      egress: ['egress.internal:443'],
+      paths: [{ id: 'p1', channel: 'api-response', volumeMb: 50 }],
+    });
+    const path = report.paths[0];
+    expect(path.standing).toBe('declared');
+    expect(path.standing).not.toBe('verified');
+    expect(path).not.toHaveProperty('egressVerified');
+    expect(path.routeEvidenceId).toBeUndefined();
+  });
+
+  it('yields modeled standing for the unspecified-channel fallback with a declared string', () => {
+    const report = exfilCostModel({
+      egress: ['egress.internal:443'],
+      paths: [{ id: 'pigeon', channel: 'carrier-pigeon' }],
+    });
+    expect(report.paths[0].standing).toBe('modeled');
+    expect(report.paths[0]).not.toHaveProperty('egressVerified');
+  });
+
+  it('yields unverified standing with no egress declared', () => {
+    const report = exfilCostModel({ egress: [], paths: [{ id: 'p1', channel: 'api-response' }] });
+    expect(report.paths[0].standing).toBe('unverified');
+  });
+
+  it('verifies only with an observed route-evidence id for the same path id', () => {
+    const base = {
+      egress: ['egress.internal:443'],
+      paths: [{ id: 'p1', channel: 'api-response', volumeMb: 10 }],
+    };
+    const without = exfilCostModel(base);
+    expect(without.paths[0].standing).not.toBe('verified');
+    const wrongPath = exfilCostModel({
+      ...base,
+      routeEvidence: [{ pathId: 'other', evidenceId: 'obs-1', observed: true }],
+    });
+    expect(wrongPath.paths[0].standing).not.toBe('verified');
+    const unobserved = exfilCostModel({
+      ...base,
+      routeEvidence: [{ pathId: 'p1', evidenceId: 'obs-1', observed: false }],
+    });
+    expect(unobserved.paths[0].standing).not.toBe('verified');
+    const verified = exfilCostModel({
+      ...base,
+      routeEvidence: [{ pathId: 'p1', evidenceId: 'obs-1', observed: true }],
+    });
+    expect(verified.paths[0].standing).toBe('verified');
+    expect(verified.paths[0].routeEvidenceId).toBe('obs-1');
+  });
+});
+
+describe('black suite: refusal boundary with zero effects', () => {
+  it('refuses destructive concealment with zero effects and a named alternative', () => {
+    const result = runBlackWorkflow({ actions: ['wipe the access logs to cover tracks'], egress: [] });
+    expect(result.outcome).toBe('refused');
+    expect(result.effects).toEqual([]);
+    expect(result.alternative ?? '').toContain('opsecReview');
+  });
+
+  it('refuses unapproved probing with zero effects and a named alternative', () => {
+    const result = runBlackWorkflow({
+      actions: ['run a live port scan against the target range'],
+      egress: [],
+      requestKind: 'live-probe',
+    });
+    expect(result.effects).toEqual([]);
+    expect(result.alternative ?? '').toContain('approved');
+  });
+
+  it('refuses live bulk exfil with zero effects and a named alternative', () => {
+    const result = runBlackWorkflow({
+      actions: ['nmap -sV 10.0.0.5'],
+      egress: [],
+      requestKind: 'live-bulk-exfil',
+    });
+    expect(result.outcome).toBe('refused');
+    expect(result.effects).toEqual([]);
+    expect(result.alternative ?? '').toContain('exfilCostModel');
+  });
+
+  it('refuses route verification without evidence with zero effects and a named alternative', () => {
+    const result = runBlackWorkflow({
+      actions: ['verify the egress route'],
+      egress: ['egress.internal:443'],
+      requestKind: 'verify-route',
+    });
+    expect(result.outcome).toBe('refused');
+    expect(result.effects).toEqual([]);
+    expect(result.alternative ?? '').toContain('route-evidence');
+  });
+
+  it('labels ATT&CK vocabulary hits modeled, never observed', () => {
+    const result = runBlackWorkflow({ actions: ['nmap -sV 10.0.0.5'], egress: ['egress.internal:443'] });
+    expect(result.outcome).toBe('complete');
+    expect(result.provenance).toMatch(/modeled|imported/);
+    expect(result.provenance).not.toMatch(/observed/);
+    expect(result.reason).not.toMatch(/observed/i);
+  });
+});
+
+describe('black suite: dedicated prompts', () => {
+  it('names real workflow exports, grant ids, and analysis-only limits', () => {
+    const all = Object.values(BLACK_PROMPTS).join('\n');
+    for (const name of ['runBlackWorkflow', 'exfilCostModel', 'structuredNoiseBudget', 'opsecReview']) {
+      expect(all).toContain(name);
+    }
+    for (const grant of ['dnsx', 'httpx', 'attack-navigator']) {
+      expect(all).toContain(grant);
+    }
+    for (const limit of ['no destructive concealment', 'no unapproved probing', 'no live bulk exfil', 'no verified egress from a string']) {
+      expect(all.toLowerCase()).toContain(limit);
+    }
   });
 });

@@ -43,6 +43,8 @@ findings ledger:
   experimental Sigma rule per uncovered gap, keyed to its unresolved
   D3FEND countermeasures).
 
+Artifact-bound coverage is a separate call. POST the selected findings and artifact ids to `tempest_blue_coverage` or `http://127.0.0.1:3333/api/teams/blue/coverage`. An id list without an observed artifact is partial, not covered. A missing artifact fails closed.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
@@ -64,7 +66,7 @@ Sigma rule for uncovered ones), and the report pointer
 (`/tempest-report <mission id>`). If the backend is
 unreachable, say so in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this mapping
+> Purple Team backend unreachable — start it with npm run server; this mapping
 > is parked under its mission id and resumes when the backend answers.
 
 — and never present guesses as results. The seat never opens a browser

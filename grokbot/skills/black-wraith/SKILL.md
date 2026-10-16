@@ -39,6 +39,8 @@ planned path costed per channel against the noise budget:
   `pathId`, `channel`, `tier`, `totalCost`, `feasible`, and pressure
   `notes`; envelope `totalVolumeMb`, `totalCost`, `budget`, `within`).
 
+A nonempty egress string is not verified egress. POST the paths to `tempest_black_workflow` or `http://127.0.0.1:3333/api/teams/black/workflow` and relay `declared`, `modeled`, or `unverified` unless the result cites an observed route-evidence id for that path.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
@@ -59,7 +61,7 @@ budget with the `within` standing, and the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this
+> Purple Team backend unreachable — start it with npm run server; this
 > simulation is parked under its mission id and resumes when the backend
 > answers.
 

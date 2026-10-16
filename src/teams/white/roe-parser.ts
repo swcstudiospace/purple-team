@@ -215,11 +215,15 @@ export function parseRoe(text: string): RoeParseResult {
   }
   if (specTargets.length > 0) roe.allowedTargets = specTargets;
 
-  const ok = resolved.length > 0 && unresolved.length === 0;
+  // A spec without scope targets cannot bound any action: roeAudit treats an empty
+  // allowedTargets as unrestricted, so allow-active-only text must not parse as ok.
+  const ok = resolved.length > 0 && unresolved.length === 0 && specTargets.length > 0;
   const summary =
     resolved.length === 0 && unresolved.length === 0
       ? 'no ROE directives found in the text'
-      : `parsed ${resolved.length} directive line(s); ${unresolved.length} line(s) unresolved${ok ? '' : ' — resolve the reported lines before adjudication'}`;
+      : specTargets.length === 0 && unresolved.length === 0
+        ? 'parsed directive line(s) but no scope targets; a spec without scope cannot be adjudicated'
+        : `parsed ${resolved.length} directive line(s); ${unresolved.length} line(s) unresolved${ok ? '' : ' — resolve the reported lines before adjudication'}`;
 
   return { roe, resolved, unresolved, commentLines, ok, summary };
 }

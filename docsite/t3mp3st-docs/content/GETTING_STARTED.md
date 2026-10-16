@@ -9,9 +9,9 @@ source: "T3MP3ST repository"
 sourcePath: "docs/GETTING_STARTED.md"
 updated: "2026-07-20"
 ---
-# Getting Started With T3MP3ST
+# Getting Started With Purple Team
 
-T3MP3ST is a local offensive-security command center for authorized testing. It gives an AI coding agent or LLM-backed operator a UI, API, evidence store, mission model, and tool arsenal. Use it only on systems you own or have explicit written permission to test.
+Purple Team is a local offensive-security command center for authorized testing. It gives an AI coding agent or LLM-backed operator a UI, API, evidence store, mission model, and tool arsenal. Use it only on systems you own or have explicit written permission to test.
 
 ## Requirements
 
@@ -64,7 +64,7 @@ Hosted providers receive the model id, prompts/context, generated output, and
 request metadata needed to serve the request. For Novita, review the current
 [privacy policy](https://novita.ai/legal/privacy-policy) and
 [terms](https://novita.ai/legal/terms-of-service) before sending sensitive
-target data; T3MP3ST does not independently certify it for sensitive workloads.
+target data; Purple Team does not independently certify it for sensitive workloads.
 
 Local/offline example with Ollama:
 
@@ -162,7 +162,7 @@ The updater protects local secrets and run artifacts listed in `scripts/update-p
 
 ## Inference Providers
 
-T3MP3ST accepts hosted keys, local endpoints, and plan sign-ins. `POST
+Purple Team accepts hosted keys, local endpoints, and plan sign-ins. `POST
 `/api/models`` lists models for a provider; mission/general/admiral routes
 take a `provider` field.
 

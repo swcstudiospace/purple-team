@@ -1,6 +1,6 @@
-# T3MP3ST Documentation
+# Purple Team Documentation
 
-Start here when you want to install, run, integrate, or contribute to T3MP3ST.
+Start here when you want to install, run, integrate, or contribute to Purple Team.
 
 ## For Operators
 
@@ -32,7 +32,7 @@ npm run docs:serve
 
 | Doc | Use it for |
 |---|---|
-| [Verified Provenance](VERIFIED_PROVENANCE.md) | How T3MP3ST ties findings to tool evidence |
+| [Verified Provenance](VERIFIED_PROVENANCE.md) | How Purple Team ties findings to tool evidence |
 | [XBOW Baseline](XBOW_BASELINE.md) | XBEN benchmark notes |
 | [Cybench](CYBENCH.md) | Cybench benchmark notes |
 | [Wall Forensics](WALL_FORENSICS.md) | Per-challenge misses and benchmark analysis |

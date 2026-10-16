@@ -13,6 +13,19 @@ run authorized adversarial research with scope receipts, approval gates, and evi
 Every adversarial claim hardens into scoped, receipt-backed, retestable evidence — power without
 provenance is failure.
 
+## Current Milestone: v1.5 Four-Hat Runtime Parity
+
+**Goal:** Preserve Red functionality while making Blue, Black, and White comparably substantive and executable through tools, skills, prompts, mission/MCP integration, and the actual UI.
+
+**Target features:**
+- Runtime-enforced role grants and complete mission support for all four hats and existing specialists.
+- Evidence-bound Blue detector/hardening validation, Black modeled tradecraft/route analysis, and White scope/provenance/dispute adjudication.
+- Substantive role-specific workflows and prompts, callable skills/tool contracts, and attributed runtime-connected UI states.
+- Four-hat parity matrix, Red regression, scope/authorization/error coverage, real localhost/API/browser proof, and audited milestone closure.
+
+**Approved:** User selected Full four-hat parity. Complexity means functional depth, not matching counts.
+**Boundaries:** Keep established analysis-first role doctrine; unrelated v1.4 audit/v2 debt below stays deferred.
+
 ## Next Milestone: v2 (unplanned)
 
 **Candidates recorded at v1.4 close (audit 2026-10-13, owner-accepted):**
@@ -59,7 +72,10 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 
 ### Active
 
-- (none — v1.4 scope delivered; next-milestone candidates recorded above)
+- [ ] Deliver runtime-authoritative four-hat selection, grants, dispatch, and result attribution.
+- [ ] Complete Blue, Black, and White tools, skills, prompts, and evidence/retest workflows at substantive Red parity.
+- [ ] Connect all supported role workflows to the UI, MCP, and mission-local inputs with honest availability/error states.
+- [ ] Verify security boundaries, Red regression, accessibility, and end-to-end behavior before milestone completion.
 
 ### Out of Scope
 

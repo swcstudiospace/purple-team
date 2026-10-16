@@ -44,6 +44,8 @@ parse (each with its reason), and verdicts for any actions on record:
   lines — relay the stamps; with nothing on record it returns the
   honest zeroed parse and derives no verdicts).
 
+A supplied ROE text and action list is staged with `tempest_white_stage` or POST `http://127.0.0.1:3333/api/teams/white/stage`. An empty allow-list is out of scope. `approved: true` without an evidence id is not a receipt.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
@@ -69,7 +71,7 @@ the report pointer
 (`/tempest-report <mission id>`). If the backend is unreachable, say so
 in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this verdict
+> Purple Team backend unreachable — start it with npm run server; this verdict
 > is parked under its mission id and resumes when the backend answers.
 
 — and never present guesses as results. The seat never opens a browser

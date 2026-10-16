@@ -1,6 +1,6 @@
 # Model and Harness Comparisons
 
-T3MP3ST model comparisons are built from committed benchmark receipts. The
+Purple Team model comparisons are built from committed benchmark receipts. The
 matrix command aggregates existing artifacts; it never starts containers,
 calls a model, or contacts a target.
 

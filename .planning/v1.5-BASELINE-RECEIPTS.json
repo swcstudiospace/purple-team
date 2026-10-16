@@ -1,0 +1,554 @@
+{
+  "recordedAt": "2026-10-14T10:27:32.934523+00:00",
+  "reference": "f3fdc3efede534c62bd8a52340e8399236cb00a9",
+  "scope": "Pre-change baseline only; no product implementation or acceptance",
+  "checks": {
+    "testPr": "passed",
+    "vitestTests": 1125,
+    "vitestFiles": 102,
+    "lintErrors": 0,
+    "lintWarnings": 176,
+    "typecheck": "passed",
+    "doctor": {
+      "outcome": "PASS",
+      "passed": 30,
+      "total": 35,
+      "warnings": 5
+    }
+  },
+  "moduleSmoke": {
+    "registeredToolCount": 36,
+    "catalogAdapters": 84,
+    "workflowPromptKeys": [
+      "reconWorkflow",
+      "vulnScanWorkflow",
+      "exploitWorkflow"
+    ],
+    "domainPromptKeys": [
+      "webAppTesting",
+      "apiTesting",
+      "cloudSecurity",
+      "networkPentest"
+    ],
+    "counts": {
+      "red": {
+        "roles": 8,
+        "profileTools": [
+          "api_endpoint_discovery",
+          "base64_decode",
+          "cidr_expand",
+          "clickjacking_test",
+          "cookie_analysis",
+          "cors_check",
+          "csp_analysis",
+          "curl_request",
+          "cve_lookup",
+          "dir_bruteforce",
+          "dns_lookup",
+          "ffuf_fuzz",
+          "hash_crack",
+          "header_analysis",
+          "http_methods_test",
+          "http_request",
+          "jwt_decode",
+          "lfi_test",
+          "network_trace",
+          "nmap_scan",
+          "nuclei_scan",
+          "open_redirect_test",
+          "password_spray",
+          "port_scan",
+          "reverse_dns",
+          "robots_txt_fetch",
+          "sqli_scan",
+          "ssl_scan",
+          "ssti_test",
+          "subdomain_enum",
+          "subdomain_takeover_check",
+          "technology_detect",
+          "url_encode",
+          "version_detect",
+          "whois_lookup",
+          "xss_scan"
+        ],
+        "loadedRolePrompts": 8
+      },
+      "blue": {
+        "roles": 3,
+        "profileTools": [
+          "cidr_expand",
+          "clickjacking_test",
+          "cookie_analysis",
+          "cors_check",
+          "csp_analysis",
+          "curl_request",
+          "cve_lookup",
+          "dns_lookup",
+          "header_analysis",
+          "http_methods_test",
+          "http_request",
+          "open_redirect_test",
+          "robots_txt_fetch",
+          "ssl_scan",
+          "subdomain_enum",
+          "technology_detect",
+          "version_detect",
+          "whois_lookup"
+        ],
+        "loadedRolePrompts": 3
+      },
+      "black": {
+        "roles": 3,
+        "profileTools": [
+          "base64_decode",
+          "cidr_expand",
+          "curl_request",
+          "cve_lookup",
+          "dns_lookup",
+          "header_analysis",
+          "http_request",
+          "jwt_decode",
+          "network_trace",
+          "reverse_dns",
+          "robots_txt_fetch",
+          "ssl_scan",
+          "subdomain_enum",
+          "subdomain_takeover_check",
+          "technology_detect",
+          "url_encode",
+          "version_detect",
+          "whois_lookup"
+        ],
+        "loadedRolePrompts": 3
+      },
+      "white": {
+        "roles": 3,
+        "profileTools": [
+          "base64_decode",
+          "cidr_expand",
+          "cookie_analysis",
+          "csp_analysis",
+          "curl_request",
+          "cve_lookup",
+          "dns_lookup",
+          "header_analysis",
+          "http_request",
+          "jwt_decode",
+          "robots_txt_fetch",
+          "ssl_scan",
+          "technology_detect",
+          "url_encode",
+          "whois_lookup"
+        ],
+        "loadedRolePrompts": 3
+      }
+    },
+    "scopeLookalike": [
+      {
+        "actionIndex": 0,
+        "verdict": "compliant",
+        "rationale": "passive/inspection action within the allowed scope",
+        "conditions": [
+          "attach the execution evidence and approval receipt to the mission ledger"
+        ]
+      }
+    ],
+    "emptySpecter": {
+      "reviews": [],
+      "noise": {
+        "score": 80,
+        "violations": [
+          "no egress routing declared: every action would egress uncontrolled"
+        ]
+      },
+      "realismFlags": [],
+      "verdict": "blown"
+    },
+    "declaredRouteWraith": {
+      "paths": [
+        {
+          "pathId": "p1",
+          "feasible": true,
+          "noiseCost": "low",
+          "pressureNotes": [],
+          "egressVerified": true
+        }
+      ],
+      "budget": {
+        "score": 100,
+        "violations": []
+      },
+      "totalVolumeMb": 50
+    },
+    "overBudgetExfil": {
+      "paths": [
+        {
+          "pathId": "p1",
+          "channel": "api-response",
+          "techniqueId": "T1041",
+          "techniqueName": "Exfiltration Over C2 Channel",
+          "baseCost": 2,
+          "volumeCost": 1,
+          "penalty": 0,
+          "totalCost": 3,
+          "tier": "low",
+          "feasible": true,
+          "notes": []
+        },
+        {
+          "pathId": "p2",
+          "channel": "api-response",
+          "techniqueId": "T1041",
+          "techniqueName": "Exfiltration Over C2 Channel",
+          "baseCost": 2,
+          "volumeCost": 1,
+          "penalty": 0,
+          "totalCost": 3,
+          "tier": "low",
+          "feasible": true,
+          "notes": []
+        },
+        {
+          "pathId": "p3",
+          "channel": "api-response",
+          "techniqueId": "T1041",
+          "techniqueName": "Exfiltration Over C2 Channel",
+          "baseCost": 2,
+          "volumeCost": 1,
+          "penalty": 0,
+          "totalCost": 3,
+          "tier": "low",
+          "feasible": true,
+          "notes": []
+        }
+      ],
+      "totalVolumeMb": 150,
+      "totalCost": 9,
+      "budget": 4,
+      "within": false
+    }
+  },
+  "apiSmoke": {
+    "/health": {
+      "status": 200,
+      "body": {
+        "ok": true,
+        "status": "operational",
+        "mode": "t3mp3st",
+        "organ": "t3mp3st",
+        "version": "0.2.1",
+        "apiVersion": "v1",
+        "llm": {
+          "configured": false,
+          "connected": false,
+          "provider": "openrouter",
+          "model": "anthropic/claude-opus-4.8",
+          "codexAccountMode": "/api/codex/status"
+        },
+        "storage": {
+          "ok": true,
+          "driver": "filesystem",
+          "path": "/tmp/v15-parity-awv9m6bn/state",
+          "stateFile": "/tmp/v15-parity-awv9m6bn/state/state.json",
+          "eventsFile": "/tmp/v15-parity-awv9m6bn/state/events.jsonl"
+        },
+        "mission": {
+          "active": false,
+          "id": null
+        },
+        "events": {
+          "sse": "/api/events",
+          "heartbeat": "heartbeat",
+          "legacyHeartbeat": "ping"
+        },
+        "missionDispatch": true,
+        "approvals": {
+          "endpoint": "/api/approvals",
+          "pending": 0
+        },
+        "resources": {
+          "endpoint": "/api/resource-packs",
+          "packs": 14,
+          "workflowPresets": 5,
+          "promptPacks": 5,
+          "runbooks": 5,
+          "forefrontPressureLanes": 6
+        },
+        "ledgers": {
+          "evidence": 0,
+          "hypotheses": 0,
+          "workOrders": 0,
+          "watchCycles": 0,
+          "findings": 0,
+          "retests": 0
+        },
+        "learning": {
+          "memoryEntries": 0,
+          "memoryProposals": 0,
+          "improvementProposals": 0,
+          "proposalFlow": "/api/learning/run-review -> /api/memory/proposals/:id/accept"
+        },
+        "arsenal": {
+          "total": 84,
+          "commandReady": 69,
+          "catalogOnly": 8,
+          "importOnly": 7,
+          "unmodeled": false,
+          "byExecution": {
+            "safe_command": 35,
+            "receipt_required": 34,
+            "catalog_only": 8,
+            "import_only": 7
+          },
+          "byRisk": {
+            "local_read": 38,
+            "active": 24,
+            "passive": 12,
+            "intrusive": 3,
+            "dangerous": 3,
+            "credential": 4
+          },
+          "byCategory": {
+            "core": 1,
+            "web": 11,
+            "dns": 3,
+            "osint": 4,
+            "network": 2,
+            "vulnerability": 1,
+            "supply_chain": 4,
+            "secrets": 2,
+            "container": 1,
+            "cloud": 9,
+            "ai_agent": 2,
+            "smart_contract": 6,
+            "crypto": 4,
+            "fuzzing": 2,
+            "reverse": 8,
+            "mobile": 8,
+            "forensics": 2,
+            "post_exploitation": 1,
+            "credentials": 2,
+            "detection": 6,
+            "emulation": 2,
+            "governance": 3
+          },
+          "frontierMilestone": 104,
+          "adapterCoverage": 81
+        },
+        "timestamp": "2026-10-14T07:09:08.426Z",
+        "tools_available": 69,
+        "payload_db_size": 88
+      }
+    },
+    "/api/teams/tool-grants": {
+      "status": 200,
+      "body": {
+        "grants": {
+          "black": [
+            "host",
+            "subfinder",
+            "amass",
+            "dnsx",
+            "waybackurls",
+            "wafw00f",
+            "curl",
+            "httpx",
+            "attack-navigator",
+            "caldera"
+          ],
+          "blue": [
+            "file",
+            "yara",
+            "exiftool",
+            "strings",
+            "checksec",
+            "openssl",
+            "gitleaks",
+            "trufflehog",
+            "trivy",
+            "syft",
+            "grype",
+            "osv-scanner",
+            "checkov",
+            "semgrep",
+            "dig",
+            "whois",
+            "sigma",
+            "atomic-red-team",
+            "osquery",
+            "suricata",
+            "d3fend"
+          ],
+          "white": [
+            "file",
+            "yara",
+            "exiftool",
+            "strings",
+            "binwalk",
+            "openssl",
+            "gitleaks",
+            "dig",
+            "whois",
+            "nist-800-115",
+            "ptes",
+            "osstmm"
+          ],
+          "specter": [
+            "host",
+            "subfinder",
+            "dnsx",
+            "waybackurls",
+            "wafw00f"
+          ],
+          "wraith": [
+            "host",
+            "amass",
+            "dnsx",
+            "curl",
+            "httpx"
+          ],
+          "sentinel": [
+            "file",
+            "yara",
+            "strings",
+            "semgrep",
+            "dig",
+            "whois"
+          ],
+          "warden": [
+            "file",
+            "exiftool",
+            "openssl",
+            "gitleaks",
+            "trivy",
+            "grype",
+            "osv-scanner",
+            "checkov"
+          ],
+          "arbiter": [
+            "file",
+            "strings",
+            "openssl",
+            "gitleaks",
+            "dig",
+            "whois"
+          ],
+          "auditor": [
+            "file",
+            "yara",
+            "exiftool",
+            "strings",
+            "binwalk",
+            "openssl"
+          ]
+        }
+      }
+    },
+    "/api/teams/black/exfil": {
+      "status": 200,
+      "body": {
+        "paths": [],
+        "totalVolumeMb": 0,
+        "totalCost": 0,
+        "budget": 10,
+        "within": true
+      }
+    },
+    "/api/teams/blue/gaps": {
+      "status": 200,
+      "body": {
+        "gaps": []
+      }
+    },
+    "/api/teams/white/roe": {
+      "status": 200,
+      "body": {
+        "roe": {},
+        "resolved": [],
+        "unresolved": [],
+        "commentLines": 0,
+        "ok": false,
+        "summary": "no ROE text on record"
+      }
+    }
+  },
+  "operatorPromptRoleCount": 17,
+  "purpleMissingVerdict": {
+    "status": 400,
+    "body": {
+      "error": "findings, detections, and verdicts must each be an array"
+    }
+  },
+  "browser": {
+    "actual": "Owned headless Chrome,real localhost API,no response mocks",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "blueSelection": {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selected": "blue",
+      "rosterRows": 1,
+      "roster": "blue\nBLUE\n\n<role> You are T3MP3ST Blue Operator \u2014 the defender-side detection and hardening specialist working from authorized red-team findings. </ro\n\nEdit",
+      "hatsRows": 2,
+      "hats": "sentinel\nBLUE\n\nBlue-team detection engineering: coverage mapping, detector recommendations, and detection-gap prioritization from red findings\n\nfile, yara, strings, semgrep, dig, whois\n\nDispatch\nEdit\nwarden\nBLUE\n\nBlue-team hardening audit: control verification, misconfiguration review, and prioritized hardening plans\n\nfile, exiftool, openssl, gitleaks, trivy, grype, osv-scanner, checkov\n\nDispatch\nEdit",
+      "rosterSearchLabel": null,
+      "filterOptions": [
+        "all",
+        "black",
+        "blue",
+        "white",
+        "core"
+      ],
+      "buttons": [
+        {
+          "text": "Dispatch",
+          "ariaLabel": null,
+          "dataset": {
+            "dispatch": "sentinel"
+          }
+        },
+        {
+          "text": "Edit",
+          "ariaLabel": null,
+          "dataset": {
+            "hatEdit": "sentinel"
+          }
+        },
+        {
+          "text": "Dispatch",
+          "ariaLabel": null,
+          "dataset": {
+            "dispatch": "warden"
+          }
+        },
+        {
+          "text": "Edit",
+          "ariaLabel": null,
+          "dataset": {
+            "hatEdit": "warden"
+          }
+        }
+      ]
+    },
+    "initialApiBase": "3333 connection-refused,then existing setting configured to38429",
+    "postChangeAcceptance": false
+  },
+  "controller": {
+    "correlation": "1b299db3-62f2-4a31-a133-5bb01be01615",
+    "done": [
+      "T1b29-req",
+      "T1b29-arch",
+      "T1b29-ux"
+    ],
+    "productChanges": false,
+    "gateVerdictsObserved": 0
+  },
+  "contractPins": {
+    "runtime": "69cefa9626dc0b1b111de671234c35fd0d82432bc5157e41e79de619974b07c1",
+    "ux": "9750d3c9a574a6dd2bc7101a2de4dc00d707888f03d79df98f97a801d203249b"
+  }
+}

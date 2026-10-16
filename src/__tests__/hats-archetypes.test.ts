@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { OPERATOR_SYSTEM_PROMPTS } from '../prompts/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants } from '../teams/hats.js';
 import { TEAM_ARCHETYPES, teamToolGrants } from '../teams/index.js';
 import { TOOL_ADAPTERS } from '../arsenal/catalog.js';
+import { TaskQueue } from '../mission/index.js';
+import { KillChainPhase } from '../types/index.js';
 
 const CATALOG_IDS = new Set(TOOL_ADAPTERS.map(adapter => adapter.id));
 const RISK_BY_ID = new Map(TOOL_ADAPTERS.map(adapter => [adapter.id, adapter.risk]));
@@ -40,7 +44,7 @@ describe('hat archetypes', () => {
 
   it('specter prompt carries the covert tradecraft doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.specter;
-    expect(prompt).toContain('T3MP3ST Specter');
+    expect(prompt).toContain('Purple Team Specter');
     expect(prompt).toContain('<specter-doctrine>');
     expect(prompt).toContain('covert tradecraft');
     expect(prompt).toContain("adversary's eyes");
@@ -50,7 +54,7 @@ describe('hat archetypes', () => {
 
   it('wraith prompt carries the exfil-simulation doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.wraith;
-    expect(prompt).toContain('T3MP3ST Wraith');
+    expect(prompt).toContain('Purple Team Wraith');
     expect(prompt).toContain('<wraith-doctrine>');
     expect(prompt).toContain('Exfil-simulation');
     expect(prompt).toContain('noise budget');
@@ -59,7 +63,7 @@ describe('hat archetypes', () => {
 
   it('sentinel prompt carries the detection-engineering doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.sentinel;
-    expect(prompt).toContain('T3MP3ST Sentinel');
+    expect(prompt).toContain('Purple Team Sentinel');
     expect(prompt).toContain('<sentinel-doctrine>');
     expect(prompt).toContain('detection-engineering');
     expect(prompt).toContain('detector recommendation');
@@ -68,7 +72,7 @@ describe('hat archetypes', () => {
 
   it('warden prompt carries the hardening-audit doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.warden;
-    expect(prompt).toContain('T3MP3ST Warden');
+    expect(prompt).toContain('Purple Team Warden');
     expect(prompt).toContain('<warden-doctrine>');
     expect(prompt).toContain('Control verification');
     expect(prompt).toContain('isconfiguration');
@@ -77,7 +81,7 @@ describe('hat archetypes', () => {
 
   it('arbiter prompt carries the ROE-adjudication doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.arbiter;
-    expect(prompt).toContain('T3MP3ST Arbiter');
+    expect(prompt).toContain('Purple Team Arbiter');
     expect(prompt).toContain('<arbiter-doctrine>');
     expect(prompt).toContain('OE adjudication');
     expect(prompt).toContain('compliant / violation / needs_approval');
@@ -87,7 +91,7 @@ describe('hat archetypes', () => {
 
   it('auditor prompt carries the evidence-scoring doctrine markers', () => {
     const prompt = OPERATOR_SYSTEM_PROMPTS.auditor;
-    expect(prompt).toContain('T3MP3ST Auditor');
+    expect(prompt).toContain('Purple Team Auditor');
     expect(prompt).toContain('<auditor-doctrine>');
     expect(prompt).toContain('replayable > tool > context > weak');
     expect(prompt).toContain('confidence');
@@ -138,5 +142,41 @@ describe('hat tool grants', () => {
         expect(white.has(id)).toBe(false);
       }
     }
+  });
+});
+
+describe('phase 26 retained attribution and honest cancellation', () => {
+  it('a late result cannot retarget a task onto another mission id', () => {
+    const queue = new TaskQueue();
+    queue.add({
+      id: 'task-1',
+      missionId: 'mission-a',
+      name: 'probe',
+      description: 'probe target',
+      phase: KillChainPhase.RECON,
+      operatorType: 'recon',
+      status: 'pending',
+      priority: 1,
+      dependencies: [],
+      createdAt: Date.now(),
+    });
+    expect(queue.completeForMission('task-1', 'mission-b', { success: true, output: 'late' })).toBe(false);
+    expect(queue.getTask('task-1')?.status).toBe('pending');
+    expect(queue.completeForMission('task-1', 'mission-a', { success: true, output: 'on time' })).toBe(true);
+    expect(queue.getTask('task-1')?.status).toBe('completed');
+    expect(queue.getTask('task-1')?.missionId).toBe('mission-a');
+  });
+
+  it('stop is never acknowledged as a cancel (source pin)', () => {
+    const src = readFileSync(join(process.cwd(), 'src/server.ts'), 'utf8');
+    expect(src).toContain('cancelAcknowledged: false');
+    expect(src).not.toContain("app.post('/api/mission/cancel'");
+  });
+
+  it('snapshot persists the retained slots behind the secret scrub (source pin)', () => {
+    const src = readFileSync(join(process.cwd(), 'src/server.ts'), 'utf8');
+    expect(src).toContain('observedReceipts: [...observedReceipts.values()]');
+    expect(src).toContain('operatorTaskRuns: [...operatorTaskRuns.values()]');
+    expect(src).toContain('redactSecrets({ ...buildStateSnapshot()');
   });
 });

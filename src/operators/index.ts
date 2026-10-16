@@ -627,7 +627,7 @@ export class OperatorAgent extends EventEmitter<OperatorEvents> {
               `Operator: ${this.callsign} (${this.archetype})\n` +
               `Phase: ${task.phase}\n` +
               `Required capabilities: ${this.profile.capabilities.join(', ')}\n\n` +
-              `To execute this task, configure an LLM provider in your T3MP3ST configuration.`,
+              `To execute this task, configure an LLM provider in your Purple Team configuration.`,
     };
   }
 
@@ -635,9 +635,20 @@ export class OperatorAgent extends EventEmitter<OperatorEvents> {
    * Decompose a failed task into smaller, more tractable subtasks.
    * The operator asks its LLM to break the problem down — this is an
    * internal recovery strategy, never surfaced as a user-facing mode.
+   *
+   * AUTHORITY GATE (Phase 26, AC-FH-011/019/024): denied, invalid,
+   * out-of-scope, unapproved, or unavailable work never enters LLM
+   * decomposition. Task text stays data — grants are never read from task
+   * text, the frozen per-run allowlist (see src/agent/index.ts) remains the
+   * enforcement point, and defaultTools profiles are never authority.
    */
   private async decomposeTask(task: Task, failureReason: string): Promise<Task[]> {
     if (!this.llm) return [];
+    // Authority outcomes never enter LLM decomposition: re-splitting denied,
+    // invalid, out-of-scope, unapproved, or unavailable work would let model
+    // prose re-authorize what the gates refused. Ordinary execution errors
+    // (timeouts, parse failures, tool errors) still decompose.
+    if (/authority\s*denied|not\s*authorized|out[-\s]?of[-\s]?scope|needs[-\s]?approval|unapproved|unavailable|permission\s*denied|forbidden/i.test(failureReason || '')) return [];
     try {
       const prompt = `A task just FAILED. Your job is to decompose it into 2-4 smaller, independent subtasks that are each more likely to succeed.
 

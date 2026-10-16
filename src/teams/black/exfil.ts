@@ -40,12 +40,28 @@ export interface ExfilPathCost {
   tier: 'low' | 'medium' | 'high';
   /** Whether the path is analyzable inside the noise budget at all. */
   feasible: boolean;
+  /** Route standing: declared/modeled/unverified for strings; verified only with observed route evidence. */
+  standing: 'declared' | 'modeled' | 'unverified' | 'verified';
+  /** Evidence id that verified this route, if any. */
+  routeEvidenceId?: string;
   /** Deterministic pressure notes (controls that should fire, gaps exposed). */
   notes: readonly string[];
 }
 
-/** Whole-run egress cost report. */
-export interface ExfilCostReport {
+/** Observed route evidence binding a declared path to a real observation. */
+export interface RouteEvidence {
+  /** Must equal the ExfilPath.id it attests. */
+  pathId: string;
+  /** Id of the observed route-evidence record (empty = no evidence). */
+  evidenceId: string;
+  /** Only an observed record verifies a route; strings never do. */
+  observed: boolean;
+}
+
+ /** Whole-run egress cost report. */
+ export interface ExfilCostReport {
+  /** False when the caller supplied zero paths: cost totals over nothing. */
+  sufficient: boolean;
   paths: readonly ExfilPathCost[];
   totalVolumeMb: number;
   totalCost: number;
@@ -113,18 +129,54 @@ function tierOf(cost: number): ExfilPathCost['tier'] {
   return 'low';
 }
 
+function normalizeExfilPath(raw: ExfilPath | string, index: number): ExfilPath {
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return {
+            id: typeof parsed.id === 'string' && parsed.id.trim() ? parsed.id.trim() : `path-${index + 1}`,
+            ...(typeof parsed.channel === 'string' ? { channel: parsed.channel } : {}),
+            ...(typeof parsed.volumeMb === 'number' ? { volumeMb: parsed.volumeMb } : {}),
+            ...(typeof parsed.encrypted === 'boolean' ? { encrypted: parsed.encrypted } : {}),
+          };
+        }
+      } catch {
+        // fall through to delimited string parsing
+      }
+    }
+    const parts = trimmed.split(/\s*\|\s*/);
+    const id = parts[0] || `path-${index + 1}`;
+    const channel = parts[1] ? parts[1].trim() : (EXFIL_CHANNELS.includes(id) ? id : undefined);
+    const vol = parts[2] !== undefined ? Number(parts[2]) : undefined;
+    return {
+      id,
+      ...(channel ? { channel } : {}),
+      ...(vol !== undefined && !Number.isNaN(vol) ? { volumeMb: vol } : {}),
+    };
+  }
+  return raw;
+}
+
 /**
  * Cost a set of planned exfil paths. Deterministic per path:
  * cost = channel base + ceil(volumeMb/100) + cleartext penalty; tier from the
  * thresholds above; feasible = declared egress AND not high-tier.
+ * Standing: a nonempty egress string is declared (known channel) or modeled
+ * (unspecified-channel fallback), never verified; verified requires an observed
+ * route-evidence id for the same path id. No egress declared is unverified.
  */
 export function exfilCostModel(input: {
-  paths?: readonly ExfilPath[];
+  paths?: readonly (ExfilPath | string)[];
   egress?: readonly string[];
   budget?: number;
+  routeEvidence?: readonly RouteEvidence[];
 }): ExfilCostReport {
-  const paths = input.paths ?? [];
+  const paths = (input.paths ?? []).map((p, idx) => normalizeExfilPath(p, idx));
   const egress = input.egress ?? [];
+  const routeEvidence = input.routeEvidence ?? [];
   const budget = Math.max(1, input.budget ?? EXFIL_BUDGET_DEFAULT);
   const egressDeclared = egress.length > 0;
 
@@ -162,7 +214,19 @@ export function exfilCostModel(input: {
     if (volumeMb === 0) {
       notes.push(`0MB declared on "${path.id}" — cost reflects channel base only; re-cost with real volume`);
     }
-
+    const evidence = routeEvidence.find(
+      record => record.pathId === path.id && record.observed && record.evidenceId.length > 0,
+    );
+    const standing: ExfilPathCost['standing'] = evidence
+      ? 'verified'
+      : !egressDeclared
+        ? 'unverified'
+        : channel === 'unspecified'
+          ? 'modeled'
+          : 'declared';
+    if (!evidence && egressDeclared) {
+      notes.push(`route for "${path.id}" is ${standing}, not verified — a string declares, only observed route evidence verifies`);
+    }
     return {
       pathId: path.id,
       channel,
@@ -174,10 +238,11 @@ export function exfilCostModel(input: {
       totalCost,
       tier,
       feasible: egressDeclared && tier !== 'high',
+      standing,
+      ...(evidence ? { routeEvidenceId: evidence.evidenceId } : {}),
       notes,
     };
   });
-
   const totalCost = costed.reduce((sum, path) => sum + path.totalCost, 0);
-  return { paths: costed, totalVolumeMb, totalCost, budget, within: totalCost <= budget };
+  return { sufficient: costed.length > 0, paths: costed, totalVolumeMb, totalCost, budget, within: totalCost <= budget };
 }

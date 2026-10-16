@@ -133,6 +133,47 @@ export type OperatorArchetype =
   | 'arbiter'
   | 'auditor';
 
+// =============================================================================
+// STRUCTURED MISSION START (Phase 26 tracer DTOs — types only, no behavior)
+// =============================================================================
+
+/** One role entry of a structured launch: roleInputs elements or operators strings. */
+export interface StructuredRoleInput {
+  archetype: OperatorArchetype;
+}
+
+/** One bounded inline artifact element: text/plain, utf8, server-hashed. */
+export interface InlineArtifactInput {
+  id?: string;
+  mediaType: string;
+  encoding: string;
+  data: string;
+}
+
+/** Server-bound artifact receipt: server-issued id plus server-computed hash. */
+export interface BoundInlineArtifact {
+  artifactId: string;
+  label?: string;
+  mediaType: string;
+  encoding: string;
+  byteLength: number;
+  hash: string;
+}
+
+/** Target context discriminator: artifact-only binds bytes, never targets. */
+export interface MissionTargetContext {
+  kind: string;
+}
+
+/** Structured launch body extension for POST /api/mission/start. */
+export interface StructuredMissionStart {
+  objective: string;
+  roleInputs?: Array<StructuredRoleInput | OperatorArchetype>;
+  family?: string;
+  targetContext?: MissionTargetContext;
+  inlineArtifacts?: InlineArtifactInput[];
+}
+
 export type OperatorStatus =
   | 'idle'
   | 'tasked'
@@ -454,6 +495,8 @@ export interface CustomTool {
 export interface ToolParameter {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  /** Optional union of allowed JSON Schema primitive types when a parameter accepts multiple shapes. */
+  allowedTypes?: ReadonlyArray<'string' | 'number' | 'boolean' | 'array' | 'object'>;
   description: string;
   required: boolean;
   default?: unknown;

@@ -8,7 +8,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in T3MP3ST, please report it responsibly:
+If you discover a security vulnerability in Purple Team, please report it responsibly:
 
 1. **Do NOT** open a public GitHub issue for security vulnerabilities.
 2. **Primary channel — GitHub private security advisory.** Open the repository's
@@ -27,7 +27,7 @@ If you discover a security vulnerability in T3MP3ST, please report it responsibl
 
 ### Authorized Use Only
 
-T3MP3ST is a security testing framework designed for **authorized penetration testing and red team operations only**. Before using this tool:
+Purple Team is a security testing framework designed for **authorized penetration testing and red team operations only**. Before using this tool:
 
 - Obtain explicit written authorization from the system owner
 - Define clear scope and rules of engagement
@@ -61,7 +61,7 @@ These payloads are intended for:
 
 ### Data Handling
 
-When using T3MP3ST:
+When using Purple Team:
 
 - Do not exfiltrate real sensitive data
 - Use test/dummy data for demonstrations
@@ -113,7 +113,7 @@ All core arsenal tools perform **real operations** (not simulations):
 
 ## Compliance
 
-T3MP3ST usage should comply with:
+Purple Team usage should comply with:
 
 - Computer Fraud and Abuse Act (CFAA)
 - General Data Protection Regulation (GDPR)

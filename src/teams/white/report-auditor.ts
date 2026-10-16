@@ -43,6 +43,24 @@ export interface FindingAudit {
   title: string;
   severity: FindingShape['severity'];
   status: FindingAuditStatus;
+  /** Where an accepted carrying link came from, when the finding is report-ready. Observed wins when both exist. */
+  acceptedOrigin?: 'observed' | 'claimed' | 'unlabeled';
+  /** Accepted links split by origin and by strength. Present when at least one link is accepted. */
+  acceptedCounts?: { observed: number; claimed: number; unlabeled: number; replayable: number; tool: number };
+  /** Referenced evidence split by presence and ruling. Present when the finding names any evidence. */
+  linkCounts?: { referenced: number; absent: number; insufficient: number; accepted: number };
+  /** Accepted evidence ids with the origin and strength that carried them. */
+  carryingLinks?: Array<{ id: string; origin: 'observed' | 'claimed' | 'unlabeled'; strength: ProvenanceStrength }>;
+  /** Accepted ids that are not replayable, for a high or critical finding. */
+  belowReplayable?: string[];
+  /** Referenced ids that are present but not accepted. */
+  insufficientLinks?: Array<{ id: string; strength: ProvenanceStrength }>;
+  /** Referenced ids that are not in the evidence set. */
+  absentIds?: string[];
+  /** Remediation text that was audited, when the finding supplied one. */
+  recommendedFix?: string;
+  /** Retest criteria that were audited, when the finding supplied any. */
+  acceptanceCriteria?: string[];
   /** One link per referenced evidence id, in reference order. */
   links: FindingEvidenceLink[];
   /** Exactly what blocks the finding from shipping (empty when report-ready). */
@@ -54,6 +72,18 @@ export interface FindingAudit {
 export interface UnclaimedEvidence {
   evidenceId: string;
   reason: string;
+  /** Finding the unclaimed entry names, when it names one. */
+  findingId?: string;
+  /** Resolved strength; omitted when the entry has none. */
+  strength?: ProvenanceStrength;
+  /** Platform ruling for the unclaimed entry. */
+  verdict?: 'accepted' | 'insufficient';
+  title?: string;
+  type?: string;
+  origin?: 'claimed' | 'observed';
+  source?: string;
+  tool?: string;
+  createdAt?: string;
 }
 
 export interface ReportAudit {
@@ -63,6 +93,18 @@ export interface ReportAudit {
   withGaps: number;
   /** Ledger entries no finding claims — coverage checked in the other direction too. */
   unclaimedEvidence: UnclaimedEvidence[];
+  /** Unclaimed entries whose stored origin is observed. */
+  unclaimedObserved: number;
+  /** Unclaimed entries whose stored origin is claimed. */
+  unclaimedClaimed: number;
+  /** Unclaimed entries the platform accepts at tool-grade or better. */
+  unclaimedAccepted: number;
+  /** Report-ready findings with at least one accepted observed link. */
+  readyOnObserved: number;
+  /** Report-ready findings whose accepted links are claimed and none are observed. */
+  readyOnClaimedOnly: number;
+  /** Report-ready findings whose accepted links have no origin label. */
+  readyUnlabeled: number;
   /** One-line operator-readable audit outcome. */
   summary: string;
 }
@@ -87,19 +129,43 @@ export function auditReport(findings: FindingShape[], evidence: LedgerEvidenceSh
     const conditions: string[] = [];
     // Strengths of the accepted links that can actually carry the finding.
     const carrying: ProvenanceStrength[] = [];
+    let acceptedObserved = 0;
+    let acceptedClaimed = 0;
+    let acceptedUnlabeled = 0;
+    let acceptedReplayable = 0;
+    let acceptedTool = 0;
+    let absent = 0;
+    let insufficient = 0;
+    const carryingLinks: Array<{ id: string; origin: 'observed' | 'claimed' | 'unlabeled'; strength: ProvenanceStrength }> = [];
+    const insufficientLinks: Array<{ id: string; strength: ProvenanceStrength }> = [];
+    const absentIds: string[] = [];
 
     for (const evidenceId of finding.evidenceIds) {
       const entry = byId.get(evidenceId);
       if (!entry) {
         links.push({ evidenceId, present: false, verdict: 'absent' });
         gaps.push(`evidence "${evidenceId}" is referenced but absent from the ledger`);
+        absent += 1;
+        absentIds.push(evidenceId);
         continue;
       }
       claimed.add(evidenceId);
       const strength = resolveLedgerStrength(entry);
       const verdict = rulings.get(evidenceId)?.verdict ?? 'insufficient';
       links.push({ evidenceId, present: true, verdict, strength });
-      if (verdict === 'accepted') carrying.push(strength);
+      if (verdict === 'accepted') {
+        carrying.push(strength);
+        const origin = entry.origin === 'observed' ? 'observed' as const : entry.origin === 'claimed' ? 'claimed' as const : 'unlabeled' as const;
+        carryingLinks.push({ id: evidenceId, origin, strength });
+        if (origin === 'observed') acceptedObserved += 1;
+        else if (origin === 'claimed') acceptedClaimed += 1;
+        else acceptedUnlabeled += 1;
+        if (strength === 'replayable') acceptedReplayable += 1;
+        else if (strength === 'tool') acceptedTool += 1;
+      } else {
+        insufficient += 1;
+        insufficientLinks.push({ id: evidenceId, strength });
+      }
     }
 
     if (!finding.evidenceIds.length) {
@@ -116,12 +182,37 @@ export function auditReport(findings: FindingShape[], evidence: LedgerEvidenceSh
     if ((finding.severity === 'high' || finding.severity === 'critical') && !carrying.includes('replayable')) {
       conditions.push(`${finding.severity}-severity claim rests below replayable grade; attach a receipt a third party can re-run`);
     }
+    const belowReplayable = (finding.severity === 'high' || finding.severity === 'critical')
+      ? carryingLinks.filter(link => link.strength !== 'replayable').map(link => link.id)
+      : [];
 
+    const status = gaps.length ? 'coverage_gaps' as const : 'report_ready' as const;
+    const recommendedFix = String(finding.recommendedFix || '').trim();
+    const acceptedTotal = acceptedObserved + acceptedClaimed + acceptedUnlabeled;
+    const acceptedOrigin = acceptedTotal === 0
+      ? undefined
+      : acceptedObserved > 0 ? 'observed' as const : acceptedClaimed > 0 ? 'claimed' as const : 'unlabeled' as const;
+    const acceptedCounts = acceptedTotal === 0 ? undefined : {
+      observed: acceptedObserved,
+      claimed: acceptedClaimed,
+      unlabeled: acceptedUnlabeled,
+      replayable: acceptedReplayable,
+      tool: acceptedTool,
+    };
     return {
       findingId: finding.id,
       title: finding.title,
       severity: finding.severity,
-      status: gaps.length ? 'coverage_gaps' as const : 'report_ready' as const,
+      status,
+      ...(status === 'report_ready' && acceptedOrigin ? { acceptedOrigin } : {}),
+      ...(acceptedCounts ? { acceptedCounts } : {}),
+      ...(finding.evidenceIds.length ? { linkCounts: { referenced: finding.evidenceIds.length, absent, insufficient, accepted: carryingLinks.length } } : {}),
+      ...(carryingLinks.length ? { carryingLinks } : {}),
+      ...(belowReplayable.length ? { belowReplayable } : {}),
+      ...(insufficientLinks.length ? { insufficientLinks } : {}),
+      ...(absentIds.length ? { absentIds } : {}),
+      ...(recommendedFix ? { recommendedFix } : {}),
+      ...(finding.acceptanceCriteria?.length ? { acceptanceCriteria: [...finding.acceptanceCriteria] } : {}),
       links,
       gaps,
       conditions,
@@ -132,6 +223,15 @@ export function auditReport(findings: FindingShape[], evidence: LedgerEvidenceSh
     .filter(entry => !claimed.has(entry.id))
     .map(entry => ({
       evidenceId: entry.id,
+      ...(entry.findingId ? { findingId: entry.findingId } : {}),
+      ...(resolveLedgerStrength(entry) ? { strength: resolveLedgerStrength(entry) } : {}),
+      ...(rulings.get(entry.id)?.verdict ? { verdict: rulings.get(entry.id)?.verdict } : {}),
+      ...(entry.title ? { title: entry.title } : {}),
+      ...(entry.type ? { type: entry.type } : {}),
+      ...(entry.origin ? { origin: entry.origin } : {}),
+      ...(entry.source ? { source: entry.source } : {}),
+      ...(entry.observation?.tool ? { tool: entry.observation.tool } : {}),
+      ...(entry.createdAt ? { createdAt: entry.createdAt } : {}),
       reason:
         entry.findingId && !findings.some(finding => finding.id === entry.findingId)
           ? `references finding "${entry.findingId}", which is not in the audited report`
@@ -144,6 +244,12 @@ export function auditReport(findings: FindingShape[], evidence: LedgerEvidenceSh
     reportReady,
     withGaps: audits.length - reportReady,
     unclaimedEvidence,
+    unclaimedObserved: unclaimedEvidence.filter(entry => entry.origin === 'observed').length,
+    unclaimedClaimed: unclaimedEvidence.filter(entry => entry.origin === 'claimed').length,
+    unclaimedAccepted: unclaimedEvidence.filter(entry => entry.verdict === 'accepted').length,
+    readyOnObserved: audits.filter(audit => audit.acceptedOrigin === 'observed').length,
+    readyOnClaimedOnly: audits.filter(audit => audit.acceptedOrigin === 'claimed').length,
+    readyUnlabeled: audits.filter(audit => audit.acceptedOrigin === 'unlabeled').length,
     summary: `${reportReady}/${audits.length} findings report-ready; ${unclaimedEvidence.length} unclaimed ledger entries`,
   };
 }

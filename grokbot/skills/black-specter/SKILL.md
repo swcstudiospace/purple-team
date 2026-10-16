@@ -44,6 +44,8 @@ into doctrine phases:
   ledger entries — action, matched techniques, cost, rationale — plus
   `total`, `within`, `tier`).
 
+A supplied plan is reviewed with `tempest_black_workflow` or POST `http://127.0.0.1:3333/api/teams/black/workflow`. An empty plan is insufficient, never a clean bill. Destructive concealment, unapproved probing, and live bulk exfiltration refuse with zero effects.
+
 Off loopback, every curl needs
 `-H "Authorization: Bearer $T3MP3ST_BEARER_TOKEN"` (or
 `T3MP3ST_BEARER_TOKEN_FILE`); loopback needs no token.
@@ -66,7 +68,7 @@ the `within`/`tier` standing, and the report pointer
 (`/tempest-report <mission id>`). If the backend is
 unreachable, say so in one line —
 
-> t3mp3st backend unreachable — start it with npm run server; this review
+> Purple Team backend unreachable — start it with npm run server; this review
 > is parked under its mission id and resumes when the backend answers.
 
 — and never present guesses as results. The seat never opens a browser

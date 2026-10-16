@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:,">
-<title>T3MP3ST — Operatives</title>
+<title>Purple Team — Operatives</title>
 <link rel="stylesheet" href="assets/tokens.css">
 </head>
 <body>
 <a class="skip" href="#content">Skip to content</a>
 <div class="shell">
 <div class="shell__sidebar" id="sidebar">
-<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">T</span><a class="shell__brand-name" href="overview.html">T3MP3ST</a></div>
+<div class="shell__brand"><span class="shell__brand-mark" aria-hidden="true">P</span><a class="shell__brand-name" href="overview.html">Purple Team</a></div>
 <button class="btn btn--sm shell__toggle" data-nav-toggle aria-expanded="false" aria-controls="sidebar">Menu</button>
 <nav data-shell-nav aria-label="Primary"></nav>
 </div>
@@ -74,16 +74,47 @@
 </div>
 </section>
 
+<section class="card" aria-labelledby="opStageTitle">
+<h2 class="card__title" id="opStageTitle">Stage review</h2>
+<style>#opBlueStage :focus-visible,#opBlackReview :focus-visible,#opWhiteStage :focus-visible{outline:2px solid currentColor;outline-offset:2px}</style>
+<p class="text-secondary">Submit the same staged contracts the server already exposes. A missing artifact, an empty plan, and an empty allow-list stay fail-closed.</p>
+<form class="form-row" id="opBlueStage" aria-label="Stage a blue coverage review">
+<div><label class="flabel" for="opBlueFinding">Finding id</label><input class="form-input" id="opBlueFinding" name="findingId" autocomplete="off" required aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueArtifact">Artifact id</label><input class="form-input" id="opBlueArtifact" name="artifactId" autocomplete="off" required aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueFamily">Family</label><input class="form-input" id="opBlueFamily" name="family" value="web_api" autocomplete="off" aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueBytes">Artifact bytes (optional; empty fails closed)</label><input class="form-input" id="opBlueBytes" name="artifactBytes" autocomplete="off" aria-describedby="opBlueStageResult"></div>
+<div><label class="flabel" for="opBlueStageSubmit">Score</label><button class="btn btn--sm btn--primary" id="opBlueStageSubmit" type="submit" aria-label="Score">Score artifact</button></div>
+<div><label class="flabel" for="opBlueStageRetry">Retry</label><button class="btn btn--sm" id="opBlueStageRetry" type="button">Retry</button></div>
+</form>
+<p id="opBlueStageResult" class="text-secondary" role="status" aria-live="polite"></p>
+<form class="form-row" id="opBlackReview" aria-label="Review a supplied black plan">
+<div><label class="flabel" for="opBlackActions">Actions</label><input class="form-input" id="opBlackActions" name="actions" autocomplete="off" aria-describedby="opBlackReviewResult"></div>
+<div><label class="flabel" for="opBlackPaths">Paths</label><input class="form-input" id="opBlackPaths" name="paths" autocomplete="off" aria-describedby="opBlackReviewResult"></div>
+<div><label class="flabel" for="opBlackReviewSubmit">Review</label><button class="btn btn--sm btn--primary" id="opBlackReviewSubmit" type="submit">Review plan</button></div>
+<div><label class="flabel" for="opBlackReviewRetry">Retry</label><button class="btn btn--sm" id="opBlackReviewRetry" type="button">Retry</button></div>
+</form>
+<p id="opBlackReviewResult" role="status" aria-live="polite" class="text-secondary"></p>
+<form class="form-row" id="opWhiteStage" aria-label="Stage ROE text and one action">
+<div><label class="flabel" for="opWhiteRoe">ROE text</label><input class="form-input" id="opWhiteRoe" name="roeText" autocomplete="off" required aria-describedby="opWhiteStageResult"></div>
+<div><label class="flabel" for="opWhiteAction">Action</label><input class="form-input" id="opWhiteAction" name="action" autocomplete="off" required aria-describedby="opWhiteStageResult"></div>
+<div><label class="flabel" for="opWhiteTarget">Target</label><input class="form-input" id="opWhiteTarget" name="target" autocomplete="off" aria-describedby="opWhiteStageResult"></div>
+<div><label class="flabel" for="opWhiteStageSubmit">Stage</label><button class="btn btn--sm btn--primary" id="opWhiteStageSubmit" type="submit">Stage ROE</button></div>
+<div><label class="flabel" for="opWhiteStageRetry">Retry</label><button class="btn btn--sm" id="opWhiteStageRetry" type="button">Retry</button></div>
+</form>
+<p id="opWhiteStageResult" role="status" aria-live="polite" class="text-secondary"></p>
+</section>
+
 <section class="card" aria-labelledby="purpleTitle">
 <h2 class="card__title" id="purpleTitle">Dark Purple synthesis</h2>
-<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections, <span class="mono">verdict</span> for ROE verdicts.</p>
+<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections. Verdicts require an explicit finding-to-action mapping (<span class="mono">findingId | verdict | rationale</span>).</p>
 <div class="grid grid--3">
 <div><label class="flabel" for="purpleFindings">Findings</label><textarea class="form-input" id="purpleFindings" placeholder="F-001 | Exposed admin panel | high"></textarea></div>
 <div><label class="flabel" for="purpleDetections">Detections</label><textarea class="form-input" id="purpleDetections" placeholder="F-001 | partial"></textarea></div>
-<div><label class="flabel" for="purpleVerdicts">Verdicts</label><textarea class="form-input" id="purpleVerdicts" placeholder="allow"></textarea></div>
+<div><label class="flabel" for="purpleVerdicts">Verdicts</label><textarea class="form-input" id="purpleVerdicts" placeholder="F-001 | violation | target outside scope"></textarea></div>
 </div>
 <div class="card__row" style="margin-top:8px">
-<button class="btn btn--sm" id="purpleLoad" type="button">Load finding ids from ledger</button>
+<button class="btn btn--sm" id="purpleLoad" type="button">Load ledgers</button>
+<button class="btn btn--sm" id="purpleLatest" type="button">Reload latest</button>
 <button class="btn btn--sm btn--primary" id="purpleRun" type="button">Synthesize</button>
 </div>
 <div data-state-root id="purpleState">
@@ -92,8 +123,9 @@
 <div data-state="error" class="st-error" hidden><p><strong>Synthesis failed.</strong> <span data-err></span></p><button class="btn btn--sm" type="button" data-retry>Retry</button></div>
 <div data-state="success" class="st-success" hidden><p><strong>Synthesis recorded.</strong> <span data-ok></span></p></div>
 <div data-state="data" hidden>
+<p id="purpleSummary" class="text-secondary"></p>
 <h3 class="card__title">Coverage matrix</h3>
-<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Tier</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
+<table class="table" id="coverageTable"><thead><tr><th>Finding</th><th>Detection</th><th>Verdict</th><th>Rationale</th><th>Tier</th><th>Residual risk</th></tr></thead><tbody></tbody></table>
 <h3 class="card__title">Unresolved</h3>
 <ul class="feed" id="unresolvedList"></ul>
 <h3 class="card__title">Next missions</h3>
@@ -102,11 +134,106 @@
 </div>
 </section>
 </main>
-<footer class="shell__footer"><span>T3MP3ST red-team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
+<footer class="shell__footer"><span>Purple Team console</span><span>Static UI — no build step.</span><a href="about.html">About</a></footer>
 </div>
 </div>
 <div class="toast" data-toast role="status" aria-live="polite"></div>
 <script src="assets/shell.js"></script>
+<script>
+(function () {
+  function splitLines(value) {
+    return String(value || '').split('\n').map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+
+  var blueForm = document.getElementById('opBlueStage');
+  async function submitBlue() {
+    var result = document.getElementById('opBlueStageResult');
+    var findingId = document.getElementById('opBlueFinding').value.trim();
+    var artifactId = document.getElementById('opBlueArtifact').value.trim();
+    var family = document.getElementById('opBlueFamily').value.trim() || 'web_api';
+    var bytes = document.getElementById('opBlueBytes').value;
+    result.textContent = 'Scoring…';
+    try {
+      var scored = await Shell.apiPost('/api/teams/blue/coverage', {
+        runId: 'ui-' + Date.now(),
+        missionId: 'ui-operators',
+        family: family,
+        artifactIds: artifactId ? [artifactId] : [],
+        artifactBytes: bytes,
+        findings: [{ id: findingId }],
+        telemetry: []
+      });
+      var status = (scored && scored.status) || 'insufficient-evidence';
+      var limits = scored && Array.isArray(scored.limitations) ? scored.limitations.join(' ') : '';
+      var note = status === 'insufficient-evidence'
+        ? 'fail-closed: ' + (limits || 'missing artifact fails closed')
+        : status + (limits ? '. ' + limits : '');
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/blue/coverage: ' + note);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/blue/coverage: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (blueForm) {
+    blueForm.addEventListener('submit', function (event) { event.preventDefault(); submitBlue(); });
+    var blueRetry = document.getElementById('opBlueStageRetry');
+    if (blueRetry) blueRetry.addEventListener('click', function () { submitBlue(); });
+  }
+
+  var blackForm = document.getElementById('opBlackReview');
+  async function submitBlack() {
+    var result = document.getElementById('opBlackReviewResult');
+    result.textContent = 'Reviewing…';
+    try {
+      var reviewed = await Shell.apiPost('/api/teams/black/workflow', {
+        actions: splitLines(document.getElementById('opBlackActions').value),
+        paths: splitLines(document.getElementById('opBlackPaths').value).map(function (p) { return { id: p, channel: p }; }),
+        egress: []
+      });
+      var outcome = (reviewed && reviewed.outcome) || 'unknown';
+      var effects = (reviewed && reviewed.effects) || [];
+      var text = 'Origin POST /api/teams/black/workflow: ' + outcome + '. Effects: ' + effects.length + '.';
+      if (outcome === 'insufficient') {
+        text += ' ' + ((reviewed && reviewed.reason) || 'missing plan fails closed') + '. not a clean bill.';
+      }
+      result.innerHTML = Shell.escHtml(text);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/black/workflow: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (blackForm) {
+    blackForm.addEventListener('submit', function (event) { event.preventDefault(); submitBlack(); });
+    var blackRetry = document.getElementById('opBlackReviewRetry');
+    if (blackRetry) blackRetry.addEventListener('click', function () { submitBlack(); });
+  }
+
+  var whiteForm = document.getElementById('opWhiteStage');
+  async function submitWhite() {
+    var result = document.getElementById('opWhiteStageResult');
+    result.textContent = 'Staging…';
+    try {
+      var staged = await Shell.apiPost('/api/teams/white/stage', {
+        roeText: document.getElementById('opWhiteRoe').value,
+        actions: [{ command: document.getElementById('opWhiteAction').value, target: document.getElementById('opWhiteTarget').value }]
+      });
+      var verdict = (staged && staged.verdicts && staged.verdicts[0] && staged.verdicts[0].verdict)
+        || (staged && staged.verdict)
+        || (staged && staged.ok === false ? 'refused' : 'unknown');
+      var text = 'Origin POST /api/teams/white/stage: ' + verdict + '. An approved flag alone is not a receipt.';
+      if (staged && staged.ok === false && staged.reason === 'roe-scope-empty') {
+        text += ' out of scope.';
+      }
+      result.innerHTML = Shell.escHtml(text);
+    } catch (err) {
+      result.innerHTML = Shell.escHtml('Origin POST /api/teams/white/stage: ' + (err && err.message ? err.message : 'request failed'));
+    }
+  }
+  if (whiteForm) {
+    whiteForm.addEventListener('submit', function (event) { event.preventDefault(); submitWhite(); });
+    var whiteRetry = document.getElementById('opWhiteStageRetry');
+    if (whiteRetry) whiteRetry.addEventListener('click', function () { submitWhite(); });
+  }
+})();
+</script>
 <script>
 // Operators page: roster (GET /api/operators/prompts), grants, Dark Purple synthesis.
 var TEAM_IDS = ['black', 'blue', 'white'];
@@ -240,6 +367,52 @@ function parseTriple(text) {
   }).filter(function (e) { return e.id; });
 }
 
+function paintSynthesis(synthesis) {
+  var root = document.getElementById('purpleState');
+  var tbody = document.getElementById('coverageTable').querySelector('tbody');
+  if (tbody) {
+    tbody.innerHTML = (synthesis.coverageMatrix || []).map(function (row) {
+      return '<tr><td class="mono">' + Shell.escHtml(row.findingId) + '</td>'
+        + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.detection || 'none') + '</span></td>'
+        + '<td>' + Shell.escHtml(row.verdict || '—') + '</td>'
+        + '<td>' + Shell.escHtml(row.rationale || '—') + '</td>'
+        + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.riskTier || '—') + '</span></td>'
+        + '<td>' + Shell.escHtml(row.residualRisk || '') + '</td></tr>';
+    }).join('');
+  }
+  var ul = document.getElementById('unresolvedList');
+  if (ul) ul.innerHTML = (synthesis.unresolved || []).map(function (id) { return '<li>' + Shell.escHtml(id) + '</li>'; }).join('') || '<li>None — posture holds.</li>';
+  var nm = document.getElementById('nextMissions');
+  if (nm) nm.innerHTML = (synthesis.nextMissions || []).map(function (m) { return '<li>' + Shell.escHtml(m) + '</li>'; }).join('');
+  Shell.showState(root, 'data');
+  var summary = (synthesis.correlation === 'id' ? 'id join' : 'positional join')
+    + ' · ' + (synthesis.unresolved || []).length + ' unresolved · ' + (synthesis.nextMissions || []).length + ' follow-up mission(s).'
+    + ((synthesis.recordedAt || synthesis.createdAt) ? ' · recorded ' + (synthesis.recordedAt || synthesis.createdAt) : '')
+    + (synthesis.evidenceId ? ' · receipt ' + synthesis.evidenceId : '');
+  var summaryEl = document.getElementById('purpleSummary');
+  if (summaryEl) summaryEl.textContent = summary;
+  var okEl = root.querySelector('[data-ok]');
+  if (okEl) okEl.textContent = summary;
+}
+
+async function loadLatestSynthesis() {
+  var root = document.getElementById('purpleState');
+  Shell.showState(root, 'loading');
+  try {
+    var d = await Shell.apiGet('/api/teams/purple/synthesize');
+    if (!d.synthesis) {
+      Shell.showState(root, 'empty');
+      return;
+    }
+    d.synthesis.recordedAt = d.createdAt;
+    paintSynthesis(d.synthesis);
+  } catch (e) {
+    var errEl = root.querySelector('[data-err]');
+    if (errEl) errEl.textContent = e.message || String(e);
+    Shell.showState(root, 'error');
+  }
+}
+
 async function runPurple() {
   var root = document.getElementById('purpleState');
   Shell.showState(root, 'loading');
@@ -253,27 +426,32 @@ async function runPurple() {
     var detections = parseTriple(document.getElementById('purpleDetections').value).map(function (e) {
       return { findingId: e.id, coverage: e.title || 'none' };
     });
-    var verdicts = String(document.getElementById('purpleVerdicts').value || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (v) {
-      return { verdict: v };
+    var verdictLines = String(document.getElementById('purpleVerdicts').value || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (ln) {
+      var parts = ln.split('|').map(function (p) { return p.trim(); });
+      var known = { compliant: true, violation: true, needs_approval: true };
+      if (parts.length >= 2 && parts[0] && known[parts[1]]) return { findingId: parts[0], verdict: parts[1], rationale: parts.slice(2).join(' | ') };
+      return { findingId: '', verdict: parts[0] };
     });
-    var synthesis = await Shell.apiPost('/api/teams/purple/synthesize', { findings: findings, detections: detections, verdicts: verdicts });
-    var tbody = document.getElementById('coverageTable').querySelector('tbody');
-    if (tbody) {
-      tbody.innerHTML = (synthesis.coverageMatrix || []).map(function (row) {
-        return '<tr><td class="mono">' + Shell.escHtml(row.findingId) + '</td>'
-          + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.detection || 'none') + '</span></td>'
-          + '<td>' + Shell.escHtml(row.verdict || '—') + '</td>'
-          + '<td><span class="badge badge--neutral">' + Shell.escHtml(row.riskTier || '—') + '</span></td>'
-          + '<td>' + Shell.escHtml(row.residualRisk || '') + '</td></tr>';
-      }).join('');
+    var keyedCount = verdictLines.filter(function (v) { return v.findingId; }).length;
+    if (verdictLines.length && keyedCount !== verdictLines.length) {
+      Shell.toast('Each verdict line must specify an explicit findingId | verdict mapping', 'error');
+      Shell.showState(root, 'empty');
+      return;
     }
-    var ul = document.getElementById('unresolvedList');
-    if (ul) ul.innerHTML = (synthesis.unresolved || []).map(function (id) { return '<li>' + Shell.escHtml(id) + '</li>'; }).join('') || '<li>None — posture holds.</li>';
-    var nm = document.getElementById('nextMissions');
-    if (nm) nm.innerHTML = (synthesis.nextMissions || []).map(function (m) { return '<li>' + Shell.escHtml(m) + '</li>'; }).join('');
-    Shell.showState(root, 'data');
-    var okEl = root.querySelector('[data-ok]');
-    if (okEl) okEl.textContent = (synthesis.unresolved || []).length + ' unresolved · ' + (synthesis.nextMissions || []).length + ' follow-up mission(s).';
+    var verdicts = verdictLines.map(function (v) {
+      var out = { verdict: v.verdict };
+      if (v.rationale) out.rationale = v.rationale;
+      return out;
+    });
+    var body = { findings: findings, detections: detections, verdicts: verdicts };
+    if (keyedCount) {
+      body.verdictsByFinding = {};
+      verdictLines.forEach(function (v) {
+        body.verdictsByFinding[v.findingId] = v.rationale ? { verdict: v.verdict, rationale: v.rationale } : { verdict: v.verdict };
+      });
+    }
+    var synthesis = await Shell.apiPost('/api/teams/purple/synthesize', body);
+    paintSynthesis(synthesis);
     Shell.toast('Synthesis recorded', 'success');
   } catch (e) {
     var errEl = root.querySelector('[data-err]');
@@ -303,18 +481,48 @@ async function runPurple() {
   document.getElementById('editorReset').addEventListener('click', resetEditor);
   document.getElementById('editorClose').addEventListener('click', function () { document.getElementById('editorCard').hidden = true; });
   document.getElementById('purpleRun').addEventListener('click', runPurple);
+  document.getElementById('purpleLatest').addEventListener('click', loadLatestSynthesis);
+  loadLatestSynthesis();
   document.getElementById('purpleLoad').addEventListener('click', async function () {
+    var notes = [];
     try {
       var d = await Shell.apiGet('/api/findings');
       var arr = Array.isArray(d) ? d : (d.findings || []);
       document.getElementById('purpleFindings').value = arr.map(function (f) { return (f.id || '') + ' | ' + (f.title || '') + ' | ' + (f.severity || ''); }).join('\n');
-      Shell.toast('Loaded ' + arr.length + ' finding(s) from the ledger', 'success');
+      notes.push(arr.length + ' finding(s)');
     } catch (e) {
-      Shell.toast('Ledger load failed: ' + (e.message || e), 'error');
+      Shell.toast('Findings load failed: ' + (e.message || e), 'error');
     }
+    try {
+      var gaps = await Shell.apiGet('/api/teams/blue/gaps');
+      var rows = Array.isArray(gaps.gaps) ? gaps.gaps : [];
+      document.getElementById('purpleDetections').value = rows.map(function (g) { return (g.findingId || '') + ' | ' + (g.coverage || 'none'); }).join('\n');
+      notes.push(rows.length + ' detection(s)');
+    } catch (e) {
+      Shell.toast('Coverage load failed: ' + (e.message || e), 'error');
+    }
+    try {
+      var roe = await Shell.apiGet('/api/teams/white/roe');
+      var verdicts = Array.isArray(roe.verdicts) ? roe.verdicts : [];
+      var keyedVerdicts = verdicts.filter(function (v) { return v && v.findingId && v.verdict; });
+      document.getElementById('purpleVerdicts').value = keyedVerdicts.map(function (v) {
+        return v.findingId + ' | ' + v.verdict + (v.rationale ? ' | ' + v.rationale : '');
+      }).join('\n');
+      notes.push(keyedVerdicts.length + ' mapped verdict(s)' + (verdicts.length > keyedVerdicts.length ? ' (' + (verdicts.length - keyedVerdicts.length) + ' unmapped action verdict(s) require explicit findingId | verdict)' : ''));
+    } catch (e) {
+      Shell.toast('ROE load failed: ' + (e.message || e), 'error');
+    }
+    if (notes.length) Shell.toast('Loaded ' + notes.join(', '), 'success');
   });
-  document.querySelectorAll('#rosterState [data-retry], #grantsState [data-retry], #purpleState [data-retry]').forEach(function (b) {
+  document.querySelectorAll('#rosterState [data-retry], #grantsState [data-retry]').forEach(function (b) {
     b.addEventListener('click', function () { loadRoster(); loadGrants(); });
+  });
+  document.querySelectorAll('#purpleState [data-retry]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var state = b.closest('[data-state]');
+      if (state && state.getAttribute('data-state') === 'error') loadLatestSynthesis();
+      else document.getElementById('purpleLoad').click();
+    });
   });
   Shell.params.onRestore(function () {
     var nq = Shell.params.get();

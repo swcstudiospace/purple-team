@@ -1,4 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { Arsenal } from '../arsenal/index.js';
+import { createAgentLoop } from '../agent/index.js';
+import type { LLMBackbone } from '../llm/index.js';
+import type { CustomTool, LLMResponse, LLMToolCall, Task, ToolContext } from '../types/index.js';
+import { KillChainPhase } from '../types/index.js';
+import {
+  validateStructuredStart,
+  resolveRunAllowlist,
+  RED_WORKFLOW_INVENTORY,
+} from '../teams/contracts.js';
 import { noiseBudget, coverAudit } from '../teams/black.js';
 import { detectionGaps, hardeningPlan } from '../teams/blue.js';
 import { roeAudit, adjudicateEvidence } from '../teams/white.js';
@@ -90,16 +100,25 @@ describe('specter: specterCoverReview', () => {
 });
 
 describe('wraith: wraithExfilSim', () => {
-  it('verifies a small encrypted path on declared egress as feasible and low-noise', () => {
+  it('declares a small encrypted path on a declared egress string without verifying it', () => {
     const result = wraithExfilSim({
       paths: [{ id: 'p1', channel: 'api-pagination', volumeMb: 4, encrypted: true }],
       egress: ['proxy-egress-1'],
     });
     expect(result.paths).toHaveLength(1);
-    expect(result.paths[0]).toMatchObject({ pathId: 'p1', feasible: true, noiseCost: 'low', egressVerified: true });
-    expect(result.paths[0].pressureNotes).toEqual([]);
+    expect(result.paths[0]).toMatchObject({ pathId: 'p1', feasible: true, noiseCost: 'low', standing: 'modeled', egressVerified: false });
+    expect(result.paths[0].pressureNotes.join(' ')).toMatch(/modeled, not verified/);
     expect(result.totalVolumeMb).toBe(4);
     expect(result.budget.violations).toEqual([]);
+  });
+
+  it('verifies a route only with observed route evidence for the same path id', () => {
+    const result = wraithExfilSim({
+      paths: [{ id: 'p1', channel: 'api-pagination', volumeMb: 4, encrypted: true }],
+      egress: ['proxy-egress-1'],
+      routeEvidence: [{ pathId: 'p1', evidenceId: 'route-obs-1', observed: true }],
+    });
+    expect(result.paths[0]).toMatchObject({ pathId: 'p1', standing: 'verified', egressVerified: true, routeEvidenceId: 'route-obs-1' });
   });
 
   it('rates bulk unencrypted tunnels high-noise and infeasible, with pressure notes', () => {
@@ -150,13 +169,13 @@ describe('sentinel: sentinelDetectorMap', () => {
     expect(result.gapPriority).toEqual(['f1', 'f2']);
   });
 
-  it('reuses detectionGaps and skips covered findings in artifacts and priority', () => {
+  it('does not skip a finding whose id is listed without an observed artifact', () => {
     const telemetry = [{ source: 'siem', coveredIds: ['f2'] }];
     const result = sentinelDetectorMap(findings, telemetry);
     expect(result.gaps).toEqual(detectionGaps(findings, telemetry));
-    expect(result.detectorRecommendations).toHaveLength(1);
-    expect(result.detectorRecommendations[0]).toContain('f1');
-    expect(result.gapPriority).toEqual(['f1']);
+    expect(result.detectorRecommendations).toHaveLength(2);
+    expect(result.detectorRecommendations.some(line => line.includes('f1'))).toBe(true);
+    expect(result.gapPriority).toEqual(['f1', 'f2']);
   });
 });
 
@@ -261,5 +280,180 @@ describe('auditor: auditorScore', () => {
     const result = auditorScore([{ id: 'r1', type: 'receipt' }, { id: 'u1' }]);
     expect(result.scores[0].confidence).toBe('high');
     expect(result.scores[1].confidence).toBe('very-low');
+  });
+});
+
+describe('role denial gate (AC-FH-009, NFR-FH-SEC-01)', () => {
+  function probe(name: string): CustomTool & { ran: () => boolean; calls: () => number } {
+    let calls = 0;
+    const tool: CustomTool = {
+      name, description: 'q1 probe', category: 'recon', parameters: [],
+      handler: async () => { calls += 1; return { success: true, output: 'DID_RUN' }; },
+    };
+    return Object.assign(tool, { ran: () => calls > 0, calls: () => calls });
+  }
+
+  const ctx = (parameters: Record<string, unknown> = {}): ToolContext => ({ parameters });
+
+  it('forbidden model-requested tool outside the frozen allowlist is denied with zero handler calls', async () => {
+    const ars = new Arsenal();
+    const allowed = probe('dns_lookup');
+    const forbidden = probe('metasploit_module');
+    ars.registerMany([allowed, forbidden]);
+    const res = await ars.execute('metasploit_module', ctx(), ['dns_lookup']);
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/AUTHORITY DENIED/);
+    expect(forbidden.calls()).toBe(0);
+    expect(allowed.calls()).toBe(0);
+  });
+
+  it('unknown tool name still throws ToolNotFound even with an allowlist present', async () => {
+    const ars = new Arsenal();
+    ars.register(probe('dns_lookup'));
+    await expect(ars.execute('hallucinated_tool', ctx(), ['dns_lookup'])).rejects.toThrow(/not found/);
+  });
+
+  it('omitted allowlist preserves library/test mode: the same tool runs', async () => {
+    const ars = new Arsenal();
+    const t = probe('dns_lookup');
+    ars.register(t);
+    const res = await ars.execute('dns_lookup', ctx());
+    expect(res.success).toBe(true);
+    expect(t.calls()).toBe(1);
+  });
+
+  it('AgentLoop with a frozen role denies the forbidden tool end-to-end with zero handler calls', async () => {
+    const ars = new Arsenal();
+    const forbidden = probe('metasploit_module');
+    ars.register(forbidden);
+    const forbiddenCall: LLMToolCall = { id: 'c1', name: 'metasploit_module', arguments: {} };
+    const finalResponse: LLMResponse = {
+      content: 'FINAL: no callable tool fits; standing down.',
+      model: 'q1-mock', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const first: LLMResponse = {
+      content: 'trying a forbidden tool', model: 'q1-mock', toolCalls: [forbiddenCall],
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    };
+    const llm = {
+      getProvider: vi.fn().mockReturnValue('mock'),
+      chat: vi.fn().mockImplementation(async () => finalResponse),
+      chatWithTools: vi.fn()
+        .mockImplementationOnce(async () => first)
+        .mockImplementation(async () => finalResponse),
+    } as unknown as LLMBackbone;
+    const loop = createAgentLoop(llm, ars, { role: 'sentinel', maxIterations: 3 });
+    const task: Task = {
+      id: 'q1-task', missionId: 'q1-mission', name: 'Q1 denial probe',
+      description: 'forbidden tool must never reach its handler',
+      phase: KillChainPhase.RECON, operatorType: 'sentinel', status: 'in_progress',
+      priority: 5, dependencies: [], createdAt: Date.now(),
+    };
+    const result = await loop.run(task, 'q1 system prompt');
+    expect(forbidden.calls()).toBe(0);
+    const denials = result.steps.filter((s) => s.toolResult && s.toolResult.success === false);
+    expect(denials.length).toBeGreaterThan(0);
+  });
+});
+
+describe('grant isolation (AC-FH-012)', () => {
+  function probe(name: string): CustomTool & { calls: () => number } {
+    let calls = 0;
+    const tool: CustomTool = {
+      name, description: 'q1 probe', category: 'recon', parameters: [],
+      handler: async () => { calls += 1; return { success: true, output: 'DID_RUN' }; },
+    };
+    return Object.assign(tool, { calls: () => calls });
+  }
+
+  it('empty grant denies all', async () => {
+    const ars = new Arsenal();
+    const t = probe('dns_lookup');
+    ars.register(t);
+    const res = await ars.execute('dns_lookup', { parameters: {} }, []);
+    expect(res.success).toBe(false);
+    expect(t.calls()).toBe(0);
+  });
+
+  it('two runs with different grants do not share authority on one Arsenal', async () => {
+    const ars = new Arsenal();
+    const a = probe('tool_a');
+    const b = probe('tool_b');
+    ars.registerMany([a, b]);
+    expect((await ars.execute('tool_a', { parameters: {} }, ['tool_a'])).success).toBe(true);
+    expect((await ars.execute('tool_b', { parameters: {} }, ['tool_a'])).success).toBe(false);
+    expect((await ars.execute('tool_b', { parameters: {} }, ['tool_b'])).success).toBe(true);
+    expect((await ars.execute('tool_a', { parameters: {} }, ['tool_b'])).success).toBe(false);
+    expect(a.calls()).toBe(1);
+    expect(b.calls()).toBe(1);
+  });
+
+  it('unknown grant role resolves to deny-all, never to a shared default', () => {
+    expect(() => resolveRunAllowlist('purple' as never)).toThrow();
+    expect(() => resolveRunAllowlist('ninja' as never)).toThrow();
+  });
+
+  it('blue, white, and their hats never freeze probe-grade defaultTools and expand catalog grants to adapter tool names', () => {
+    for (const role of ['blue', 'white', 'sentinel', 'warden', 'arbiter', 'auditor'] as const) {
+      const frozen = resolveRunAllowlist(role);
+      expect(frozen).not.toContain('http_request');
+      expect(frozen).not.toContain('curl_request');
+    }
+    const blueAllow = resolveRunAllowlist('blue');
+    expect(blueAllow).toContain('file');
+    expect(blueAllow).toContain('file_tool');
+    expect(blueAllow).toContain('gitleaks');
+    expect(blueAllow).toContain('gitleaks_tool');
+    const whiteAllow = resolveRunAllowlist('white');
+    expect(whiteAllow).toContain('dig');
+    expect(whiteAllow).toContain('dns_lookup');
+  });
+});
+
+describe('discipline map (AC-FH-003)', () => {
+  it('six specialists keep their parents', () => {
+    expect(hatTeam).toEqual({
+      specter: 'black', wraith: 'black',
+      sentinel: 'blue', warden: 'blue',
+      arbiter: 'white', auditor: 'white',
+    });
+    expect(HAT_ARCHETYPES).toEqual(['specter', 'wraith', 'sentinel', 'warden', 'arbiter', 'auditor']);
+  });
+
+  it('purple spawn is rejected where roles are validated', () => {
+    expect(() => validateStructuredStart({ objective: 'q1', operators: ['purple'] })).toThrow(/unknown role "purple"/);
+    expect(() => resolveRunAllowlist('purple' as never)).toThrow(/purple never spawns/);
+  });
+
+  it('only Red Blue Black White are disciplines across the eight-row inventory', () => {
+    expect(RED_WORKFLOW_INVENTORY).toHaveLength(8);
+    for (const row of RED_WORKFLOW_INVENTORY) {
+      expect(row.operatorProfile).toContain('src/operators/index.ts');
+      expect(row.api).toContain('src/server.ts');
+      expect(row.lifecycle).toContain('src/index.ts');
+    }
+  });
+
+  it('spawnOperator registers permitted catalog adapters for warden, auditor, and specter even with T3MP3ST_FULL_ARSENAL unset', async () => {
+    const { TempestCommand } = await import('../index.js');
+    const prevFlag = process.env.T3MP3ST_FULL_ARSENAL;
+    delete process.env.T3MP3ST_FULL_ARSENAL;
+    try {
+      const cmd = new TempestCommand({
+        name: 'Specialist-Tool-Test',
+        llm: { provider: 'mock', model: 'mock' },
+      });
+      for (const role of ['warden', 'auditor', 'specter'] as const) {
+        cmd.spawnOperator(`${role}-op`, role);
+        const allow = resolveRunAllowlist(role);
+        const defs = cmd.arsenal.getToolDefinitions(undefined, allow);
+        expect(defs.length).toBeGreaterThan(0);
+        const defNames = defs.map((d) => d.name);
+        expect(defNames).not.toContain('http_request');
+        expect(defNames).not.toContain('curl_request');
+      }
+    } finally {
+      if (prevFlag !== undefined) process.env.T3MP3ST_FULL_ARSENAL = prevFlag;
+    }
   });
 });

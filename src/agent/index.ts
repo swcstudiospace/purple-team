@@ -16,12 +16,14 @@ import type {
   LLMMessage,
   LLMToolDefinition,
   LLMToolCall,
+  OperatorArchetype,
   ToolResult,
   ToolFinding,
   Severity,
   Target,
   Task,
 } from '../types/index.js';
+import { resolveRunAllowlist } from '../teams/contracts.js';
 
 // =============================================================================
 // TYPES
@@ -36,6 +38,16 @@ export interface AgentLoopOptions {
   toolCategories?: string[];
   /** Explicit tool-NAME allowlist — the operator's role toolkit. Overrides toolCategories. */
   tools?: string[];
+  /**
+   * Spawnable role this loop runs as. When set, the run's frozen authority
+   * set resolves from the role (Red freezes its defaultTools, teams and hats
+   * freeze their catalog grants, Blue/White families never freeze probe-grade
+   * defaultTools) and is passed into Arsenal.execute on every call, including
+   * an empty array that denies all. Unknown roles resolve to deny-all.
+   */
+  role?: OperatorArchetype | undefined;
+  /** Curated defaultTools for a Red role; the frozen set when role is Red. */
+  redDefaultTools?: string[] | undefined;
   /** Whether to include detailed tool output in context (default: true) */
   verboseToolOutput?: boolean;
   /** Max characters per tool result before truncation (default: 4000) */
@@ -121,7 +133,13 @@ export interface AgentEvents {
 export class AgentLoop extends EventEmitter<AgentEvents> {
   private llm: LLMBackbone;
   private arsenal: Arsenal;
-  private options: Required<AgentLoopOptions>;
+  private options: Required<Omit<AgentLoopOptions, 'role' | 'redDefaultTools'>> & Pick<AgentLoopOptions, 'role' | 'redDefaultTools'>;
+  /**
+   * Frozen per-run authority set, resolved once at construction. Passed into
+   * Arsenal.execute on every tool call, including an empty array (denies
+   * all). Undefined only when no role was given (legacy/unscoped loops).
+   */
+  private readonly frozenAllowlist: readonly string[] | undefined;
 
   constructor(llm: LLMBackbone, arsenal: Arsenal, options?: AgentLoopOptions) {
     super();
@@ -132,10 +150,23 @@ export class AgentLoop extends EventEmitter<AgentEvents> {
       maxTokens: options?.maxTokens ?? 50000,
       toolCategories: options?.toolCategories ?? [],
       tools: options?.tools ?? [],
+      role: options?.role,
+      redDefaultTools: options?.redDefaultTools,
       verboseToolOutput: options?.verboseToolOutput ?? true,
       maxToolOutputLength: options?.maxToolOutputLength ?? 4000,
       maxConcurrency: Math.max(1, options?.maxConcurrency ?? 5),
     };
+    if (options?.role !== undefined) {
+      let frozen: string[];
+      try {
+        frozen = resolveRunAllowlist(options.role, options.redDefaultTools ?? options.tools ?? []);
+      } catch {
+        frozen = [];
+      }
+      this.frozenAllowlist = frozen;
+    } else {
+      this.frozenAllowlist = undefined;
+    }
   }
 
   /**
@@ -157,12 +188,14 @@ export class AgentLoop extends EventEmitter<AgentEvents> {
     const seenCalls = new Map<string, string>();
     let noProgress = 0;
 
-    // Get tool definitions from Arsenal (the operator's role toolkit: name allowlist wins,
-    // then category filter, then all).
-    const toolDefs = this.arsenal.getToolDefinitions(
-      this.options.toolCategories.length > 0 ? this.options.toolCategories : undefined,
-      this.options.tools.length > 0 ? this.options.tools : undefined
-    );
+    // Get tool definitions from Arsenal (the operator's role toolkit: frozen role allowlist wins,
+    // then name allowlist, then category filter, then all).
+    const toolDefs = this.frozenAllowlist !== undefined
+      ? (this.frozenAllowlist.length > 0 ? this.arsenal.getToolDefinitions(undefined, [...this.frozenAllowlist]) : [])
+      : this.arsenal.getToolDefinitions(
+          this.options.toolCategories.length > 0 ? this.options.toolCategories : undefined,
+          this.options.tools.length > 0 ? this.options.tools : undefined
+        );
 
     // Build initial messages
     const messages: LLMMessage[] = [
@@ -434,7 +467,7 @@ export class AgentLoop extends EventEmitter<AgentEvents> {
       toolResult = await this.arsenal.execute(toolCall.name, {
         target,
         parameters: toolCall.arguments,
-      });
+      }, this.frozenAllowlist);
     } catch (err) {
       // ToolError carries a category — use it for structured feedback to the LLM.
       if (err instanceof ToolError) {
@@ -450,12 +483,13 @@ export class AgentLoop extends EventEmitter<AgentEvents> {
       } else {
         // A bad/hallucinated tool name must NOT crash the loop. Return the callable set so the
         // model self-corrects in-place instead of dying or looping on a tool that doesn't exist.
-        const available = this.arsenal
-          .getToolDefinitions(
-            this.options.toolCategories.length ? this.options.toolCategories : undefined,
-            this.options.tools.length ? this.options.tools : undefined
-          )
-          .map((t) => t.name);
+        const available = (this.frozenAllowlist !== undefined
+          ? (this.frozenAllowlist.length > 0 ? this.arsenal.getToolDefinitions(undefined, [...this.frozenAllowlist]) : [])
+          : this.arsenal.getToolDefinitions(
+              this.options.toolCategories.length ? this.options.toolCategories : undefined,
+              this.options.tools.length ? this.options.tools : undefined
+            )
+        ).map((t) => t.name);
         toolResult = {
           success: false,
           error: JSON.stringify({

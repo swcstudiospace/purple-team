@@ -167,6 +167,20 @@ export class TaskQueue extends EventEmitter<TaskQueueEvents> {
   }
 
   /**
+   * Mission-pinned completion (Phase 26, AC-FH-008): a late result completes
+   * the original task row only when the mission still matches. A result
+   * arriving for a different mission id is refused (false) — completion
+   * never retargets attribution, and the row keeps its original hat,
+   * specialist, task, mission, and input binding.
+   */
+  completeForMission(taskId: string, missionId: string, result: TaskResult): boolean {
+    const task = this.getTask(taskId);
+    if (!task || task.missionId !== missionId) return false;
+    this.updateStatus(taskId, 'completed', result);
+    return true;
+  }
+
+  /**
    * Mark a task as failed with error message
    */
   fail(taskId: string, error: string): void {
@@ -236,7 +250,9 @@ export class MissionControl extends EventEmitter<MissionEvents> {
   }
 
   /**
-   * Create a new mission
+   * Create a new mission. The id is always server-minted (randomUUID) —
+   * caller-supplied mission ids are refused by construction: params carries
+   * no id field, so dispatch can never retarget a run onto a forged mission.
    */
   createMission(params: {
     name: string;

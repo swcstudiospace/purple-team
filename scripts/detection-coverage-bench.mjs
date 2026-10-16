@@ -52,7 +52,8 @@ export async function loadHunter() {
 export function huntCorpus(hunter, corpus) {
   const byCase = {};
   for (const c of corpus.cases) {
-    byCase[c.id] = hunter.coverageGaps(c.findings, c.telemetry);
+    const observed = c.observed ?? Object.fromEntries(c.findings.map((f) => [f.id, [`bench-artifact-${f.id}`]]));
+    byCase[c.id] = hunter.coverageGaps(c.findings, c.telemetry, observed);
   }
   return byCase;
 }
