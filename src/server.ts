@@ -1366,14 +1366,12 @@ function normalizeLedgerEvidenceIds(value: unknown): string[] {
       : [];
   const seen = new Set<string>();
   const out: string[] = [];
-  const scanLimit = Math.min(raw.length, MAX_STAGE_LIST_ITEMS * 4);
-  for (let i = 0; i < scanLimit; i++) {
+  for (let i = 0; i < raw.length; i++) {
     const item = String(raw[i] ?? '').trim();
     if (!item || seen.has(item)) continue;
     seen.add(item);
     if (evidenceLedger.has(item)) {
       out.push(item);
-      if (out.length >= MAX_STAGE_LIST_ITEMS) break;
     }
   }
   return out;
@@ -1504,9 +1502,32 @@ async function loadPersistedState(): Promise<void> {
     replaceMapContents(approvalRequests, state.approvalRequests);
     replaceMapContents(evidenceLedger, state.evidenceLedger);
     replaceMapContents(findingsLedger, state.findingsLedger);
+    for (const finding of findingsLedger.values()) {
+      if (Array.isArray(finding.evidenceIds)) {
+        finding.evidenceIds = uniqueStrings(normalizeStringList(finding.evidenceIds));
+      }
+    }
     replaceMapContents(retestLedger, state.retestLedger);
+    for (const retest of retestLedger.values()) {
+      if (Array.isArray(retest.evidenceIds)) {
+        retest.evidenceIds = uniqueStrings(normalizeStringList(retest.evidenceIds));
+      }
+    }
     replaceMapContents(hypothesisLedger, state.hypothesisLedger);
+    for (const hypothesis of hypothesisLedger.values()) {
+      if (Array.isArray(hypothesis.evidenceForIds)) {
+        hypothesis.evidenceForIds = uniqueStrings(normalizeStringList(hypothesis.evidenceForIds));
+      }
+      if (Array.isArray(hypothesis.evidenceAgainstIds)) {
+        hypothesis.evidenceAgainstIds = uniqueStrings(normalizeStringList(hypothesis.evidenceAgainstIds));
+      }
+    }
     replaceMapContents(workOrderLedger, state.workOrderLedger);
+    for (const order of workOrderLedger.values()) {
+      if (Array.isArray(order.evidenceIds)) {
+        order.evidenceIds = uniqueStrings(normalizeStringList(order.evidenceIds));
+      }
+    }
     replaceMapContents(watchCycleLedger, state.watchCycleLedger);
     replaceMapContents(memoryCapsule, state.memoryCapsule);
     replaceMapContents(memoryProposals, state.memoryProposals);
@@ -4626,9 +4647,9 @@ function createMemoryProposal(input: Partial<MemoryProposal> & Record<string, un
   const fingerprint = typeof input.fingerprint === 'string' && input.fingerprint.trim()
     ? input.fingerprint.trim()
     : memoryFingerprint(type, content);
-  const sourceEvidenceIds = normalizeStringList(input.sourceEvidenceIds).filter(id => evidenceLedger.has(id));
-  const sourceFindingIds = normalizeStringList(input.sourceFindingIds).filter(id => findingsLedger.has(id));
-  const sourceRetestIds = normalizeStringList(input.sourceRetestIds).filter(id => retestLedger.has(id));
+  const sourceEvidenceIds = normalizeLedgerEvidenceIds(input.sourceEvidenceIds);
+  const sourceFindingIds = uniqueStrings(normalizeStringList(input.sourceFindingIds)).filter(id => findingsLedger.has(id));
+  const sourceRetestIds = uniqueStrings(normalizeStringList(input.sourceRetestIds)).filter(id => retestLedger.has(id));
   const duplicateCandidates = [...memoryProposals.values()]
     .filter(proposal => proposalFingerprint(proposal) === fingerprint)
     .sort((a, b) => {
@@ -5670,9 +5691,9 @@ app.get('/api/hypotheses', (req: Request, res: Response) => {
 app.post('/api/hypotheses', (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   if (rejectDuplicateLedgerId(res, hypothesisLedger, body.id, 'Hypothesis', '/api/hypotheses')) return;
-  const evidenceForIds = normalizeStringList(body.evidenceForIds).filter(id => evidenceLedger.has(id));
-  const evidenceAgainstIds = normalizeStringList(body.evidenceAgainstIds).filter(id => evidenceLedger.has(id));
-  const findingIds = normalizeStringList(body.findingIds).filter(id => findingsLedger.has(id));
+  const evidenceForIds = normalizeLedgerEvidenceIds(body.evidenceForIds);
+  const evidenceAgainstIds = normalizeLedgerEvidenceIds(body.evidenceAgainstIds);
+  const findingIds = uniqueStrings(normalizeStringList(body.findingIds)).filter(id => findingsLedger.has(id));
   const now = nowIso();
   const hypothesis: HypothesisRecord = {
     id: clientLedgerId(body.id, 'hypothesis'),
@@ -5705,10 +5726,10 @@ app.patch('/api/hypotheses/:id', (req: Request, res: Response) => {
   const body = req.body as Record<string, unknown>;
   const evidenceForIds = body.evidenceForIds === undefined
     ? existing.evidenceForIds
-    : normalizeStringList(body.evidenceForIds).filter(id => evidenceLedger.has(id));
+    : normalizeLedgerEvidenceIds(body.evidenceForIds);
   const evidenceAgainstIds = body.evidenceAgainstIds === undefined
     ? existing.evidenceAgainstIds
-    : normalizeStringList(body.evidenceAgainstIds).filter(id => evidenceLedger.has(id));
+    : normalizeLedgerEvidenceIds(body.evidenceAgainstIds);
   let updated: HypothesisRecord = {
     ...existing,
     missionId: typeof body.missionId === 'string' ? body.missionId : existing.missionId,
@@ -5721,7 +5742,7 @@ app.patch('/api/hypotheses/:id', (req: Request, res: Response) => {
     confidence: body.confidence === undefined ? existing.confidence : clampConfidence(body.confidence),
     evidenceForIds,
     evidenceAgainstIds,
-    findingIds: body.findingIds === undefined ? existing.findingIds : normalizeStringList(body.findingIds).filter(id => findingsLedger.has(id)),
+    findingIds: body.findingIds === undefined ? existing.findingIds : uniqueStrings(normalizeStringList(body.findingIds)).filter(id => findingsLedger.has(id)),
     nextTests: body.nextTests === undefined ? existing.nextTests : normalizeStringList(body.nextTests).map(item => redactLedgerText(item, 500)),
     updatedAt: nowIso(),
   };
@@ -5749,7 +5770,7 @@ app.post('/api/hypotheses/:id/promote', (req: Request, res: Response) => {
   const evidenceIds = uniqueStrings([
     ...hypothesis.evidenceForIds,
     ...normalizeLedgerEvidenceIds(body.evidenceIds),
-  ]).slice(0, MAX_STAGE_LIST_ITEMS);
+  ]);
   const finding: FindingRecord = {
     id: clientLedgerId(body.id, 'finding'),
     missionId: hypothesis.missionId,
@@ -7079,10 +7100,12 @@ function resolveStagedBlueInput(rawBody: unknown): void {
     }
     if (matchedSet.size < knownArtifactIds.size) {
       const ledgerFinding = findingsLedger.get(findingId);
-      if (ledgerFinding) {
-        const evidenceRefs = ledgerFinding.evidenceIds;
-        const limit = Math.min(evidenceRefs.length, MAX_STAGE_LIST_ITEMS);
-        for (let i = 0; i < limit; i++) {
+      if (ledgerFinding && Array.isArray(ledgerFinding.evidenceIds)) {
+        const evidenceRefs = uniqueStrings(ledgerFinding.evidenceIds);
+        if (evidenceRefs.length !== ledgerFinding.evidenceIds.length) {
+          ledgerFinding.evidenceIds = evidenceRefs;
+        }
+        for (let i = 0; i < evidenceRefs.length; i++) {
           const evId = evidenceRefs[i];
           if (knownArtifactIds.has(evId)) {
             matchedSet.add(evId);

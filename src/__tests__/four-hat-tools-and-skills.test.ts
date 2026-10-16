@@ -832,5 +832,19 @@ describe('Wave 3: Upgraded UI Shell, Hat Theming & Desktop/Mobile Optimization S
     expect(serverTs).toContain("app.post('/api/teams/tools/run'");
     expect(serverTs).toContain("app.get('/api/teams/skills'");
     expect(serverTs).toContain("app.post('/api/teams/skills/run'");
+
+    const normalizeStart = serverTs.indexOf('function normalizeLedgerEvidenceIds(');
+    expect(normalizeStart).toBeGreaterThanOrEqual(0);
+    const normalizeEnd = serverTs.indexOf('\n}', normalizeStart);
+    const normalizeBlock = serverTs.slice(normalizeStart, normalizeEnd + 2);
+    expect(normalizeBlock).toContain('new Set<string>()');
+    expect(normalizeBlock).not.toContain('MAX_STAGE_LIST_ITEMS');
+
+    const resolveStart = serverTs.indexOf('function resolveStagedBlueInput(');
+    expect(resolveStart).toBeGreaterThanOrEqual(0);
+    const resolveEnd = serverTs.indexOf('\nfunction resolveStagedBlackInput(', resolveStart);
+    const resolveBlock = serverTs.slice(resolveStart, resolveEnd);
+    expect(resolveBlock).toContain('uniqueStrings(ledgerFinding.evidenceIds)');
+    expect(resolveBlock).not.toContain('Math.min(evidenceRefs.length, MAX_STAGE_LIST_ITEMS)');
   });
 });
