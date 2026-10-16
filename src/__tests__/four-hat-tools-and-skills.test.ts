@@ -32,7 +32,12 @@ import {
   listComposableSkills,
   getComposableSkill,
   runComposableSkill,
+  buildSpecialistWorkflowTools,
 } from '../teams/index.js';
+import { runBlueCoverageStage } from '../teams/blue/workflow.js';
+import { artifactHash } from '../teams/contracts.js';
+import { Arsenal } from '../arsenal/index.js';
+import { redactSecrets } from '../redact.js';
 import { synthesize } from '../teams/purple.js';
 import { exfilCostModel } from '../teams/black/exfil.js';
 
@@ -709,6 +714,50 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
       decisions: parsedExport.entries,
     });
     expect(recomputedLedger.ledgerDigest).toBe(exportedLedger.ledgerDigest);
+
+    // 10. Round 8: Arsenal-registered Hat tools validate array/text/object parameters via validateToolArgs
+    const arsenal = new Arsenal();
+    arsenal.clear();
+    const allIds = new Set(HAT_TOOL_REGISTRY.map((t) => t.id));
+    for (const customTool of buildSpecialistWorkflowTools(allIds)) {
+      arsenal.register(customTool);
+    }
+    for (const reg of HAT_TOOL_REGISTRY) {
+      const execResult = await arsenal.execute(reg.id, {
+        parameters: { ...reg.defaultPreset },
+      });
+      expect(execResult.success, `Arsenal execute failed for ${reg.id}`).toBe(true);
+    }
+    const textInspect = await arsenal.execute('white-data-inspector', {
+      parameters: {
+        rawPayload: 'id=ev-1 host=127.0.0.1 severity=high',
+        format: 'kv_log',
+      },
+    });
+    expect(textInspect.success).toBe(true);
+
+    // 11. Round 8: Blue coverage stage enforces 1,000-entry limit on findings and telemetry
+    const tooManyFindings = Array.from({ length: 1001 }, (_, i) => ({
+      id: `f-${i}`,
+      title: `Finding ${i}`,
+      techniques: ['T1190'],
+    }));
+    expect(() =>
+      runBlueCoverageStage({
+        runId: 'r-limit',
+        missionId: 'm-limit',
+        family: 'web_api',
+        artifactIds: ['art-1'],
+        artifactBytes: 'sample',
+        findings: tooManyFindings,
+        telemetry: [],
+      }),
+    ).toThrow(/exceeds maximum of 1000/);
+
+    // 12. Round 8: Grouped artifactHash format survives redactSecrets intact
+    const groupedDigest = artifactHash('structured-task-input');
+    expect(redactSecrets({ inputSha256: groupedDigest })).toEqual({ inputSha256: groupedDigest });
+    expect(groupedDigest).not.toContain('[redacted]');
   });
 });
 

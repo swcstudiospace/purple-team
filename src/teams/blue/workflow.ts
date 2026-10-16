@@ -170,8 +170,14 @@ export function runBlueCoverageStage(input: BlueCoverageStageInput): BlueCoverag
   if (!Array.isArray(input?.findings)) {
     throw new Error('blue workflow blue-coverage: findings must be an array');
   }
+  if (input.findings.length > MAX_STRING_ARRAY_ITEMS) {
+    throw new Error(`blue workflow blue-coverage: findings exceeds maximum of ${MAX_STRING_ARRAY_ITEMS} entries`);
+  }
   if (!Array.isArray(input?.telemetry)) {
     throw new Error('blue workflow blue-coverage: telemetry must be an array');
+  }
+  if (input.telemetry.length > MAX_STRING_ARRAY_ITEMS) {
+    throw new Error(`blue workflow blue-coverage: telemetry exceeds maximum of ${MAX_STRING_ARRAY_ITEMS} entries`);
   }
   const findings = input.findings;
   const telemetry = input.telemetry;
@@ -236,6 +242,12 @@ export function runBlueDetectionStage(input: BlueDetectionStageInput): BlueDetec
   }
   if (!Array.isArray(input?.findings)) {
     throw new Error('blue workflow blue-detection: findings must be an array');
+  }
+  if (input.findings.length > MAX_STRING_ARRAY_ITEMS) {
+    throw new Error(`blue workflow blue-detection: findings exceeds maximum of ${MAX_STRING_ARRAY_ITEMS} entries`);
+  }
+  if (Array.isArray(input?.telemetry) && input.telemetry.length > MAX_STRING_ARRAY_ITEMS) {
+    throw new Error(`blue workflow blue-detection: telemetry exceeds maximum of ${MAX_STRING_ARRAY_ITEMS} entries`);
   }
   const findings = input.findings;
   const telemetry = Array.isArray(input?.telemetry) ? input.telemetry : [];

@@ -34,8 +34,14 @@ export function buildJsonSchema(params: ToolParameter[]): Record<string, unknown
   const required: string[] = [];
 
   for (const param of params) {
+    const resolvedType =
+      param.allowedTypes && param.allowedTypes.length > 0
+        ? param.allowedTypes.length === 1
+          ? param.allowedTypes[0]
+          : [...param.allowedTypes]
+        : param.type;
     const prop: Record<string, unknown> = {
-      type: param.type,
+      type: resolvedType,
       description: param.description,
     };
 
@@ -92,8 +98,14 @@ function buildObjectProperties(
   const required: string[] = [];
 
   for (const [key, param] of Object.entries(properties)) {
+    const resolvedType =
+      param.allowedTypes && param.allowedTypes.length > 0
+        ? param.allowedTypes.length === 1
+          ? param.allowedTypes[0]
+          : [...param.allowedTypes]
+        : param.type;
     const prop: Record<string, unknown> = {
-      type: param.type,
+      type: resolvedType,
       description: param.description,
     };
 
@@ -335,7 +347,9 @@ function getFieldValue(obj: Record<string, unknown>, path: string): unknown {
  */
 function formatExpected(error: any): string { // eslint-disable-line @typescript-eslint/no-explicit-any
   if (error.keyword === 'type') {
-    return error.params?.type || 'unknown type';
+    const t = error.params?.type;
+    if (Array.isArray(t)) return t.join(' | ');
+    return t || 'unknown type';
   }
   if (error.keyword === 'enum') {
     return `one of: ${(error.params?.allowedValues || []).join(', ')}`;

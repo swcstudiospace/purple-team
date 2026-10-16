@@ -495,6 +495,8 @@ export interface CustomTool {
 export interface ToolParameter {
   name: string;
   type: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  /** Optional union of allowed JSON Schema primitive types when a parameter accepts multiple shapes. */
+  allowedTypes?: ReadonlyArray<'string' | 'number' | 'boolean' | 'array' | 'object'>;
   description: string;
   required: boolean;
   default?: unknown;

@@ -57,7 +57,7 @@ import { initGrammars } from './recon/ts-grammars.js';
 import { redactCredential } from './evidence/index.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
-import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, ArtifactValidationError, RED_ARCHETYPES } from './teams/contracts.js';
+import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, artifactHash, ArtifactValidationError, RED_ARCHETYPES } from './teams/contracts.js';
 import type { BoundInlineArtifact } from './types/index.js';
 import { synthesize, type DarkPurpleSynthesis, type PurpleVerdictByFinding } from './teams/purple.js';
 import { hardeningPlan, type DetectionGap, type ObservedArtifactIds } from './teams/blue.js';
@@ -1042,9 +1042,9 @@ function recordOperatorTaskRun(entry: {
     hat: hatForSpecialistRole(entry.specialist),
     specialist: entry.specialist,
     taskId: entry.taskId,
-    inputSha256: createHash('sha256').update(entry.inputText, 'utf8').digest('hex'),
+    inputSha256: artifactHash(entry.inputText),
     status,
-    executionSettled: status === 'completed' || status === 'failed' || status === 'interrupted',
+    executionSettled: status === 'completed' || status === 'failed',
     createdAt: now,
     updatedAt: now,
   };
@@ -1083,15 +1083,15 @@ function updateOperatorTaskRunByTaskId(
       hat: hatForSpecialistRole(specialist),
       specialist,
       taskId,
-      inputSha256: createHash('sha256').update(taskId, 'utf8').digest('hex'),
+      inputSha256: artifactHash(taskId),
       status: patch.status,
-      executionSettled: patch.status === 'completed' || patch.status === 'failed' || patch.status === 'interrupted',
+      executionSettled: patch.status === 'completed' || patch.status === 'failed',
       createdAt: now,
       updatedAt: now,
     };
   } else {
     row.status = patch.status;
-    row.executionSettled = patch.status === 'completed' || patch.status === 'failed' || patch.status === 'interrupted';
+    row.executionSettled = patch.status === 'completed' || patch.status === 'failed';
     row.updatedAt = now;
   }
   if (typeof patch.output === 'string' && patch.output.trim()) {
@@ -1500,7 +1500,7 @@ async function loadPersistedState(): Promise<void> {
     // loss become interrupted with executionSettled:true — never resumed.
     replaceMapContents(operatorTaskRuns, state.operatorTaskRuns);
     for (const row of operatorTaskRuns.values()) {
-      if (row.status === 'pending' || row.status === 'running') {
+      if (row.status === 'pending' || row.status === 'running' || (row.status === 'interrupted' && !row.executionSettled)) {
         row.status = 'interrupted';
         row.executionSettled = true;
         row.updatedAt = nowIso();
@@ -6983,29 +6983,84 @@ app.get('/api/teams/white/report-audit', (_req: Request, res: Response): void =>
 // Resolve staged evidence associations against live server ledgers before
 // running the Blue/Black/White staged helpers so unbacked caller labels do not
 // pass as verified/observed/approved proof.
+const MAX_STAGE_LIST_ITEMS = 1000;
+
 function resolveStagedBlueInput(rawBody: unknown): void {
   if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) return;
   const body = rawBody as Record<string, unknown>;
   if (!Array.isArray(body.artifactIds) || !Array.isArray(body.findings)) return;
-  const validArtifactIds = body.artifactIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+  if (body.artifactIds.length > MAX_STAGE_LIST_ITEMS) {
+    throw new Error(`blue workflow: artifactIds exceeds maximum of ${MAX_STAGE_LIST_ITEMS} entries`);
+  }
+  if (body.findings.length > MAX_STAGE_LIST_ITEMS) {
+    throw new Error(`blue workflow blue-coverage: findings exceeds maximum of ${MAX_STAGE_LIST_ITEMS} entries`);
+  }
+  if (Array.isArray(body.telemetry) && body.telemetry.length > MAX_STAGE_LIST_ITEMS) {
+    throw new Error(`blue workflow blue-coverage: telemetry exceeds maximum of ${MAX_STAGE_LIST_ITEMS} entries`);
+  }
+
+  const uniqueArtifactIds = new Set<string>();
+  for (const id of body.artifactIds) {
+    if (typeof id === 'string') {
+      const trimmed = id.trim();
+      if (trimmed) uniqueArtifactIds.add(trimmed);
+    }
+  }
+
+  const universalIds: string[] = [];
+  const idsByFindingId = new Map<string, Set<string>>();
+  const knownArtifactIds = new Set<string>();
+
+  for (const artId of uniqueArtifactIds) {
+    const receipt = observedReceipts.get(artId);
+    if (receipt) {
+      knownArtifactIds.add(artId);
+      if (receipt.itemId) {
+        let bucket = idsByFindingId.get(receipt.itemId);
+        if (!bucket) {
+          bucket = new Set<string>();
+          idsByFindingId.set(receipt.itemId, bucket);
+        }
+        bucket.add(artId);
+      }
+    }
+    const ev = evidenceLedger.get(artId);
+    if (ev) {
+      knownArtifactIds.add(artId);
+      if (ev.source === 'tool' || ev.provenanceStrength === 'replayable' || ev.provenanceStrength === 'tool') {
+        if (!ev.findingId) {
+          universalIds.push(artId);
+        } else {
+          let bucket = idsByFindingId.get(ev.findingId);
+          if (!bucket) {
+            bucket = new Set<string>();
+            idsByFindingId.set(ev.findingId, bucket);
+          }
+          bucket.add(artId);
+        }
+      }
+    }
+  }
+
   const observedByFinding: Record<string, readonly string[]> = {};
   for (const rawFinding of body.findings) {
     if (!rawFinding || typeof rawFinding !== 'object' || Array.isArray(rawFinding)) continue;
     const findingRec = rawFinding as Record<string, unknown>;
     const findingId = typeof findingRec.id === 'string' ? findingRec.id : '';
     if (!findingId) continue;
+
+    const matchedSet = new Set<string>(universalIds);
+    const directBucket = idsByFindingId.get(findingId);
+    if (directBucket) {
+      for (const artId of directBucket) matchedSet.add(artId);
+    }
     const ledgerFinding = findingsLedger.get(findingId);
-    const matchedIds = validArtifactIds.filter((artId) => {
-      const receipt = observedReceipts.get(artId);
-      if (receipt && receipt.itemId === findingId) return true;
-      const ev = evidenceLedger.get(artId);
-      if (ev && (ev.source === 'tool' || ev.provenanceStrength === 'replayable' || ev.provenanceStrength === 'tool') && (!ev.findingId || ev.findingId === findingId)) return true;
-      if (ledgerFinding && ledgerFinding.evidenceIds.includes(artId) && (evidenceLedger.has(artId) || observedReceipts.has(artId))) {
-        return true;
+    if (ledgerFinding && knownArtifactIds.size > 0) {
+      for (const evId of ledgerFinding.evidenceIds) {
+        if (knownArtifactIds.has(evId)) matchedSet.add(evId);
       }
-      return false;
-    });
-    observedByFinding[findingId] = matchedIds;
+    }
+    observedByFinding[findingId] = [...matchedSet];
   }
   const typedObserved: ObservedArtifactIds = observedByFinding;
   body.observedByFinding = typedObserved;
@@ -7664,9 +7719,13 @@ app.post('/api/mission/stop', (_req: Request, res: Response) => {
 
   cmd.stop();
   for (const row of operatorTaskRuns.values()) {
-    if (row.status === 'pending' || row.status === 'running') {
+    if (row.status === 'pending') {
       row.status = 'interrupted';
       row.executionSettled = true;
+      row.updatedAt = nowIso();
+    } else if (row.status === 'running') {
+      row.status = 'interrupted';
+      row.executionSettled = false;
       row.updatedAt = nowIso();
     }
   }

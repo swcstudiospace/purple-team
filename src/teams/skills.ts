@@ -138,7 +138,12 @@ import {
 export interface HatToolParameterSpec {
   name: string;
   label: string;
-  type: 'string' | 'number' | 'boolean' | 'json';
+  type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'json';
+  allowedTypes?: ReadonlyArray<'string' | 'number' | 'boolean' | 'array' | 'object'>;
+  items?: {
+    type: string;
+    description?: string;
+  };
   required: boolean;
   description: string;
 }
@@ -166,7 +171,7 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     parameters: [
       { name: 'workflowName', label: 'Workflow Name', type: 'string', required: false, description: 'Display name of the cross-Hat pipeline' },
       { name: 'objective', label: 'Objective', type: 'string', required: false, description: 'Operational goal for the sequence' },
-      { name: 'steps', label: 'Workflow Steps (JSON)', type: 'json', required: false, description: 'Ordered array of cross-Hat workflow steps' },
+      { name: 'steps', label: 'Workflow Steps (JSON)', type: 'array', items: { type: 'object' }, required: false, description: 'Ordered array of cross-Hat workflow steps' },
     ],
     defaultPreset: {
       workflowName: 'D3FEND Coverage → ROE Audit → Hardening Retest',
@@ -188,7 +193,8 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     parameters: [
       { name: 'sessionId', label: 'Session ID', type: 'string', required: false, description: 'Unique session identifier' },
       { name: 'objective', label: 'Active Objective', type: 'string', required: true, description: 'Primary session objective' },
-      { name: 'decisions', label: 'Decision Entries (JSON)', type: 'json', required: false, description: 'Cross-Hat transition and decision records' },
+      { name: 'decisions', label: 'Decision Entries (JSON)', type: 'array', items: { type: 'object' }, required: false, description: 'Cross-Hat transition and decision records' },
+      { name: 'constraints', label: 'Constraints (JSON)', type: 'array', items: { type: 'string' }, required: false, description: 'Session constraints' },
     ],
     defaultPreset: {
       sessionId: 'session-4hat-01',
@@ -216,7 +222,7 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     parameters: [
       { name: 'budgetLimitMs', label: 'Budget Limit (ms)', type: 'number', required: false, description: 'Total execution budget in milliseconds' },
       { name: 'maxConcurrency', label: 'Max Concurrency', type: 'number', required: false, description: 'Maximum concurrent tool runs' },
-      { name: 'tasks', label: 'Task Queue (JSON)', type: 'json', required: false, description: 'Active, queued, and completed tool tasks' },
+      { name: 'tasks', label: 'Task Queue (JSON)', type: 'array', items: { type: 'object' }, required: false, description: 'Active, queued, and completed tool tasks' },
     ],
     defaultPreset: {
       budgetLimitMs: 60000,
@@ -238,9 +244,9 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     description: 'Parse, filter, and query structured JSON, JSONL, or key=value logs with schema validation, chunked rendering, and non-destructive error recovery.',
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
-      { name: 'rawPayload', label: 'Structured Payload', type: 'json', required: true, description: 'JSON array/object, JSONL lines, or key=value log lines' },
+      { name: 'rawPayload', label: 'Structured Payload', type: 'json', allowedTypes: ['string', 'array', 'object'], required: true, description: 'JSON array/object, JSONL lines, or key=value log lines' },
       { name: 'format', label: 'Format', type: 'string', required: false, description: 'auto, json, jsonl, or kv_log' },
-      { name: 'requiredFields', label: 'Required Fields (JSON)', type: 'json', required: false, description: 'Schema fields that must be non-null' },
+      { name: 'requiredFields', label: 'Required Fields (JSON)', type: 'array', items: { type: 'string' }, required: false, description: 'Schema fields that must be non-null' },
     ],
     defaultPreset: {
       format: 'json',
@@ -259,7 +265,7 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     description: 'Capture, tag, cross-reference, and verify facts with provenance metadata, SHA-256 digests, and deterministic confidence scoring.',
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
-      { name: 'facts', label: 'Fact Entries (JSON)', type: 'json', required: true, description: 'Facts with source, artifactId, sha256, and corroboration' },
+      { name: 'facts', label: 'Fact Entries (JSON)', type: 'array', items: { type: 'object' }, required: true, description: 'Facts with source, artifactId, sha256, and corroboration' },
       { name: 'tagFilter', label: 'Tag Filter', type: 'string', required: false, description: 'Optional tag to filter collected facts' },
     ],
     defaultPreset: {
@@ -285,8 +291,9 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
       { name: 'objective', label: 'Audit Objective', type: 'string', required: false, description: 'Objective being evaluated for completeness' },
-      { name: 'requiredVariables', label: 'Required Variables (JSON)', type: 'json', required: true, description: 'Variables required before execution' },
-      { name: 'knownFacts', label: 'Known Facts (JSON)', type: 'json', required: false, description: 'Currently known variables and verification status' },
+      { name: 'requiredVariables', label: 'Required Variables (JSON)', type: 'array', items: { type: 'string' }, required: true, description: 'Variables required before execution' },
+      { name: 'knownFacts', label: 'Known Facts (JSON)', type: 'array', items: { type: 'object' }, required: false, description: 'Currently known variables and verification status' },
+      { name: 'assumptions', label: 'Assumptions (JSON)', type: 'array', items: { type: 'object' }, required: false, description: 'Assumptions to audit for verification status' },
     ],
     defaultPreset: {
       objective: 'Pre-Engagement Readiness & Scope Verification',
@@ -310,7 +317,8 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
       { name: 'planName', label: 'Plan Name', type: 'string', required: false, description: 'Name of the architecture or workflow plan' },
-      { name: 'components', label: 'Components (JSON)', type: 'json', required: true, description: 'Components with SPOF, secret handling, and noise metadata' },
+      { name: 'components', label: 'Components (JSON)', type: 'array', items: { type: 'object' }, required: true, description: 'Components with SPOF, secret handling, and noise metadata' },
+      { name: 'assumptions', label: 'Assumptions (JSON)', type: 'array', items: { type: 'string' }, required: false, description: 'Unverified assumptions to incorporate into risk analysis' },
     ],
     defaultPreset: {
       planName: 'Gateway & Telemetry Relay Assessment',
@@ -330,8 +338,8 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
       { name: 'artifactName', label: 'Artifact Name', type: 'string', required: false, description: 'Identifier of the artifact under test' },
-      { name: 'rawConfig', label: 'Configuration Payload', type: 'json', required: true, description: 'JSON object or configuration string to audit' },
-      { name: 'allowedHosts', label: 'Allowed Hosts (JSON)', type: 'json', required: false, description: 'ROE allowed hostnames/IPs' },
+      { name: 'rawConfig', label: 'Configuration Payload', type: 'json', allowedTypes: ['string', 'object'], required: true, description: 'JSON object or configuration string to audit' },
+      { name: 'allowedHosts', label: 'Allowed Hosts (JSON)', type: 'array', items: { type: 'string' }, required: false, description: 'ROE allowed hostnames/IPs' },
     ],
     defaultPreset: {
       artifactName: 'runtime-gateway.json',
@@ -353,8 +361,8 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
       { name: 'targetComponent', label: 'Target Component', type: 'string', required: true, description: 'Component or API boundary to probe' },
-      { name: 'inputFields', label: 'Input Fields (JSON)', type: 'json', required: false, description: 'Typed input fields to generate boundary probes for' },
-      { name: 'dependencies', label: 'Dependencies (JSON)', type: 'json', required: false, description: 'Downstream dependencies to model failure scenarios for' },
+      { name: 'inputFields', label: 'Input Fields (JSON)', type: 'array', items: { type: 'object' }, required: false, description: 'Typed input fields to generate boundary probes for' },
+      { name: 'dependencies', label: 'Dependencies (JSON)', type: 'array', items: { type: 'string' }, required: false, description: 'Downstream dependencies to model failure scenarios for' },
     ],
     defaultPreset: {
       targetComponent: 'FourHatToolDispatcher',
@@ -395,7 +403,7 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     parameters: [
       { name: 'fromHat', label: 'Source Hat', type: 'string', required: true, description: 'red, blue, black, or white' },
       { name: 'toHat', label: 'Target Hat', type: 'string', required: true, description: 'red, blue, black, or white' },
-      { name: 'payload', label: 'Payload', type: 'json', required: true, description: 'Structured output to transform' },
+      { name: 'payload', label: 'Payload', type: 'json', allowedTypes: ['string', 'number', 'boolean', 'array', 'object'], required: true, description: 'Structured output to transform' },
     ],
     defaultPreset: {
       fromHat: 'white',
@@ -413,8 +421,8 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     description: 'Compare two structured artifacts or configurations line-by-line and key-by-key across Hat runs.',
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
-      { name: 'before', label: 'Baseline Artifact', type: 'json', required: true, description: 'Baseline string or JSON object' },
-      { name: 'after', label: 'Candidate Artifact', type: 'json', required: true, description: 'Candidate string or JSON object' },
+      { name: 'before', label: 'Baseline Artifact', type: 'json', allowedTypes: ['string', 'object'], required: true, description: 'Baseline string or JSON object' },
+      { name: 'after', label: 'Candidate Artifact', type: 'json', allowedTypes: ['string', 'object'], required: true, description: 'Candidate string or JSON object' },
     ],
     defaultPreset: {
       beforeLabel: 'pre-hardening',
@@ -433,6 +441,8 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     parameters: [
       { name: 'action', label: 'Action', type: 'string', required: false, description: 'create, verify, or restore' },
       { name: 'activeHat', label: 'Active Hat', type: 'string', required: false, description: 'red, blue, black, or white' },
+      { name: 'workspaceState', label: 'Workspace State', type: 'object', required: false, description: 'Workspace state payload to snapshot' },
+      { name: 'snapshotToVerify', label: 'Snapshot To Verify', type: 'object', required: false, description: 'Signed snapshot envelope to verify or restore' },
     ],
     defaultPreset: {
       action: 'create',
@@ -453,7 +463,7 @@ export const HAT_TOOL_REGISTRY: readonly HatToolRegistration[] = [
     timeoutMs: DEFAULT_TOOL_TIMEOUT_MS,
     parameters: [
       { name: 'batchName', label: 'Batch Name', type: 'string', required: false, description: 'Name of the batch run' },
-      { name: 'jobs', label: 'Batch Jobs (JSON)', type: 'json', required: true, description: 'Array of cross-Hat job specifications' },
+      { name: 'jobs', label: 'Batch Jobs (JSON)', type: 'array', items: { type: 'object' }, required: true, description: 'Array of cross-Hat job specifications' },
     ],
     defaultPreset: {
       batchName: 'Four-Hat Smoke Verification Batch',
@@ -1230,6 +1240,7 @@ export function buildSpecialistWorkflowTools(
         {
           name: 'input',
           type: 'object',
+          allowedTypes: ['string', 'number', 'boolean', 'array', 'object'],
           description: `Structured parameters for ${entry.name}`,
           required: false,
         },
@@ -1257,12 +1268,20 @@ export function buildSpecialistWorkflowTools(
       description: reg.description,
       category: 'custom',
       riskTier: 'passive',
-      parameters: reg.parameters.map((param) => ({
-        name: param.name,
-        type: param.type === 'json' ? 'object' : param.type,
-        description: param.description,
-        required: param.required,
-      })),
+      parameters: reg.parameters.map((param) => {
+        const allowedTypes =
+          param.allowedTypes ??
+          (param.type === 'json' ? (['string', 'number', 'boolean', 'array', 'object'] as const) : undefined);
+        const mappedType = param.type === 'json' ? (allowedTypes?.[0] ?? 'object') : param.type;
+        return {
+          name: param.name,
+          type: mappedType,
+          ...(allowedTypes ? { allowedTypes } : {}),
+          ...(param.items ? { items: param.items } : {}),
+          description: param.description,
+          required: param.required,
+        };
+      }),
       handler: async (context: ToolContext): Promise<ToolResult> => {
         const envelope = await executeRegisteredHatTool(reg.id, context.parameters ?? {});
         return {
