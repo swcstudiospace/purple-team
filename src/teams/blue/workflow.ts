@@ -106,17 +106,26 @@ function requireFamily(family: unknown): BlueFamily {
   return family as BlueFamily;
 }
 
+const MAX_STRING_ARRAY_ITEMS = 1000;
+
 function requireStringArray(value: unknown, field: string): string[] {
   if (!Array.isArray(value)) {
     throw new Error(`blue workflow: ${field} must be an array of strings`);
   }
+  if (value.length > MAX_STRING_ARRAY_ITEMS) {
+    throw new Error(`blue workflow: ${field} exceeds maximum of ${MAX_STRING_ARRAY_ITEMS} entries`);
+  }
   const ids: string[] = [];
+  const seen = new Set<string>();
   for (const entry of value) {
     if (typeof entry !== 'string') {
       throw new Error(`blue workflow: ${field} must be an array of strings`);
     }
     const id = entry.trim();
-    if (id && !ids.includes(id)) ids.push(id);
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      ids.push(id);
+    }
   }
   return ids;
 }
@@ -133,6 +142,8 @@ export interface BlueCoverageStageInput {
   artifactBytes: string;
   findings: CoverageFinding[];
   telemetry: TelemetryDeclaration[];
+  /** Optional per-finding resolved artifact bindings from ledger lookup. */
+  observedByFinding?: ObservedArtifactIds;
 }
 
 export interface BlueCoverageStageResult {
@@ -181,7 +192,8 @@ export function runBlueCoverageStage(input: BlueCoverageStageInput): BlueCoverag
     };
   }
 
-  const observed: ObservedArtifactIds = Object.fromEntries(findings.map(finding => [finding.id, artifactIds]));
+  const observed: ObservedArtifactIds = input.observedByFinding
+    ?? Object.fromEntries(findings.map(finding => [finding.id, artifactIds]));
   const inputSha256 = blueInputHash(`${input.artifactBytes}\n${JSON.stringify({ family, findings, telemetry })}`);
   const gaps = coverageGaps(findings, telemetry, observed);
   return {

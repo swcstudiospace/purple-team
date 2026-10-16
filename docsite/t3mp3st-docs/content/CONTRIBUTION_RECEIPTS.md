@@ -11,7 +11,7 @@ updated: "2026-07-20"
 ---
 # Contribution Receipts
 
-T3MP3ST already treats benchmark claims as something reviewers should be able to
+Purple Team already treats benchmark claims as something reviewers should be able to
 re-derive. Contribution receipts apply the same discipline to pull requests:
 make scope, run mode, evidence, redaction, and model/harness labels explicit
 before a change is merged.

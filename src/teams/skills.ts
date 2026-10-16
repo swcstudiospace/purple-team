@@ -51,6 +51,89 @@ import {
   type ContextTransformInput,
   type SnapshotManagerInput,
 } from './extra-tools.js';
+import type { CustomTool, ToolContext, ToolResult } from '../types/index.js';
+import {
+  applyHardeningRetest,
+  detectionGaps,
+  evaluateHardeningRetest,
+  hardeningPlan,
+  type HardeningItem,
+  type ObservedArtifactIds,
+  type RedFindingShape,
+  type TelemetrySourceShape,
+} from './blue.js';
+import {
+  blueInputHash,
+  runBlueCoverageAcrossFamilies,
+  runBlueCoverageStage,
+  runBlueDetectionStage,
+  runBlueDetectorStage,
+  runBlueRetestStage,
+  type BlueCoverageStageInput,
+  type BlueDetectionStageInput,
+  type BlueDetectorStageInput,
+  type BlueRetestStageInput,
+} from './blue/workflow.js';
+import {
+  coverageGaps,
+  type CoverageFinding,
+  type CoverageGap,
+  type TelemetryDeclaration,
+} from './blue/coverage.js';
+import {
+  sigmaRuleForGap,
+  sigmaRulepack,
+  validateDetectorStanding,
+  type DetectorValidationInput,
+  type SigmaRuleOptions,
+} from './blue/rulepacks.js';
+import { coverAudit, noiseBudget } from './black.js';
+import {
+  hashBlackInput,
+  runBlackWorkflow,
+  type BlackWorkflowInput,
+} from './black/workflow.js';
+import {
+  exfilCostModel,
+  type ExfilPath,
+  type RouteEvidence,
+} from './black/exfil.js';
+import { matchVocabulary, structuredNoiseBudget } from './black/noise.js';
+import { opsecChecklist, opsecReview, type OpsecPhase } from './black/checklist.js';
+import {
+  adjudicateEvidence,
+  roeAudit,
+  type AuditedAction,
+  type EvidenceEntryShape,
+  type RoeSpec,
+  type RoeVerdict,
+} from './white.js';
+import { parseRoe } from './white/roe-parser.js';
+import {
+  auditEvidenceChain,
+  resolveLedgerStrength,
+  type LedgerEvidenceShape,
+} from './white/evidence-chain.js';
+import { auditReport, type FindingShape } from './white/report-auditor.js';
+import {
+  aggregateEvidenceStanding,
+  pairDisputeRulings,
+  stageRoeAudit,
+  type ApprovalBearingAction,
+  type PairedDisputeRuling,
+  type RoeStageMeta,
+} from './white/workflow.js';
+import {
+  arbiterDispute,
+  auditorScore,
+  sentinelDetectorMap,
+  specterCoverReview,
+  wardenHardeningReview,
+  wraithExfilSim,
+  type DisputeClaim,
+  type ExfilPathShape,
+  type SentinelStageBinding,
+} from './hats.js';
 
 export interface HatToolParameterSpec {
   name: string;
@@ -845,4 +928,351 @@ export async function runComposableSkill(
       };
     },
   });
+}
+
+// =============================================================================
+// SPECIALIST WORKFLOW CUSTOM TOOLS FOR OPERATOR DISPATCH
+// =============================================================================
+
+interface SpecialistEngineEntry {
+  name: string;
+  description: string;
+  run: (params: Record<string, unknown>) => unknown | Promise<unknown>;
+}
+
+const SPECIALIST_WORKFLOW_ENTRIES: readonly SpecialistEngineEntry[] = [
+  {
+    name: 'runBlueCoverageStage',
+    description: 'Run the artifact-bound Blue coverage stage for one mission family.',
+    run: (p) => runBlueCoverageStage(p as unknown as BlueCoverageStageInput),
+  },
+  {
+    name: 'runBlueDetectionStage',
+    description: 'Run the artifact-bound Blue detection stage and emit Sigma rulepack.',
+    run: (p) => runBlueDetectionStage(p as unknown as BlueDetectionStageInput),
+  },
+  {
+    name: 'runBlueDetectorStage',
+    description: 'Run the offline Blue detector validation stage against supplied matching/non-matching evidence.',
+    run: (p) => runBlueDetectorStage(p as unknown as BlueDetectorStageInput),
+  },
+  {
+    name: 'runBlueRetestStage',
+    description: 'Run the Blue hardening retest stage with item-linked baseline and retest evidence IDs.',
+    run: (p) => runBlueRetestStage(p as unknown as BlueRetestStageInput),
+  },
+  {
+    name: 'runBlueCoverageAcrossFamilies',
+    description: 'Run Blue coverage across multiple mission families in isolation.',
+    run: (p) => runBlueCoverageAcrossFamilies(p as unknown as BlueCoverageStageInput),
+  },
+  {
+    name: 'blueInputHash',
+    description: 'Compute deterministic SHA-256 input digest for Blue stage bindings.',
+    run: (p) => ({ sha256: blueInputHash(typeof p.text === 'string' ? p.text : JSON.stringify(p)) }),
+  },
+  {
+    name: 'coverageGaps',
+    description: 'Evaluate D3FEND countermeasure coverage gaps for findings and telemetry declarations.',
+    run: (p) => coverageGaps(
+      (Array.isArray(p.findings) ? p.findings : []) as CoverageFinding[],
+      (Array.isArray(p.telemetry) ? p.telemetry : []) as TelemetryDeclaration[],
+      p.observed as ObservedArtifactIds | undefined,
+    ),
+  },
+  {
+    name: 'detectionGaps',
+    description: 'Evaluate telemetry detection gaps per finding.',
+    run: (p) => detectionGaps(
+      (Array.isArray(p.findings) ? p.findings : []) as RedFindingShape[],
+      (Array.isArray(p.telemetry) ? p.telemetry : undefined) as TelemetrySourceShape[] | undefined,
+      p.observed as ObservedArtifactIds | undefined,
+    ),
+  },
+  {
+    name: 'hardeningPlan',
+    description: 'Group findings into severity-tiered Blue hardening work items.',
+    run: (p) => hardeningPlan((Array.isArray(p.findings) ? p.findings : []) as RedFindingShape[]),
+  },
+  {
+    name: 'evaluateHardeningRetest',
+    description: 'Resolve a hardening retest outcome from baseline and retest evidence IDs.',
+    run: (p) => ({ outcome: evaluateHardeningRetest(p) }),
+  },
+  {
+    name: 'applyHardeningRetest',
+    description: 'Link baseline and retest evidence IDs onto a hardening item and resolve its retest outcome.',
+    run: (p) => applyHardeningRetest(
+      (p.item ?? p) as unknown as HardeningItem,
+      (p.verdict ?? p) as { baselineEvidenceIds?: unknown; retestEvidenceIds?: unknown; retestPassed?: unknown },
+    ),
+  },
+  {
+    name: 'validateDetectorStanding',
+    description: 'Validate a Sigma or YARA detector offline against matching and non-matching evidence excerpts.',
+    run: (p) => validateDetectorStanding(p as unknown as DetectorValidationInput),
+  },
+  {
+    name: 'sigmaRulepack',
+    description: 'Generate deterministic Sigma YAML rules keyed to uncovered D3FEND countermeasures.',
+    run: (p) => sigmaRulepack(
+      (Array.isArray(p.findings) ? p.findings : []) as RedFindingShape[],
+      (Array.isArray(p.gaps) ? p.gaps : []) as CoverageGap[],
+      p.options as SigmaRuleOptions | undefined,
+    ),
+  },
+  {
+    name: 'sigmaRuleForGap',
+    description: 'Generate a single Sigma rule for an uncovered coverage gap.',
+    run: (p) => sigmaRuleForGap(
+      p.finding as RedFindingShape | undefined,
+      (p.gap ?? p) as unknown as CoverageGap,
+      p.options as SigmaRuleOptions | undefined,
+    ),
+  },
+  {
+    name: 'sentinelDetectorMap',
+    description: 'Map findings to telemetry via detectionGaps and produce Sentinel detector engineering specifications.',
+    run: (p) => sentinelDetectorMap(
+      (Array.isArray(p.findings) ? p.findings : []) as RedFindingShape[],
+      (Array.isArray(p.telemetry) ? p.telemetry : undefined) as TelemetrySourceShape[] | undefined,
+      p.stage as SentinelStageBinding | undefined,
+    ),
+  },
+  {
+    name: 'wardenHardeningReview',
+    description: 'Audit hardening plan items and optional linked retest outcomes.',
+    run: (p) => wardenHardeningReview(
+      (Array.isArray(p.findings) ? p.findings : []) as RedFindingShape[],
+      p.retest as {
+        runId: string;
+        missionId: string;
+        links: Array<{ itemIndex: number; baselineEvidenceIds: string[]; retestEvidenceIds: string[]; retestPassed: boolean }>;
+      } | undefined,
+    ),
+  },
+  {
+    name: 'runBlackWorkflow',
+    description: 'Run the Black staged OPSEC, noise budget, and exfil cost workflow with refusal boundary.',
+    run: (p) => runBlackWorkflow(p as BlackWorkflowInput),
+  },
+  {
+    name: 'hashBlackInput',
+    description: 'Compute deterministic FNV-1a digest for Black workflow input.',
+    run: (p) => ({ inputHash: hashBlackInput(p as BlackWorkflowInput) }),
+  },
+  {
+    name: 'exfilCostModel',
+    description: 'Model detection-surface cost across planned exfiltration paths.',
+    run: (p) => exfilCostModel({
+      paths: (Array.isArray(p.paths) ? p.paths : []) as Array<ExfilPath | string>,
+      egress: Array.isArray(p.egress) ? p.egress.map(String) : undefined,
+      budget: typeof p.budget === 'number' ? p.budget : undefined,
+      routeEvidence: Array.isArray(p.routeEvidence) ? (p.routeEvidence as RouteEvidence[]) : undefined,
+    }),
+  },
+  {
+    name: 'structuredNoiseBudget',
+    description: 'Score planned actions against ATT&CK tactic-weighted noise budget.',
+    run: (p) => structuredNoiseBudget({
+      actions: Array.isArray(p.actions) ? p.actions.map(String) : [],
+      budget: typeof p.budget === 'number' ? p.budget : undefined,
+      egress: Array.isArray(p.egress) ? p.egress.map(String) : undefined,
+    }),
+  },
+  {
+    name: 'matchVocabulary',
+    description: 'Match an action string against the vendored ATT&CK noise vocabulary.',
+    run: (p) => matchVocabulary(typeof p.action === 'string' ? p.action : String(p.command ?? '')),
+  },
+  {
+    name: 'opsecReview',
+    description: 'Review planned actions and egress declarations against phase-keyed OPSEC checklists.',
+    run: (p) => opsecReview({
+      actions: Array.isArray(p.actions) ? p.actions.map(String) : undefined,
+      egress: Array.isArray(p.egress) ? p.egress.map(String) : undefined,
+    }),
+  },
+  {
+    name: 'opsecChecklist',
+    description: 'Retrieve the OPSEC checklist for an ATT&CK tactic phase.',
+    run: (p) => opsecChecklist((typeof p.phase === 'string' ? p.phase : 'reconnaissance') as OpsecPhase),
+  },
+  {
+    name: 'noiseBudget',
+    description: 'Score a mission plan noise budget.',
+    run: (p) => noiseBudget({
+      actions: Array.isArray(p.actions) ? p.actions.map(String) : [],
+      egress: Array.isArray(p.egress) ? p.egress.map(String) : undefined,
+    }),
+  },
+  {
+    name: 'coverAudit',
+    description: 'Perform awareness-only cover and residue audit for a planned or executed command.',
+    run: (p) => coverAudit({
+      command: typeof p.command === 'string' ? p.command : String(p.action ?? ''),
+      artifacts: Array.isArray(p.artifacts) ? p.artifacts.map(String) : undefined,
+    }),
+  },
+  {
+    name: 'specterCoverReview',
+    description: 'Critique a plan for per-action cover, noise budget, and realism flags.',
+    run: (p) => specterCoverReview({
+      actions: Array.isArray(p.actions) ? p.actions.map(String) : [],
+      egress: Array.isArray(p.egress) ? p.egress.map(String) : undefined,
+    }),
+  },
+  {
+    name: 'wraithExfilSim',
+    description: 'Simulate exfiltration paths as analysis with cost tiers and route standing.',
+    run: (p) => wraithExfilSim({
+      paths: (Array.isArray(p.paths) ? p.paths : []) as ExfilPathShape[],
+      egress: Array.isArray(p.egress) ? p.egress.map(String) : undefined,
+      routeEvidence: Array.isArray(p.routeEvidence) ? (p.routeEvidence as RouteEvidence[]) : undefined,
+    }),
+  },
+  {
+    name: 'parseRoe',
+    description: 'Parse operator ROE text into a structured RoeSpec with resolved/unresolved line accounting.',
+    run: (p) => parseRoe(typeof p.roeText === 'string' ? p.roeText : String(p.text ?? '')),
+  },
+  {
+    name: 'stageRoeAudit',
+    description: 'Run the staged White ROE gate and audit actions against parsed ROE scope and approval receipts.',
+    run: (p) => stageRoeAudit(
+      typeof p.roeText === 'string' ? p.roeText : String(p.text ?? ''),
+      (Array.isArray(p.actions) ? p.actions : []) as ApprovalBearingAction[],
+      p.meta as RoeStageMeta | undefined,
+    ),
+  },
+  {
+    name: 'roeAudit',
+    description: 'Audit actions against a structured RoeSpec.',
+    run: (p) => roeAudit(
+      (Array.isArray(p.actions) ? p.actions : []) as AuditedAction[],
+      (p.roe ?? {}) as RoeSpec,
+    ),
+  },
+  {
+    name: 'adjudicateEvidence',
+    description: 'Adjudicate evidence entries against the platform provenance ranking.',
+    run: (p) => adjudicateEvidence((Array.isArray(p.entries) ? p.entries : []) as EvidenceEntryShape[]),
+  },
+  {
+    name: 'pairDisputeRulings',
+    description: 'Pair opposed Red and Blue dispute claims per action against ROE verdicts.',
+    run: (p) => pairDisputeRulings(
+      (Array.isArray(p.claims) ? p.claims : []) as DisputeClaim[],
+      (Array.isArray(p.verdicts) ? p.verdicts : []) as RoeVerdict[],
+    ),
+  },
+  {
+    name: 'auditEvidenceChain',
+    description: 'Validate receipt-ledger evidence chain links and provenance strength.',
+    run: (p) => auditEvidenceChain((Array.isArray(p.entries) ? p.entries : []) as LedgerEvidenceShape[]),
+  },
+  {
+    name: 'resolveLedgerStrength',
+    description: 'Resolve the provenance strength of a ledger evidence entry.',
+    run: (p) => ({ strength: resolveLedgerStrength((p.entry ?? p) as LedgerEvidenceShape) }),
+  },
+  {
+    name: 'auditReport',
+    description: 'Audit findings-to-evidence coverage, remediation completeness, and unclaimed evidence.',
+    run: (p) => auditReport(
+      (Array.isArray(p.findings) ? p.findings : []) as FindingShape[],
+      (Array.isArray(p.evidence) ? p.evidence : Array.isArray(p.entries) ? p.entries : []) as LedgerEvidenceShape[],
+    ),
+  },
+  {
+    name: 'aggregateEvidenceStanding',
+    description: 'Compute aggregate sufficiency standing and score across findings and evidence.',
+    run: (p) => aggregateEvidenceStanding(
+      (Array.isArray(p.findings) ? p.findings : []) as FindingShape[],
+      (Array.isArray(p.evidence) ? p.evidence : Array.isArray(p.entries) ? p.entries : []) as LedgerEvidenceShape[],
+      p.options as { requiredFindingIds?: string[]; disputes?: PairedDisputeRuling[] } | undefined,
+    ),
+  },
+  {
+    name: 'arbiterDispute',
+    description: 'Adjudicate actions via roeAudit and pair opposed Red/Blue dispute claims.',
+    run: (p) => arbiterDispute({
+      actions: (Array.isArray(p.actions) ? p.actions : []) as AuditedAction[],
+      roe: (p.roe ?? {}) as RoeSpec,
+      claims: Array.isArray(p.claims) ? (p.claims as DisputeClaim[]) : undefined,
+    }),
+  },
+  {
+    name: 'auditorScore',
+    description: 'Review evidence entries, label provenance confidence, and compute Auditor readiness score.',
+    run: (p) => auditorScore((Array.isArray(p.entries) ? p.entries : []) as EvidenceEntryShape[]),
+  },
+];
+
+/**
+ * Mint callable CustomTool instances for specialist workflow/engine functions and
+ * registered 4-Hat tools permitted by `permittedNames`, skipping any already in `alreadyRegistered`.
+ */
+export function buildSpecialistWorkflowTools(
+  permittedNames: ReadonlySet<string>,
+  alreadyRegistered: ReadonlySet<string> = new Set(),
+): CustomTool[] {
+  const tools: CustomTool[] = [];
+
+  for (const entry of SPECIALIST_WORKFLOW_ENTRIES) {
+    if (!permittedNames.has(entry.name) || alreadyRegistered.has(entry.name)) continue;
+    tools.push({
+      name: entry.name,
+      description: entry.description,
+      category: 'custom',
+      riskTier: 'passive',
+      parameters: [
+        {
+          name: 'input',
+          type: 'object',
+          description: `Structured parameters for ${entry.name}`,
+          required: false,
+        },
+      ],
+      handler: async (context: ToolContext): Promise<ToolResult> => {
+        const rawParams = context.parameters ?? {};
+        const nested = rawParams.input;
+        const effectiveParams =
+          nested && typeof nested === 'object' && !Array.isArray(nested)
+            ? { ...rawParams, ...(nested as Record<string, unknown>) }
+            : rawParams;
+        const data = await entry.run(effectiveParams);
+        return {
+          success: true,
+          output: JSON.stringify(data),
+        };
+      },
+    });
+  }
+
+  for (const reg of HAT_TOOL_REGISTRY) {
+    if (!permittedNames.has(reg.id) || alreadyRegistered.has(reg.id)) continue;
+    tools.push({
+      name: reg.id,
+      description: reg.description,
+      category: 'custom',
+      riskTier: 'passive',
+      parameters: reg.parameters.map((param) => ({
+        name: param.name,
+        type: param.type === 'json' ? 'object' : param.type,
+        description: param.description,
+        required: param.required,
+      })),
+      handler: async (context: ToolContext): Promise<ToolResult> => {
+        const envelope = await executeRegisteredHatTool(reg.id, context.parameters ?? {});
+        return {
+          success: envelope.ok,
+          output: JSON.stringify(envelope),
+          ...(envelope.ok ? {} : { error: envelope.error?.message ?? 'Hat tool execution failed' }),
+        };
+      },
+    });
+  }
+
+  return tools;
 }

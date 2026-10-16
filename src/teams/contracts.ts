@@ -248,6 +248,60 @@ const CATALOG_TO_ADAPTER_NAMES: Readonly<Record<string, readonly string[]>> = {
   nmap: ['port_scanner', 'nmap_scanner'],
 };
 
+const ROLE_WORKFLOW_TOOL_GRANTS: Readonly<Record<string, readonly string[]>> = {
+  blue: [
+    'runBlueCoverageStage', 'runBlueDetectionStage', 'runBlueDetectorStage',
+    'runBlueRetestStage', 'runBlueCoverageAcrossFamilies', 'blueInputHash',
+    'coverageGaps', 'detectionGaps', 'hardeningPlan', 'evaluateHardeningRetest',
+    'applyHardeningRetest', 'validateDetectorStanding', 'sigmaRulepack',
+    'sigmaRuleForGap', 'sentinelDetectorMap', 'wardenHardeningReview',
+    'blue-workflow-sequencer', 'blue-decision-ledger', 'blue-runbook-verifier',
+  ],
+  sentinel: [
+    'runBlueCoverageStage', 'runBlueDetectionStage', 'runBlueDetectorStage',
+    'blueInputHash', 'coverageGaps', 'detectionGaps', 'validateDetectorStanding',
+    'sigmaRulepack', 'sigmaRuleForGap', 'sentinelDetectorMap',
+    'blue-workflow-sequencer', 'blue-decision-ledger', 'blue-runbook-verifier',
+  ],
+  warden: [
+    'runBlueCoverageStage', 'runBlueRetestStage', 'runBlueCoverageAcrossFamilies',
+    'blueInputHash', 'coverageGaps', 'hardeningPlan', 'evaluateHardeningRetest',
+    'applyHardeningRetest', 'wardenHardeningReview',
+    'blue-workflow-sequencer', 'blue-decision-ledger', 'blue-runbook-verifier',
+  ],
+  black: [
+    'runBlackWorkflow', 'hashBlackInput', 'exfilCostModel', 'structuredNoiseBudget',
+    'matchVocabulary', 'opsecReview', 'opsecChecklist', 'noiseBudget', 'coverAudit',
+    'specterCoverReview', 'wraithExfilSim',
+    'black-risk-analyzer', 'black-policy-validator', 'black-stress-prober',
+  ],
+  specter: [
+    'runBlackWorkflow', 'hashBlackInput', 'structuredNoiseBudget', 'matchVocabulary',
+    'opsecReview', 'opsecChecklist', 'noiseBudget', 'coverAudit', 'specterCoverReview',
+    'black-risk-analyzer', 'black-policy-validator', 'black-stress-prober',
+  ],
+  wraith: [
+    'runBlackWorkflow', 'hashBlackInput', 'exfilCostModel', 'structuredNoiseBudget',
+    'opsecReview', 'opsecChecklist', 'noiseBudget', 'wraithExfilSim',
+    'black-risk-analyzer', 'black-policy-validator', 'black-stress-prober',
+  ],
+  white: [
+    'parseRoe', 'stageRoeAudit', 'roeAudit', 'adjudicateEvidence',
+    'pairDisputeRulings', 'auditEvidenceChain', 'resolveLedgerStrength',
+    'auditReport', 'aggregateEvidenceStanding', 'arbiterDispute', 'auditorScore',
+    'white-data-inspector', 'white-gap-analyzer', 'white-evidence-collector',
+  ],
+  arbiter: [
+    'parseRoe', 'stageRoeAudit', 'roeAudit', 'pairDisputeRulings', 'arbiterDispute',
+    'white-data-inspector', 'white-gap-analyzer', 'white-evidence-collector',
+  ],
+  auditor: [
+    'adjudicateEvidence', 'auditEvidenceChain', 'resolveLedgerStrength',
+    'auditReport', 'aggregateEvidenceStanding', 'auditorScore',
+    'white-data-inspector', 'white-gap-analyzer', 'white-evidence-collector',
+  ],
+};
+
 function expandCatalogGrantsToToolNames(grants: readonly string[]): string[] {
   const out = new Set<string>();
   for (const id of grants) {
@@ -269,10 +323,16 @@ export function resolveRunAllowlist(
     return expandCatalogGrantsToToolNames(redDefaultTools);
   }
   if (role === 'black' || role === 'blue' || role === 'white') {
-    return expandCatalogGrantsToToolNames(teamToolGrants(role));
+    return [
+      ...expandCatalogGrantsToToolNames(teamToolGrants(role)),
+      ...(ROLE_WORKFLOW_TOOL_GRANTS[role] ?? []),
+    ];
   }
   if (isHat(role)) {
-    return expandCatalogGrantsToToolNames(hatToolGrants(role));
+    return [
+      ...expandCatalogGrantsToToolNames(hatToolGrants(role)),
+      ...(ROLE_WORKFLOW_TOOL_GRANTS[role] ?? []),
+    ];
   }
   throw new Error(`resolveRunAllowlist: "${role}" is not a spawnable role (purple never spawns)`);
 }

@@ -558,4 +558,13 @@ describe('white suite: prompts name real exports and referee limits', () => {
     expect(verdicts[1].verdict).toBe('compliant');
     expect(verdicts[2].verdict).toBe('violation');
   });
+
+  it('rejects inherited Object.prototype property names on allow-active directives', () => {
+    for (const token of ['constructor', 'toString', 'valueOf', '__proto__']) {
+      const parsed = parseRoe(`scope: app.example.com\nallow active: ${token}`);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.unresolved).toHaveLength(1);
+      expect(parsed.unresolved[0].text).toContain(token);
+    }
+  });
 });

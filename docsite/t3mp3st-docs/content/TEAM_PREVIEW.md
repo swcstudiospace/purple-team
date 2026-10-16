@@ -9,11 +9,11 @@ source: "T3MP3ST repository"
 sourcePath: "docs/TEAM_PREVIEW.md"
 updated: "2026-07-20"
 ---
-# T3MP3ST Team Preview
+# Purple Team Preview
 
-This preview is for prompt engineers, red-teamers, bug bounty operators, cyber researchers, and builders who want to pressure-test T3MP3ST before a broader release.
+This preview is for prompt engineers, red-teamers, bug bounty operators, cyber researchers, and builders who want to pressure-test Purple Team before a broader release.
 
-The useful mental model: T3MP3ST is an evidence-first adversarial AI command center. It is not only a scanner UI. It routes a mission into specialist agent lanes, binds tool output to evidence, promotes evidence into findings, retests claims, and only then proposes durable learning.
+The useful mental model: Purple Team is an evidence-first adversarial AI command center. It is not only a scanner UI. It routes a mission into specialist agent lanes, binds tool output to evidence, promotes evidence into findings, retests claims, and only then proposes durable learning.
 
 ## Ten-Minute First Run
 

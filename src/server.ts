@@ -57,23 +57,23 @@ import { initGrammars } from './recon/ts-grammars.js';
 import { redactCredential } from './evidence/index.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
-import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, ArtifactValidationError } from './teams/contracts.js';
+import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, ArtifactValidationError, RED_ARCHETYPES } from './teams/contracts.js';
 import type { BoundInlineArtifact } from './types/index.js';
 import { synthesize, type DarkPurpleSynthesis, type PurpleVerdictByFinding } from './teams/purple.js';
-import { hardeningPlan, type DetectionGap } from './teams/blue.js';
+import { hardeningPlan, type DetectionGap, type ObservedArtifactIds } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
 import { sigmaRulepack } from './teams/blue/rulepacks.js';
 import { registryTelemetry } from './teams/blue/telemetry.js';
 import { runBlueCoverageStage } from './teams/blue/workflow.js';
 import { opsecReview } from './teams/black/checklist.js';
-import { exfilCostModel } from './teams/black/exfil.js';
+import { exfilCostModel, type RouteEvidence } from './teams/black/exfil.js';
 import { structuredNoiseBudget } from './teams/black/noise.js';
-import { runBlackWorkflow } from './teams/black/workflow.js';
+import { runBlackWorkflow, type BlackWorkflowInput } from './teams/black/workflow.js';
 import { parseRoe } from './teams/white/roe-parser.js';
 import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
 import { roeAudit, type AuditedAction, type RoeVerdict } from './teams/white.js';
-import { stageRoeAudit } from './teams/white/workflow.js';
+import { stageRoeAudit, type ApprovalBearingAction, type RoeStageMeta } from './teams/white/workflow.js';
 import {
   listRegisteredHatTools,
   executeRegisteredHatTool,
@@ -448,9 +448,43 @@ function createTempestCommandInstance(missionName: string, apiKey: string | unde
   // Evidence Vault (/api/findings) reflects the run instead of showing 0 afterward.
   tempestCommand.on('finding:discovered', ({ finding }) => {
     try {
-      upsertMissionFindingToLedger(finding as any, tempestCommand?.mission.getActiveMission()?.id);
+      const findingShape: {
+        id?: string;
+        title?: string;
+        description?: string;
+        severity?: unknown;
+        targetId?: string;
+      } = finding;
+      upsertMissionFindingToLedger(findingShape, tempestCommand?.mission.getActiveMission()?.id);
     } catch (err) {
       console.error('[purple-team] failed to persist mission finding to ledger:', err instanceof Error ? err.message : err);
+    }
+  });
+
+  tempestCommand.on('scan:progress', (event) => {
+    if (!event.taskId) return;
+    const activeMissionId = tempestCommand?.mission.getActiveMission()?.id || 'active';
+    if (event.kind === 'task_started') {
+      updateOperatorTaskRunByTaskId(event.taskId, {
+        status: 'running',
+        specialist: event.archetype,
+        missionId: activeMissionId,
+      });
+    } else if (event.kind === 'task_completed') {
+      updateOperatorTaskRunByTaskId(event.taskId, {
+        status: event.success === false ? 'failed' : 'completed',
+        output: event.detail,
+        ...(event.success === false ? { error: event.detail } : {}),
+        specialist: event.archetype,
+        missionId: activeMissionId,
+      });
+    } else if (event.kind === 'task_failed') {
+      updateOperatorTaskRunByTaskId(event.taskId, {
+        status: 'failed',
+        error: event.detail,
+        specialist: event.archetype,
+        missionId: activeMissionId,
+      });
     }
   });
 
@@ -975,11 +1009,100 @@ interface OperatorTaskRun {
   inputSha256: string;
   status: 'pending' | 'running' | 'completed' | 'failed' | 'interrupted';
   executionSettled: boolean;
+  output?: string;
+  error?: string;
   createdAt: string;
   updatedAt: string;
 }
 const operatorTaskRuns = new Map<string, OperatorTaskRun>();
 
+function hatForSpecialistRole(role: string): string {
+  if (role === 'blue' || role === 'sentinel' || role === 'warden') return 'blue';
+  if (role === 'black' || role === 'specter' || role === 'wraith') return 'black';
+  if (role === 'white' || role === 'arbiter' || role === 'auditor') return 'white';
+  return 'red';
+}
+
+function recordOperatorTaskRun(entry: {
+  id?: string;
+  runId: string;
+  missionId: string;
+  specialist: string;
+  taskId: string;
+  inputText: string;
+  status?: OperatorTaskRun['status'];
+}): OperatorTaskRun {
+  const now = nowIso();
+  const id = entry.id || entry.taskId || randomUUID();
+  const status = entry.status ?? 'pending';
+  const row: OperatorTaskRun = {
+    id,
+    runId: entry.runId,
+    missionId: entry.missionId,
+    hat: hatForSpecialistRole(entry.specialist),
+    specialist: entry.specialist,
+    taskId: entry.taskId,
+    inputSha256: createHash('sha256').update(entry.inputText, 'utf8').digest('hex'),
+    status,
+    executionSettled: status === 'completed' || status === 'failed' || status === 'interrupted',
+    createdAt: now,
+    updatedAt: now,
+  };
+  operatorTaskRuns.set(row.id, row);
+  schedulePersist('operatorTaskRuns');
+  return row;
+}
+
+function updateOperatorTaskRunByTaskId(
+  taskId: string,
+  patch: {
+    status: OperatorTaskRun['status'];
+    output?: string;
+    error?: string;
+    specialist?: string;
+    missionId?: string;
+  },
+): void {
+  if (!taskId) return;
+  const now = nowIso();
+  let row = operatorTaskRuns.get(taskId);
+  if (!row) {
+    for (const candidate of operatorTaskRuns.values()) {
+      if (candidate.taskId === taskId) {
+        row = candidate;
+        break;
+      }
+    }
+  }
+  if (!row) {
+    const specialist = patch.specialist || 'recon';
+    row = {
+      id: taskId,
+      runId: taskId,
+      missionId: patch.missionId || 'active',
+      hat: hatForSpecialistRole(specialist),
+      specialist,
+      taskId,
+      inputSha256: createHash('sha256').update(taskId, 'utf8').digest('hex'),
+      status: patch.status,
+      executionSettled: patch.status === 'completed' || patch.status === 'failed' || patch.status === 'interrupted',
+      createdAt: now,
+      updatedAt: now,
+    };
+  } else {
+    row.status = patch.status;
+    row.executionSettled = patch.status === 'completed' || patch.status === 'failed' || patch.status === 'interrupted';
+    row.updatedAt = now;
+  }
+  if (typeof patch.output === 'string' && patch.output.trim()) {
+    row.output = redactLedgerText(patch.output, 2000);
+  }
+  if (typeof patch.error === 'string' && patch.error.trim()) {
+    row.error = redactLedgerText(patch.error, 1000);
+  }
+  operatorTaskRuns.set(row.id, row);
+  schedulePersist('operatorTaskRuns');
+}
 /**
  * Private receipt writer — the ONLY path that mints origin:observed. Call
  * only after a real computation returns, with the full run/mission/stage/
@@ -6857,11 +6980,143 @@ app.get('/api/teams/white/report-audit', (_req: Request, res: Response): void =>
 });
 
 // POST /api/teams/blue/coverage — artifact-bound coverage stage for one family
+// Resolve staged evidence associations against live server ledgers before
+// running the Blue/Black/White staged helpers so unbacked caller labels do not
+// pass as verified/observed/approved proof.
+function resolveStagedBlueInput(rawBody: unknown): void {
+  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) return;
+  const body = rawBody as Record<string, unknown>;
+  if (!Array.isArray(body.artifactIds) || !Array.isArray(body.findings)) return;
+  const validArtifactIds = body.artifactIds.filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+  const observedByFinding: Record<string, readonly string[]> = {};
+  for (const rawFinding of body.findings) {
+    if (!rawFinding || typeof rawFinding !== 'object' || Array.isArray(rawFinding)) continue;
+    const findingRec = rawFinding as Record<string, unknown>;
+    const findingId = typeof findingRec.id === 'string' ? findingRec.id : '';
+    if (!findingId) continue;
+    const ledgerFinding = findingsLedger.get(findingId);
+    const matchedIds = validArtifactIds.filter((artId) => {
+      const receipt = observedReceipts.get(artId);
+      if (receipt && receipt.itemId === findingId) return true;
+      const ev = evidenceLedger.get(artId);
+      if (ev && (ev.source === 'tool' || ev.provenanceStrength === 'replayable' || ev.provenanceStrength === 'tool') && (!ev.findingId || ev.findingId === findingId)) return true;
+      if (ledgerFinding && ledgerFinding.evidenceIds.includes(artId) && (evidenceLedger.has(artId) || observedReceipts.has(artId))) {
+        return true;
+      }
+      return false;
+    });
+    observedByFinding[findingId] = matchedIds;
+  }
+  const typedObserved: ObservedArtifactIds = observedByFinding;
+  body.observedByFinding = typedObserved;
+}
+
+function resolveStagedBlackInput(rawBody: unknown): BlackWorkflowInput {
+  if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) {
+    return {};
+  }
+  const body = rawBody as Record<string, unknown>;
+  if (!Array.isArray(body.routeEvidence)) {
+    return body as BlackWorkflowInput;
+  }
+  const resolvedRouteEvidence: RouteEvidence[] = body.routeEvidence.map((item) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return { pathId: '', evidenceId: '', observed: false };
+    }
+    const rec = item as Record<string, unknown>;
+    const pathId = typeof rec.pathId === 'string' ? rec.pathId : '';
+    const evidenceId = typeof rec.evidenceId === 'string' ? rec.evidenceId.trim() : '';
+    const claimedObserved = rec.observed === true;
+    if (!claimedObserved || !pathId || !evidenceId) {
+      return { pathId, evidenceId, observed: false };
+    }
+    const receipt = observedReceipts.get(evidenceId);
+    const ledgerEntry = evidenceLedger.get(evidenceId);
+    const verifiedByReceipt = Boolean(receipt && receipt.origin === 'observed' && receipt.itemId === pathId);
+    const verifiedByLedger = Boolean(
+      ledgerEntry &&
+      (ledgerEntry.source === 'tool' || ledgerEntry.provenanceStrength === 'replayable' || ledgerEntry.provenanceStrength === 'tool') &&
+      (ledgerEntry.resourceIds.includes(pathId) || ledgerEntry.title.includes(pathId) || ledgerEntry.summary.includes(pathId)),
+    );
+    return {
+      pathId,
+      evidenceId,
+      observed: verifiedByReceipt || verifiedByLedger,
+    };
+  });
+  return {
+    ...(body as BlackWorkflowInput),
+    routeEvidence: resolvedRouteEvidence,
+  };
+}
+
+interface ResolvedWhiteStageBody {
+  roeText: string;
+  actions: ApprovalBearingAction[];
+  meta?: RoeStageMeta;
+}
+
+function resolveStagedWhiteInput(rawBody: unknown): ResolvedWhiteStageBody {
+  const body = (rawBody && typeof rawBody === 'object' && !Array.isArray(rawBody)
+    ? rawBody
+    : {}) as Record<string, unknown>;
+  const roeText = typeof body.roeText === 'string' ? body.roeText : (body.roeText as unknown as string);
+  const rawActions = Array.isArray(body.actions) ? (body.actions as ApprovalBearingAction[]) : (body.actions as unknown as ApprovalBearingAction[]);
+  const actions = Array.isArray(rawActions)
+    ? rawActions.map((act) => {
+        if (!act || typeof act !== 'object') return act;
+        const approvalId = typeof act.approvalEvidenceId === 'string' ? act.approvalEvidenceId.trim() : '';
+        if (!approvalId) return act;
+        const approvedReq = approvalRequests.get(approvalId);
+        const receipt = observedReceipts.get(approvalId);
+        const ev = evidenceLedger.get(approvalId);
+        const validApproval = Boolean(
+          (approvedReq && approvedReq.status === 'approved' && (!act.target || approvedReq.target === act.target)) ||
+          (receipt && receipt.origin === 'observed') ||
+          (ev && (ev.type === 'receipt' || ev.provenanceStrength === 'replayable')),
+        );
+        if (validApproval) return act;
+        const copy: ApprovalBearingAction = { ...act };
+        delete copy.approvalEvidenceId;
+        return copy;
+      })
+    : rawActions;
+  return {
+    roeText,
+    actions,
+    meta: body.meta as RoeStageMeta | undefined,
+  };
+}
+
+function extractInlineArtifactRaw(inlineArtifacts: unknown): string | undefined {
+  if (Array.isArray(inlineArtifacts) && inlineArtifacts.length > 0) {
+    const first: unknown = inlineArtifacts[0];
+    if (first && typeof first === 'object') {
+      if ('data' in first && typeof first.data === 'string' && first.data.trim()) {
+        return first.data;
+      }
+      if ('raw' in first && typeof first.raw === 'string' && first.raw.trim()) {
+        return first.raw;
+      }
+    }
+  }
+  if (inlineArtifacts && typeof inlineArtifacts === 'object' && !Array.isArray(inlineArtifacts)) {
+    if ('data' in inlineArtifacts && typeof inlineArtifacts.data === 'string' && inlineArtifacts.data.trim()) {
+      return inlineArtifacts.data;
+    }
+    if ('raw' in inlineArtifacts && typeof inlineArtifacts.raw === 'string' && inlineArtifacts.raw.trim()) {
+      return inlineArtifacts.raw;
+    }
+  }
+  return undefined;
+}
+
 // (teams/blue/workflow.ts runBlueCoverageStage). The body passes straight
 // through: missing artifacts fail closed inside the workflow as
 // insufficient-evidence, never covered. Validation throws answer 400.
 app.post('/api/teams/blue/coverage', (req: Request, res: Response): void => {
   try {
+    resolveStagedBlueInput(req.body);
     res.json(redactSecrets(runBlueCoverageStage(req.body)));
   } catch (err) {
     res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
@@ -6872,14 +7127,15 @@ app.post('/api/teams/blue/coverage', (req: Request, res: Response): void => {
 // (teams/black/workflow.ts runBlackWorkflow). The body IS the workflow input;
 // caller-supplied paths pass through untouched (never defaulted to []).
 app.post('/api/teams/black/workflow', (req: Request, res: Response): void => {
-  res.json(redactSecrets(runBlackWorkflow((req.body ?? {}) as Parameters<typeof runBlackWorkflow>[0])));
+  const input = resolveStagedBlackInput(req.body);
+  res.json(redactSecrets(runBlackWorkflow(input)));
 });
 
 // POST /api/teams/white/stage — stage an ROE audit without minting a receipt
 // (teams/white/workflow.ts stageRoeAudit). Body: { roeText, actions, meta }.
 // No receipt-mint route lives here: stamps are echoed from caller meta only.
 app.post('/api/teams/white/stage', (req: Request, res: Response): void => {
-  const body = (req.body ?? {}) as { roeText: string; actions: Parameters<typeof stageRoeAudit>[1]; meta?: Parameters<typeof stageRoeAudit>[2] };
+  const body = resolveStagedWhiteInput(req.body);
   res.json(redactSecrets(stageRoeAudit(body.roeText, body.actions, body.meta)));
 });
 
@@ -6901,7 +7157,12 @@ app.post('/api/teams/tools/run', async (req: Request, res: Response): Promise<vo
     res.status(400).json({ error: 'toolId is required' });
     return;
   }
-  const envelope = await executeRegisteredHatTool(toolId, body.input ?? {});
+  const controller = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  const envelope = await executeRegisteredHatTool(toolId, body.input ?? {}, controller.signal);
+  if (res.writableEnded) return;
   res.status(envelope.error?.code === 'PAYLOAD_CAP_EXCEEDED' ? 413 : 200).json(redactSecrets(envelope));
 });
 
@@ -6926,10 +7187,14 @@ app.post('/api/teams/skills/run', async (req: Request, res: Response): Promise<v
   const params = typeof body.params === 'object' && body.params !== null
     ? (body.params as Record<string, unknown>)
     : {};
-  const envelope = await runComposableSkill(skillId, params);
+  const controller = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) controller.abort();
+  });
+  const envelope = await runComposableSkill(skillId, params, controller.signal);
+  if (res.writableEnded) return;
   res.json(redactSecrets(envelope));
 });
-
 // POST /api/models — live model list for the Universal API Config panel (#90).
 // POST (not GET) so the browser can pass its own localStorage-held key/baseUrl in the body — the
 // standalone UI holds the key, not the server (consistent with the existing per-request mission key,
@@ -7147,12 +7412,14 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       }
 
       const spawnedOps: Array<{ id: string; callsign: string; archetype: string }> = [];
+      const spawnedRoles: OperatorArchetype[] = [];
       const unavailable: Array<{ role: string; status: string; runId: string }> = [];
       for (const role of start.roles) {
         const callsign = role.charAt(0).toUpperCase() + role.slice(1) + '-1';
         try {
           const op = cmd.spawnOperator(callsign, role);
           spawnedOps.push({ id: op.id, callsign: op.callsign, archetype: role });
+          spawnedRoles.push(role);
         } catch {
           // Unregistered hat executor: unavailable with a retained run id —
           // never model prose as the hat result.
@@ -7160,8 +7427,42 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
         }
       }
 
-      cmd.start();
+      const rawArtifactText = extractInlineArtifactRaw(startBody.inlineArtifacts);
+      const seededTasks = cmd.configureStructuredRun({
+        runId: start.runId,
+        objective: start.objective,
+        roles: spawnedRoles,
+        artifactOnly: start.artifactOnly,
+        stagedArtifact: stagedArtifact ? { ...stagedArtifact, raw: rawArtifactText } : null,
+        roleInputs: startBody.roleInputs,
+        family: startBody.family,
+      });
 
+      const activeMissionId = cmd.mission.getActiveMission()?.id || start.runId;
+      for (const seeded of seededTasks) {
+        recordOperatorTaskRun({
+          id: seeded.id,
+          runId: start.runId,
+          missionId: activeMissionId,
+          specialist: seeded.role,
+          taskId: seeded.id,
+          inputText: `${start.objective}\n${stagedArtifact?.hash ?? ''}\n${seeded.description}`,
+          status: 'pending',
+        });
+      }
+      for (const unavail of unavailable) {
+        recordOperatorTaskRun({
+          id: `${start.runId}:${unavail.role}`,
+          runId: start.runId,
+          missionId: activeMissionId,
+          specialist: unavail.role,
+          taskId: `${start.runId}:${unavail.role}`,
+          inputText: `${start.objective}\n${unavail.role}`,
+          status: 'failed',
+        });
+      }
+
+      cmd.start();
       broadcastEvent('mission:started', {
         name,
         runId: start.runId,
@@ -7362,6 +7663,14 @@ app.post('/api/mission/stop', (_req: Request, res: Response) => {
   }
 
   cmd.stop();
+  for (const row of operatorTaskRuns.values()) {
+    if (row.status === 'pending' || row.status === 'running') {
+      row.status = 'interrupted';
+      row.executionSettled = true;
+      row.updatedAt = nowIso();
+    }
+  }
+  schedulePersist('operatorTaskRuns');
   // Stop the General's sitrep interval too — otherwise startMonitoring's setInterval
   // leaks and keeps firing against a dead mission.
   if (activeGeneral) activeGeneral.stopMonitoring();
@@ -7439,6 +7748,7 @@ app.get('/api/mission/status', (_req: Request, res: Response) => {
     vault: status.vault,
     opsec: status.opsec,
     tasks: status.tasks,
+    operatorTaskRuns: [...operatorTaskRuns.values()].map(r => redactSecrets(r)),
     progress: status.progress,
     findings: findings.map(f => ({
       id: f.id,
@@ -7617,13 +7927,31 @@ app.post('/api/operators/:id/task', async (req: Request, res: Response): Promise
 
   // Execute asynchronously — return immediately with task ID
   const targets = cmd.targetEnv.getAllTargets();
-  if (targets.length === 0) {
+  const requiresTarget = (RED_ARCHETYPES as readonly string[]).includes(operator.archetype);
+  if (targets.length === 0 && requiresTarget) {
     res.status(400).json({ error: 'No targets available for task dispatch' });
     return;
   }
   const target = targets[0];
 
+  recordOperatorTaskRun({
+    id: task.id,
+    runId: task.id,
+    missionId: task.missionId,
+    specialist: operator.archetype,
+    taskId: task.id,
+    inputText: `${taskName}\n${taskDescription}`,
+    status: 'running',
+  });
+
   operator.assignTask(task, target).then((result) => {
+    updateOperatorTaskRunByTaskId(task.id, {
+      status: result.success === false ? 'failed' : 'completed',
+      output: result.output,
+      error: result.error,
+      specialist: operator.archetype,
+      missionId: task.missionId,
+    });
     broadcastEvent('task:completed', {
       taskId: task.id,
       operatorId: operator.id,
@@ -7632,15 +7960,21 @@ app.post('/api/operators/:id/task', async (req: Request, res: Response): Promise
       output: (result.output || '').substring(0, 2000),
       ...(result.findings && { findings: result.findings }),
     });
-  }).catch((error: any) => {
+  }).catch((error: unknown) => {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    updateOperatorTaskRunByTaskId(task.id, {
+      status: 'failed',
+      error: errMsg,
+      specialist: operator.archetype,
+      missionId: task.missionId,
+    });
     broadcastEvent('task:failed', {
       taskId: task.id,
       operatorId: operator.id,
       callsign: operator.callsign,
-      error: error.message,
+      error: errMsg,
     });
   });
-
   res.json({
     success: true,
     taskId: task.id,

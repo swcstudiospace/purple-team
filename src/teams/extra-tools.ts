@@ -40,7 +40,7 @@ const DEFAULT_TARGET_TOOL_BY_HAT: Record<HatDomain, string> = {
   blue: 'blue-workflow-sequencer',
   white: 'white-data-inspector',
   black: 'black-risk-analyzer',
-  red: 'recon',
+  red: 'red-surface-validator',
 };
 
 /**
@@ -77,6 +77,32 @@ export function runContextTransformTool(
     : JSON.stringify(sanitizedPayload, null, 2);
   const provenanceHash = `sha256-${sha256Short(`${fromHat}:${toHat}:${targetToolId}:${rawText}`)}`;
   const note = (input.note ?? '').trim() || `Forwarded from ${fromHat.toUpperCase()} (${input.sourceToolId ?? 'workspace'})`;
+  const payloadRecord = typeof sanitizedPayload === 'object' && sanitizedPayload !== null && !Array.isArray(sanitizedPayload)
+    ? (sanitizedPayload as Record<string, unknown>)
+    : null;
+  const sourceArtifactId = typeof payloadRecord?.artifactId === 'string' && payloadRecord.artifactId.trim()
+    ? payloadRecord.artifactId.trim()
+    : undefined;
+  const sourceSha256 = typeof payloadRecord?.sha256 === 'string' && payloadRecord.sha256.trim()
+    ? payloadRecord.sha256.trim()
+    : undefined;
+  const sourceCorroboratedBy = Array.isArray(payloadRecord?.corroboratedBy)
+    ? payloadRecord.corroboratedBy.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    : [];
+  const sourceContradictedBy = Array.isArray(payloadRecord?.contradictedBy)
+    ? payloadRecord.contradictedBy.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    : [];
+  const sourceEvidenceRefs = Array.isArray(payloadRecord?.evidenceRefs)
+    ? payloadRecord.evidenceRefs.filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    : (sourceArtifactId ? [sourceArtifactId] : []);
+  const sourceVerified = (payloadRecord?.verified === true || payloadRecord?.confidence === 'verified')
+    && Boolean(sourceArtifactId)
+    && Boolean(sourceSha256)
+    && sourceCorroboratedBy.length > 0
+    && sourceContradictedBy.length === 0;
+  const sourceDecisionStatus = payloadRecord?.status === 'rejected' || sourceContradictedBy.length > 0
+    ? 'rejected'
+    : (payloadRecord?.status === 'accepted' && sourceEvidenceRefs.length > 0 ? 'accepted' : 'deferred');
 
   let transformedInput: Record<string, unknown>;
 
@@ -91,8 +117,9 @@ export function runContextTransformTool(
             toHat: 'blue',
             summary: note,
             rationale: `Imported ${fromHat.toUpperCase()} output (${provenanceHash})`,
-            evidenceRefs: [provenanceHash],
-            status: 'accepted',
+            evidenceRefs: sourceEvidenceRefs,
+            evidenceHash: sourceSha256,
+            status: sourceDecisionStatus,
           },
         ],
       };
@@ -108,24 +135,24 @@ export function runContextTransformTool(
     }
   } else if (toHat === 'white') {
     if (targetToolId === 'white-evidence-collector') {
+      const fact: Record<string, unknown> = {
+        claim: note,
+        source: `${fromHat.toUpperCase()}:${input.sourceToolId ?? 'tool'}`,
+        tags: [fromHat, 'forwarded'],
+      };
+      if (sourceArtifactId) fact.artifactId = sourceArtifactId;
+      if (sourceSha256) fact.sha256 = sourceSha256;
+      if (sourceCorroboratedBy.length > 0) fact.corroboratedBy = sourceCorroboratedBy;
+      if (sourceContradictedBy.length > 0) fact.contradictedBy = sourceContradictedBy;
       transformedInput = {
-        facts: [
-          {
-            claim: note,
-            source: `${fromHat.toUpperCase()}:${input.sourceToolId ?? 'tool'}`,
-            artifactId: provenanceHash,
-            sha256: provenanceHash,
-            tags: [fromHat, 'forwarded'],
-            corroboratedBy: [`${fromHat}-runtime`],
-          },
-        ],
+        facts: [fact],
       };
     } else if (targetToolId === 'white-gap-analyzer') {
       transformedInput = {
         objective: note,
         requiredVariables: ['scope_target', 'telemetry_source', 'approval_receipt'],
         knownFacts: [
-          { variable: 'scope_target', value: rawText.slice(0, 80), verified: true, source: fromHat },
+          { variable: 'scope_target', value: rawText.slice(0, 80), verified: sourceVerified, source: fromHat },
         ],
       };
     } else {
@@ -158,8 +185,11 @@ export function runContextTransformTool(
       };
     }
   } else {
+    const explicitTarget = [payloadRecord?.target, payloadRecord?.host, payloadRecord?.scope]
+      .find((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)?.trim() ?? '';
     transformedInput = {
-      target: '127.0.0.1',
+      target: explicitTarget,
+      requiresTargetSelection: explicitTarget.length === 0,
       contextNote: note,
       upstreamHash: provenanceHash,
       rawContext: rawText.slice(0, 500),

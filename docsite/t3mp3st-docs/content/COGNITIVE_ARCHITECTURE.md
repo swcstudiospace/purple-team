@@ -9,7 +9,7 @@ source: "T3MP3ST repository"
 sourcePath: "docs/COGNITIVE_ARCHITECTURE.md"
 updated: "2026-07-20"
 ---
-# T3MP3ST Cognitive Architecture
+# Purple Team Cognitive Architecture
 
 The agent that drives Cybench / live-tools runs is steered entirely by
 `scripts/cybench-bench.mjs::TOOLS_SYSTEM`. Below is the v3 design rationale —

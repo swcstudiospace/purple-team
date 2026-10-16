@@ -12,6 +12,7 @@ import {
   artifactHash,
   ArtifactValidationError,
   INLINE_ARTIFACT_MAX_BYTES,
+  resolveRunAllowlist,
 } from '../teams/contracts.js';
 
 describe('black team: noiseBudget', () => {
@@ -499,5 +500,24 @@ describe('inline artifact binding (T-26-02)', () => {
     expect(bindInlineArtifacts([good])?.label).toBe('draft-1');
     expect(() => bindInlineArtifacts([good, good])).toThrow(/at most 1 element/);
     expect(() => bindInlineArtifacts(good)).toThrow(/must be an array/);
+  });
+
+  it('grants specialist workflow engine functions in resolveRunAllowlist for non-Red roles', () => {
+    const blueAllowed = resolveRunAllowlist('blue');
+    expect(blueAllowed).toContain('runBlueDetectorStage');
+    expect(blueAllowed).toContain('runBlueCoverageStage');
+    expect(blueAllowed).toContain('sigmaRulepack');
+
+    const sentinelAllowed = resolveRunAllowlist('sentinel');
+    expect(sentinelAllowed).toContain('runBlueDetectorStage');
+    expect(sentinelAllowed).toContain('sentinelDetectorMap');
+
+    const blackAllowed = resolveRunAllowlist('black');
+    expect(blackAllowed).toContain('runBlackWorkflow');
+    expect(blackAllowed).toContain('exfilCostModel');
+
+    const whiteAllowed = resolveRunAllowlist('white');
+    expect(whiteAllowed).toContain('stageRoeAudit');
+    expect(whiteAllowed).toContain('auditEvidenceChain');
   });
 });

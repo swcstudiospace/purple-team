@@ -183,9 +183,14 @@ export function runWhiteDataInspector(
 
   if (Array.isArray(raw)) {
     rawString = JSON.stringify(raw);
-    allRecords = raw.filter(
-      (item): item is Record<string, unknown> => typeof item === 'object' && item !== null && !Array.isArray(item),
-    );
+    for (let i = 0; i < raw.length; i += 1) {
+      const item = raw[i];
+      if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+        allRecords.push(item as Record<string, unknown>);
+      } else {
+        allRecords.push({ value: item, index: i });
+      }
+    }
   } else if (typeof raw === 'object') {
     rawString = JSON.stringify(raw);
     allRecords = [raw as Record<string, unknown>];

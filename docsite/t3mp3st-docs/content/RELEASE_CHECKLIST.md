@@ -11,7 +11,7 @@ updated: "2026-07-20"
 ---
 # Release Checklist
 
-A repeatable, artifact-first checklist for cutting a T3MP3ST release. The guiding rule is the
+A repeatable, artifact-first checklist for cutting a Purple Team release. The guiding rule is the
 same as the project itself: **every headline number re-derives from committed artifacts** — so a
 release isn't cut until the deterministic gates and the local smoke path are green.
 

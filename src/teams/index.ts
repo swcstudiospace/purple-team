@@ -188,6 +188,7 @@ export {
   listComposableSkills,
   getComposableSkill,
   runComposableSkill,
+  buildSpecialistWorkflowTools,
 } from './skills.js';
 export type {
   HatToolRegistration,

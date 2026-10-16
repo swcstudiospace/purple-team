@@ -757,7 +757,7 @@
     } catch (err) {
       if (reqSeq !== runSeq) return;
       if (cancelBtn) cancelBtn.hidden = true;
-      var msg = (err && err.name === 'AbortError') ? 'Execution cancelled by user.' : ((err && err.message) || String(err));
+      var msg = (err && err.name === 'AbortError') ? 'Stopped waiting for response; server execution may still finish.' : ((err && err.message) || String(err));
       var errEl = document.getElementById('toolErrorMsg');
       if (errEl) errEl.textContent = msg;
       Shell.showState(root, 'error');
@@ -797,7 +797,11 @@
       });
       Shell.workspace.saveDraft(targetToolId, JSON.stringify(nextInput, null, 2));
       renderForwardedBanner();
-      Shell.toast('Forwarded output from ' + fromHat.toUpperCase() + ' to ' + toHat.toUpperCase() + ' (' + targetToolId + ')', 'success');
+      if (nextInput && nextInput.requiresTargetSelection) {
+        Shell.toast('Forwarded to ' + toHat.toUpperCase() + ' (' + targetToolId + ') — select an explicit target host before running.', 'warning');
+      } else {
+        Shell.toast('Forwarded output from ' + fromHat.toUpperCase() + ' to ' + toHat.toUpperCase() + ' (' + targetToolId + ')', 'success');
+      }
       Shell.announce('Context forwarded to ' + toHat.toUpperCase() + ' Hat');
     } catch (err) {
       Shell.toast('Failed to transform context: ' + ((err && err.message) || String(err)), 'error');

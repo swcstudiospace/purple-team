@@ -9,7 +9,7 @@ source: "T3MP3ST repository"
 sourcePath: "docs/DEVELOPER_GUIDE.md"
 updated: "2026-07-20"
 ---
-# T3MP3ST Developer Guide
+# Purple Team Developer Guide
 
 This guide maps the codebase to the public surfaces documented for operators and integrators.
 
@@ -89,7 +89,7 @@ Set `PAGENARY_SITE_URL` before `docs:sync` or `docs:build` when publishing somew
 The package exports the main factory functions and core classes from `src/index.ts`.
 
 ```ts
-import { createTempest, createTestTempest } from 't3mp3st';
+import { createTempest, createTestTempest } from 'purple-team';
 
 const tempest = createTempest({
   name: 'Authorized Lab Run',

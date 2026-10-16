@@ -260,7 +260,7 @@ loopback trust as every other route (see Security Model above).
 |---|---|---|
 | `GET` | `/api/teams/tool-grants` | Per-team arsenal grant table (`{ grants: { black, blue, white } }`) |
 | `GET` | `/api/teams/purple/synthesize` | Latest stored synthesis (`{ synthesis, createdAt }`; none stored → `{ synthesis: null }`). Does not write a receipt |
-| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger and write an observed `purple.synthesize` receipt (`evidenceId`) |
+| `POST` | `/api/teams/purple/synthesize` | Correlate findings + detection gaps + ROE verdicts into a posture ledger, store the latest synthesis, and emit `purple.synthesize` (does not mint a receipt) |
 | `GET` | `/api/teams/blue/gaps` | Read-only v2 D3FEND coverage report over the findings ledger (`{ gaps }`, per-gap `unresolvedCountermeasures` surfaced) |
 | `GET` | `/api/teams/blue/hardening` | Read-only severity-tiered hardening plan over the findings ledger (`{ items }`) |
 | `GET` | `/api/teams/blue/rules` | Read-only Sigma rule pack from ledger coverage gaps (`{ rules, yaml }`, experimental rules) |

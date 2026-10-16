@@ -106,7 +106,7 @@
 
 <section class="card" aria-labelledby="purpleTitle">
 <h2 class="card__title" id="purpleTitle">Dark Purple synthesis</h2>
-<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections. Verdicts are either <span class="mono">verdict | rationale</span> (positional) or <span class="mono">findingId | verdict | rationale</span> (id join). Do not mix the two.</p>
+<p class="text-secondary">Correlate red findings, blue detection gaps, and white ROE verdicts into a posture ledger. One entry per line: <span class="mono">id | title | severity</span> for findings, <span class="mono">findingId | coverage</span> for detections. Verdicts require an explicit finding-to-action mapping (<span class="mono">findingId | verdict | rationale</span>).</p>
 <div class="grid grid--3">
 <div><label class="flabel" for="purpleFindings">Findings</label><textarea class="form-input" id="purpleFindings" placeholder="F-001 | Exposed admin panel | high"></textarea></div>
 <div><label class="flabel" for="purpleDetections">Detections</label><textarea class="form-input" id="purpleDetections" placeholder="F-001 | partial"></textarea></div>
@@ -429,13 +429,12 @@ async function runPurple() {
     var verdictLines = String(document.getElementById('purpleVerdicts').value || '').split('\n').map(function (ln) { return ln.trim(); }).filter(Boolean).map(function (ln) {
       var parts = ln.split('|').map(function (p) { return p.trim(); });
       var known = { compliant: true, violation: true, needs_approval: true };
-      if (parts.length >= 2 && known[parts[1]]) return { findingId: parts[0], verdict: parts[1], rationale: parts.slice(2).join(' | ') };
-      if (known[parts[0]]) return { verdict: parts[0], rationale: parts.slice(1).join(' | ') };
-      return { verdict: parts[0] };
+      if (parts.length >= 2 && parts[0] && known[parts[1]]) return { findingId: parts[0], verdict: parts[1], rationale: parts.slice(2).join(' | ') };
+      return { findingId: '', verdict: parts[0] };
     });
     var keyedCount = verdictLines.filter(function (v) { return v.findingId; }).length;
-    if (keyedCount && keyedCount !== verdictLines.length) {
-      Shell.toast('Verdict lines must all be positional or all be findingId | verdict', 'error');
+    if (verdictLines.length && keyedCount !== verdictLines.length) {
+      Shell.toast('Each verdict line must specify an explicit findingId | verdict mapping', 'error');
       Shell.showState(root, 'empty');
       return;
     }
@@ -505,11 +504,11 @@ async function runPurple() {
     try {
       var roe = await Shell.apiGet('/api/teams/white/roe');
       var verdicts = Array.isArray(roe.verdicts) ? roe.verdicts : [];
-      document.getElementById('purpleVerdicts').value = verdicts.map(function (v) {
-        if (!v.verdict) return '';
-        return v.rationale ? v.verdict + ' | ' + v.rationale : v.verdict;
-      }).filter(Boolean).join('\n');
-      notes.push(verdicts.length + ' verdict(s)');
+      var keyedVerdicts = verdicts.filter(function (v) { return v && v.findingId && v.verdict; });
+      document.getElementById('purpleVerdicts').value = keyedVerdicts.map(function (v) {
+        return v.findingId + ' | ' + v.verdict + (v.rationale ? ' | ' + v.rationale : '');
+      }).join('\n');
+      notes.push(keyedVerdicts.length + ' mapped verdict(s)' + (verdicts.length > keyedVerdicts.length ? ' (' + (verdicts.length - keyedVerdicts.length) + ' unmapped action verdict(s) require explicit findingId | verdict)' : ''));
     } catch (e) {
       Shell.toast('ROE load failed: ' + (e.message || e), 'error');
     }
