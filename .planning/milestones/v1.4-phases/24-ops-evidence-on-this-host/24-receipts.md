@@ -189,12 +189,12 @@ Both names fresh (size changed 89571371 → 89934154, mtime at/after chain start
 |---|---|---|---|---|---|
 | deb | yes | `src-tauri/target/release/bundle/deb/T3MP3ST_1.0.0_amd64.deb` | 36376766 | `9bcfa006aedbbcc188bd31a3440ace516d30a83e772d788f6fe5c058365cd595` | no (install-and-launch deferred to v2) |
 | AppImage | yes | `src-tauri/target/release/bundle/appimage/T3MP3ST_1.0.0_amd64.AppImage` | 112257528 | `87e3222d7aa5a259a9e0a860b4801c7c8060b47e03b9c467e7c267c768b42154` | no — `--appimage-extract-and-run` attempted: binary executes, then panics `Failed to initialize gtk backend … Failed to initialize GTK` (headless host, no display). Extraction/bundling proven; GUI launch needs a display (v2). |
-| msi | CI-evidence-only | — | — | — | CI: `tauri-build.yml` windows-latest `--bundles msi,nsis` (https://github.com/swcstudiospace/purple-team/blob/main/.github/workflows/tauri-build.yml#L35-L43); green run at phase commit SHA |
-| nsis | CI-evidence-only | — | — | — | CI: same windows-latest row as msi |
-| app | CI-evidence-only | — | — | — | CI: `tauri-build.yml` macos-latest `--bundles app,dmg` (same URL); green run at phase commit SHA |
-| dmg | CI-evidence-only | — | — | — | CI: same macos-latest row as app |
+| msi | CI-evidence-only | — | — | — | CI: windows-latest `--bundles msi,nsis` — GREEN RUN https://github.com/swcstudiospace/purple-team/actions/runs/38343965421 (head `b54cff9924c445480687a8ccf2bed645b19e5e61`, 2026-10-13). Note: the phase-24 commit itself was never pushed, so CI never ran on it; this run certifies the content-equivalent head including all post-phase reviewed fixes. First green run of this workflow ever (pre-fix runs failed on a missing `tauri` npm script — fixed in `fcbf63f`/`6910461`). |
+| nsis | CI-evidence-only | — | — | — | CI: same windows-latest green run as msi (38343965421 @ `b54cff9`) |
+| app | CI-evidence-only | — | — | — | CI: macos-latest `--bundles app,dmg` — same GREEN RUN 38343965421 @ `b54cff9` (same phase-commit caveat) |
+| dmg | CI-evidence-only | — | — | — | CI: same macos-latest green run as app (38343965421 @ `b54cff9`) |
 
-Cross-compiled artifacts never counted as host-observed (locked constraint).
+Cross-compiled artifacts never counted as host-observed (locked constraint). CI-run provenance annotated 2026-10-13 per review: the original "green run at phase commit SHA" wording cited only the workflow definition — the workflow's first-ever green run is 38343965421, at the content-equivalent PR head, not at the unpushed phase commit.
 
 ### Gate receipts
 

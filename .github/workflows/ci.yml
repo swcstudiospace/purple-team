@@ -31,6 +31,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Build dist (bench suites import the real dist/ pipeline)
+        run: npm run build
       - name: Run PR correctness gate
         run: npm run test:pr
       - name: Resolve comparison base
