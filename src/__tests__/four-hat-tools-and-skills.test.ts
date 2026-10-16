@@ -758,6 +758,21 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     const groupedDigest = artifactHash('structured-task-input');
     expect(redactSecrets({ inputSha256: groupedDigest })).toEqual({ inputSha256: groupedDigest });
     expect(groupedDigest).not.toContain('[redacted]');
+
+    // 13. Round 9: Specialist workflow tools require object `input` and reject non-object `input`
+    const vocabTools = buildSpecialistWorkflowTools(new Set(['matchVocabulary']));
+    expect(vocabTools).toHaveLength(1);
+    arsenal.register(vocabTools[0]);
+    await expect(
+      arsenal.execute('matchVocabulary', {
+        parameters: { input: 'nmap' },
+      }),
+    ).rejects.toThrow(/Validation failed for "matchVocabulary"/);
+    const objectInputResult = await arsenal.execute('matchVocabulary', {
+      parameters: { input: { command: 'nmap -sS 127.0.0.1' } },
+    });
+    expect(objectInputResult.success).toBe(true);
+    expect(JSON.parse(objectInputResult.output ?? '[]').length).toBeGreaterThan(0);
   });
 });
 

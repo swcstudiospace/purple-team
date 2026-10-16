@@ -1352,8 +1352,31 @@ function normalizeMemoryStatus(value: unknown, fallback: MemoryProposalStatus): 
     : fallback;
 }
 
+const MAX_STAGE_LIST_ITEMS = 1000;
+
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+function normalizeLedgerEvidenceIds(value: unknown): string[] {
+  const raw = Array.isArray(value)
+    ? value
+    : typeof value === 'string' && value.trim()
+      ? value.split(/[\n,]/)
+      : [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const scanLimit = Math.min(raw.length, MAX_STAGE_LIST_ITEMS * 4);
+  for (let i = 0; i < scanLimit; i++) {
+    const item = String(raw[i] ?? '').trim();
+    if (!item || seen.has(item)) continue;
+    seen.add(item);
+    if (evidenceLedger.has(item)) {
+      out.push(item);
+      if (out.length >= MAX_STAGE_LIST_ITEMS) break;
+    }
+  }
+  return out;
 }
 
 function canonicalMemoryContent(content: string): string {
@@ -2280,7 +2303,7 @@ function createWorkOrder(input: Partial<WorkOrderRecord> & Record<string, unknow
     requiresReceipt,
     toolHints: normalizeStringList(input.toolHints).length ? normalizeStringList(input.toolHints) : workOrderToolHints(hypothesis.family, kind),
     status: normalizeWorkOrderStatus(input.status, requiresReceipt ? 'needs_receipt' : defaultWorkOrderStatus(target, kind)),
-    evidenceIds: normalizeStringList(input.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: normalizeLedgerEvidenceIds(input.evidenceIds),
     resultSummary: typeof input.resultSummary === 'string' ? redactLedgerText(input.resultSummary) : undefined,
     createdAt: now,
     updatedAt: now,
@@ -5725,8 +5748,8 @@ app.post('/api/hypotheses/:id/promote', (req: Request, res: Response) => {
   const now = nowIso();
   const evidenceIds = uniqueStrings([
     ...hypothesis.evidenceForIds,
-    ...normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
-  ]);
+    ...normalizeLedgerEvidenceIds(body.evidenceIds),
+  ]).slice(0, MAX_STAGE_LIST_ITEMS);
   const finding: FindingRecord = {
     id: clientLedgerId(body.id, 'finding'),
     missionId: hypothesis.missionId,
@@ -5885,7 +5908,7 @@ app.patch('/api/work-orders/:id', (req: Request, res: Response) => {
     requiresReceipt: body.requiresReceipt === undefined ? existing.requiresReceipt : Boolean(body.requiresReceipt),
     toolHints: body.toolHints === undefined ? existing.toolHints : normalizeStringList(body.toolHints),
     status: body.status === undefined ? existing.status : normalizeWorkOrderStatus(body.status, existing.status),
-    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeLedgerEvidenceIds(body.evidenceIds),
     resultSummary: typeof body.resultSummary === 'string' ? redactLedgerText(body.resultSummary) : existing.resultSummary,
     updatedAt: nowIso(),
     completedAt: typeof body.completedAt === 'string' ? body.completedAt : existing.completedAt,
@@ -5912,7 +5935,7 @@ app.post('/api/work-orders/:id/complete', (req: Request, res: Response) => {
   const resultSummary = typeof body.resultSummary === 'string' && body.resultSummary.trim()
     ? redactLedgerText(body.resultSummary.trim())
     : `Work order completed: ${existing.objective}`;
-  let evidenceIds = normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id));
+  let evidenceIds = normalizeLedgerEvidenceIds(body.evidenceIds);
   if (body.createEvidence !== false) {
     const evidence: EvidenceEntry = {
       id: clientLedgerId(body.evidenceId, 'evidence'),
@@ -6070,7 +6093,7 @@ app.post('/api/findings', (req: Request, res: Response) => {
     severity: normalizeSeverity(body.severity),
     confidence: clampConfidence(body.confidence),
     status: normalizeFindingStatus(body.status, 'open'),
-    evidenceIds: normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: normalizeLedgerEvidenceIds(body.evidenceIds),
     resourceIds: normalizeResourceIds(body.resourceIds),
     recommendedFix: typeof body.recommendedFix === 'string' ? redactLedgerText(body.recommendedFix) : '',
     acceptanceCriteria: normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)),
@@ -6106,7 +6129,7 @@ app.patch('/api/findings/:id', (req: Request, res: Response) => {
     severity: body.severity === undefined ? existing.severity : normalizeSeverity(body.severity),
     confidence: body.confidence === undefined ? existing.confidence : clampConfidence(body.confidence),
     status: body.status === undefined ? existing.status : normalizeFindingStatus(body.status, existing.status),
-    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeLedgerEvidenceIds(body.evidenceIds),
     resourceIds: body.resourceIds === undefined ? existing.resourceIds : normalizeResourceIds(body.resourceIds),
     recommendedFix: typeof body.recommendedFix === 'string' ? redactLedgerText(body.recommendedFix) : existing.recommendedFix,
     acceptanceCriteria: body.acceptanceCriteria === undefined ? existing.acceptanceCriteria : normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)),
@@ -6135,7 +6158,7 @@ app.post('/api/findings/:id/retest', (req: Request, res: Response) => {
     status: normalizeRetestStatus(body.status, 'queued'),
     method: typeof body.method === 'string' && body.method.trim() ? redactLedgerText(body.method.trim()) : 'Verify the acceptance criteria and attach fresh evidence.',
     acceptanceCriteria: normalizeStringList(body.acceptanceCriteria).length ? normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)) : finding.acceptanceCriteria,
-    evidenceIds: normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: normalizeLedgerEvidenceIds(body.evidenceIds),
     resultSummary: typeof body.resultSummary === 'string' ? redactLedgerText(body.resultSummary) : undefined,
     createdAt: now,
     updatedAt: now,
@@ -6173,7 +6196,7 @@ app.patch('/api/retests/:id', (req: Request, res: Response) => {
     status: body.status === undefined ? existing.status : normalizeRetestStatus(body.status, existing.status),
     method: typeof body.method === 'string' && body.method.trim() ? redactLedgerText(body.method.trim()) : existing.method,
     acceptanceCriteria: body.acceptanceCriteria === undefined ? existing.acceptanceCriteria : normalizeStringList(body.acceptanceCriteria).map(item => redactLedgerText(item, 500)),
-    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeStringList(body.evidenceIds).filter(id => evidenceLedger.has(id)),
+    evidenceIds: body.evidenceIds === undefined ? existing.evidenceIds : normalizeLedgerEvidenceIds(body.evidenceIds),
     resultSummary: typeof body.resultSummary === 'string' ? redactLedgerText(body.resultSummary) : existing.resultSummary,
     updatedAt: nowIso(),
   };
@@ -6983,8 +7006,6 @@ app.get('/api/teams/white/report-audit', (_req: Request, res: Response): void =>
 // Resolve staged evidence associations against live server ledgers before
 // running the Blue/Black/White staged helpers so unbacked caller labels do not
 // pass as verified/observed/approved proof.
-const MAX_STAGE_LIST_ITEMS = 1000;
-
 function resolveStagedBlueInput(rawBody: unknown): void {
   if (!rawBody || typeof rawBody !== 'object' || Array.isArray(rawBody)) return;
   const body = rawBody as Record<string, unknown>;
@@ -7043,21 +7064,31 @@ function resolveStagedBlueInput(rawBody: unknown): void {
   }
 
   const observedByFinding: Record<string, readonly string[]> = {};
+  const resolvedFindingIds = new Set<string>();
   for (const rawFinding of body.findings) {
     if (!rawFinding || typeof rawFinding !== 'object' || Array.isArray(rawFinding)) continue;
     const findingRec = rawFinding as Record<string, unknown>;
     const findingId = typeof findingRec.id === 'string' ? findingRec.id : '';
-    if (!findingId) continue;
+    if (!findingId || resolvedFindingIds.has(findingId)) continue;
+    resolvedFindingIds.add(findingId);
 
     const matchedSet = new Set<string>(universalIds);
     const directBucket = idsByFindingId.get(findingId);
     if (directBucket) {
       for (const artId of directBucket) matchedSet.add(artId);
     }
-    const ledgerFinding = findingsLedger.get(findingId);
-    if (ledgerFinding && knownArtifactIds.size > 0) {
-      for (const evId of ledgerFinding.evidenceIds) {
-        if (knownArtifactIds.has(evId)) matchedSet.add(evId);
+    if (matchedSet.size < knownArtifactIds.size) {
+      const ledgerFinding = findingsLedger.get(findingId);
+      if (ledgerFinding) {
+        const evidenceRefs = ledgerFinding.evidenceIds;
+        const limit = Math.min(evidenceRefs.length, MAX_STAGE_LIST_ITEMS);
+        for (let i = 0; i < limit; i++) {
+          const evId = evidenceRefs[i];
+          if (knownArtifactIds.has(evId)) {
+            matchedSet.add(evId);
+            if (matchedSet.size >= knownArtifactIds.size) break;
+          }
+        }
       }
     }
     observedByFinding[findingId] = [...matchedSet];

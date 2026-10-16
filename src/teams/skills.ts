@@ -1240,7 +1240,6 @@ export function buildSpecialistWorkflowTools(
         {
           name: 'input',
           type: 'object',
-          allowedTypes: ['string', 'number', 'boolean', 'array', 'object'],
           description: `Structured parameters for ${entry.name}`,
           required: false,
         },
