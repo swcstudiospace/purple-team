@@ -1,14 +1,12 @@
 name: Tauri shell build
 
-# Desktop bundles build on push/PR; mobile jobs are manual dispatch only
-# (they need signing identities plus Xcode / Android SDK+NDK toolchains).
+# Desktop bundles build on every push and on PRs to main. Pushes also publish the
+# desktop installers as a prerelease (build-<short sha>). Mobile jobs are manual
+# dispatch only (they need signing identities plus Xcode / Android SDK+NDK toolchains).
 on:
   push:
-    branches: [main]
-    paths: ['src-tauri/**', 'src/server.ts', 'docs/**', 'scripts/build-sidecar.mjs', 'scripts/sidecar.pkg.json', 'package.json', 'package-lock.json', '.github/workflows/tauri-build.yml']
   pull_request:
     branches: [main]
-    paths: ['src-tauri/**', 'src/server.ts', 'docs/**', 'scripts/build-sidecar.mjs', 'scripts/sidecar.pkg.json', 'package.json', 'package-lock.json', '.github/workflows/tauri-build.yml']
   workflow_dispatch:
     inputs:
       mobile:
@@ -65,6 +63,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
+      - name: Upload desktop bundles
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*-setup.exe
+            src-tauri/target/release/bundle/**/*.dmg
 
   ios:
     name: iOS init check (manual only)
@@ -102,3 +112,43 @@ jobs:
       - run: npm ci
       - run: npx --no-install @tauri-apps/cli android init
       - run: npx --no-install @tauri-apps/cli android build
+
+  publish:
+    name: Publish prerelease
+    needs: desktop
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Download desktop bundles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: gh run download "$RUN_ID" --dir dist
+      - name: Create or update build prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          SHORT="${GITHUB_SHA:0:7}"
+          TAG="build-$SHORT"
+          files=()
+          while IFS= read -r -d '' f; do
+            files+=("$f")
+          done < <(find dist -type f -print0)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No desktop bundles found under dist/" >&2
+            exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${files[@]}" --clobber
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --prerelease \
+              --title "Purple Team build $SHORT" \
+              --notes "Native desktop packages built from $GITHUB_SHA" \
+              "${files[@]}"
+          fi
