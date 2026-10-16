@@ -350,6 +350,7 @@ export interface BlueDecisionEntryRecord {
   summary: string;
   rationale: string;
   evidenceRefs: readonly string[];
+  evidenceHash?: string;
   status: 'accepted' | 'deferred' | 'rejected';
   entryHash: string;
 }
@@ -430,7 +431,20 @@ export function runBlueDecisionLedger(
       unbackedDecisionCount += 1;
     }
 
-    const entryHash = `sha256-${shortSha256(`${sessionId}:${i}:${d.fromHat}:${d.toHat}:${summary}:${rationale}:${status}:${evidenceRefs.join(',')}:${evidenceHash}`)}`;
+    const entryHash = `sha256-${shortSha256(
+      JSON.stringify([
+        sessionId,
+        i,
+        id,
+        d.fromHat,
+        d.toHat,
+        summary,
+        rationale,
+        status,
+        evidenceRefs,
+        evidenceHash,
+      ]),
+    )}`;
     entries.push({
       index: i,
       id,
@@ -439,14 +453,16 @@ export function runBlueDecisionLedger(
       summary,
       rationale,
       evidenceRefs,
+      ...(evidenceHash ? { evidenceHash } : {}),
       status,
       entryHash,
     });
   }
 
   const resolvedObjective = objective || 'Cross-Hat Operational Session';
-  const ledgerDigest = `sha256-${shortSha256(`${sessionId}:${resolvedObjective}:${entries.map(e => e.entryHash).join('|')}`)}`;
-
+  const ledgerDigest = `sha256-${shortSha256(
+    JSON.stringify([sessionId, resolvedObjective, constraints, entries.map(e => e.entryHash)]),
+  )}`;
   const mdLines: string[] = [
     `# Blue Hat Session & Decision Ledger — ${sessionId}`,
     '',
@@ -464,7 +480,7 @@ export function runBlueDecisionLedger(
     mdLines.push(
       `${e.index + 1}. **[${e.fromHat.toUpperCase()} → ${e.toHat.toUpperCase()}] (${e.status})** ${e.summary}`,
       `   - Rationale: ${e.rationale}`,
-      `   - Evidence Refs: \`${refs}\` · Hash: \`${e.entryHash}\``,
+      `   - Evidence Refs: \`${refs}\`${e.evidenceHash ? ` · Evidence Hash: \`${e.evidenceHash}\`` : ''} · Hash: \`${e.entryHash}\``,
     );
   }
 

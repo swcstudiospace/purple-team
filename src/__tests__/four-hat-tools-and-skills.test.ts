@@ -667,6 +667,48 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
     });
     expect(largeMultiPageSkill.ok).toBe(true);
     expect(largeMultiPageSkill.data?.state).toBe('success');
+
+    // 15. Decision ledger prevents colon-boundary hash collisions and preserves evidenceHash across exports
+    const ledgerPairA = runBlueDecisionLedger({
+      sessionId: 's-collision',
+      decisions: [{ fromHat: 'white', toHat: 'blue', summary: 'Isolate host', rationale: 'Approved:receipt R1', evidenceRefs: ['r1'] }],
+    });
+    const ledgerPairB = runBlueDecisionLedger({
+      sessionId: 's-collision',
+      decisions: [{ fromHat: 'white', toHat: 'blue', summary: 'Isolate host:Approved', rationale: 'receipt R1', evidenceRefs: ['r1'] }],
+    });
+    expect(ledgerPairA.entries[0].entryHash).not.toBe(ledgerPairB.entries[0].entryHash);
+    expect(ledgerPairA.ledgerDigest).not.toBe(ledgerPairB.ledgerDigest);
+
+    const exportedLedger = disputedIncident.data?.stepOutputs[3].output as {
+      sessionId: string;
+      objective: string;
+      constraints: string[];
+      ledgerDigest: string;
+      exportJson: string;
+    };
+    const parsedExport = JSON.parse(exportedLedger.exportJson) as {
+      sessionId: string;
+      objective: string;
+      constraints: string[];
+      entries: Array<{
+        id: string;
+        fromHat: 'red' | 'blue' | 'black' | 'white';
+        toHat: 'red' | 'blue' | 'black' | 'white';
+        summary: string;
+        rationale: string;
+        evidenceRefs: string[];
+        evidenceHash?: string;
+        status: 'accepted' | 'deferred' | 'rejected';
+      }>;
+    };
+    const recomputedLedger = runBlueDecisionLedger({
+      sessionId: parsedExport.sessionId,
+      objective: parsedExport.objective,
+      constraints: parsedExport.constraints,
+      decisions: parsedExport.entries,
+    });
+    expect(recomputedLedger.ledgerDigest).toBe(exportedLedger.ledgerDigest);
   });
 });
 
