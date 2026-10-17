@@ -12,7 +12,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { execFile, spawn } from 'child_process';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
@@ -9267,6 +9267,11 @@ app.get('/api/agents/local/status', async (req: Request, res: Response): Promise
 app.get('/', (_req: Request, res: Response) => res.redirect('/ui/'));
 
 app.use('/ui', express.static('docs'));
+
+// Built React UI (`npm run ui:build` writes ui/dist). Mounted only when the bundle
+// exists, so the server still starts without a build.
+const APP_DIST = 'ui/dist';
+if (existsSync(APP_DIST)) app.use('/app', express.static(APP_DIST));
 
 // =============================================================================
 // ERROR HANDLING
