@@ -2,12 +2,14 @@ import { useEffect, useState, type MouseEvent } from 'react';
 import Overview from './pages/Overview';
 import Reports from './pages/Reports';
 import AgentPanel from './components/AgentPanel';
+import GenUiPanel from './genui/GenUiPanel';
 
-type SectionId = 'overview' | 'agent-panel' | 'reports';
+type SectionId = 'overview' | 'agent-panel' | 'generative-ui' | 'reports';
 
 const NAV_ITEMS: ReadonlyArray<{ id: SectionId; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'agent-panel', label: 'Agent Panel' },
+  { id: 'generative-ui', label: 'Generative UI' },
   { id: 'reports', label: 'Reports' },
 ];
 
@@ -76,6 +78,7 @@ export default function App() {
 
         {active === 'overview' && <Overview />}
         {active === 'agent-panel' && <AgentPanel />}
+        {active === 'generative-ui' && <GenUiPanel />}
         {active === 'reports' && <Reports />}
       </main>
     </div>
