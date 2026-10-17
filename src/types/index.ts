@@ -14,7 +14,7 @@ export interface LLMConfig {
   apiKey?: string;
   /**
    * How `apiKey` should be presented on the wire.
-   * `oauth` = subscription Bearer (SuperGrok / Claude Pro-Max); omit or `api-key` = provider API key.
+   * `oauth` = subscription Bearer (SuperGrok); omit or `api-key` = provider API key.
    */
   authType?: 'api-key' | 'oauth';
   baseUrl?: string;

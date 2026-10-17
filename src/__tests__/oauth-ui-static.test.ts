@@ -12,21 +12,20 @@ const pages = readdirSync(docsDir).filter((f) => f.endsWith('.html'));
 const allHtml = pages.map((f) => readFileSync(join(docsDir, f), 'utf8')).join('\n');
 
 describe('settings sign-in surface (all five providers)', () => {
-  it('labels ChatGPT Plan, Claude Pro, Super Grok Heavy, Cursor, and OpenRouter', () => {
-    for (const label of ['ChatGPT Plan', 'Claude Pro', 'Super Grok Heavy', 'Cursor', 'OpenRouter']) {
+  it('labels ChatGPT Plan, Claude Code, Super Grok Heavy, Cursor, and OpenRouter', () => {
+    for (const label of ['ChatGPT Plan', 'Claude Code', 'Super Grok Heavy', 'Cursor', 'OpenRouter']) {
       expect(settings, `settings.html missing provider label "${label}"`).toContain(label);
     }
   });
 
   it('wires a startOAuth flow per subscription vendor', () => {
-    for (const fn of ['startOpenaiOAuth', 'startXaiOAuth', 'startAnthropicOAuth']) {
+    for (const fn of ['startOpenaiOAuth', 'startXaiOAuth']) {
       expect(settings, `settings.html missing ${fn}`).toContain(fn);
     }
     expect(settings).toContain('/api/oauth/openai/start');
     expect(settings).toContain('/api/oauth/openai/complete');
     expect(settings).toContain('/api/oauth/openai/logout');
     expect(settings).toContain('/api/oauth/xai/start');
-    expect(settings).toContain('/api/oauth/anthropic/start');
   });
 
   it('connects Cursor as a local agent and detects agents', () => {
@@ -42,9 +41,8 @@ describe('settings sign-in surface (all five providers)', () => {
 
   it('keeps the landing keyless callout on the subscription + agent story', () => {
     expect(landing).toContain('Super Grok Heavy');
-    expect(landing).toContain('Claude Pro/Max');
+    expect(landing).toContain('Claude Code');
     expect(landing).toContain('startXaiOAuth');
-    expect(landing).toContain('startAnthropicOAuth');
     expect(landing).toContain('xai:grok-4-heavy');
     expect(landing).toContain("auth: 'oauth'");
   });
@@ -74,7 +72,6 @@ describe('server OAuth routes (unchanged)', () => {
   it('wires server OAuth routes that never return tokens in their names/paths', () => {
     expect(server).toContain("app.get('/api/oauth/status'");
     expect(server).toContain("app.post('/api/oauth/xai/start'");
-    expect(server).toContain("app.post('/api/oauth/anthropic/complete'");
     expect(server).toContain("app.post('/api/oauth/openai/start'");
     expect(server).toContain("app.post('/api/oauth/openai/complete'");
     expect(server).toContain("app.post('/api/oauth/openai/logout'");

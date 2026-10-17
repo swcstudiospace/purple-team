@@ -96,15 +96,7 @@ export async function listProviderModels(
     const abase = stripTrailingSlash(opts.baseUrl || 'https://api.anthropic.com').replace(/\/v1$/, '');
     url = `${abase}/v1/models`;
     headers['anthropic-version'] = ANTHROPIC_VERSION;
-    const oauth = opts.authType === 'oauth'
-      || (opts.apiKey || '').startsWith('sk-ant-oat')
-      || (opts.apiKey || '').startsWith('eyJ');
-    if (opts.apiKey && oauth) {
-      headers.Authorization = `Bearer ${opts.apiKey}`;
-      headers['anthropic-beta'] = 'oauth-2025-04-20';
-    } else if (opts.apiKey) {
-      headers['x-api-key'] = opts.apiKey;                                    // Anthropic API keys use x-api-key, NOT Bearer
-    }
+    if (opts.apiKey) headers['x-api-key'] = opts.apiKey;                     // Anthropic API keys use x-api-key, NOT Bearer
   } else if (provider === 'openrouter') {
     // Honor a custom OpenRouter-compatible base URL if given; else the public list.
     url = opts.baseUrl && opts.baseUrl.trim() ? `${stripTrailingSlash(opts.baseUrl)}/models` : OPENROUTER_MODELS_URL;

@@ -25,7 +25,7 @@
 
 <section class="card" aria-labelledby="signinTitle">
 <h2 class="card__title" id="signinTitle">Subscription sign-in</h2>
-<p class="text-secondary">Use your Super Grok Heavy, Claude Pro/Max, or ChatGPT Plan subscription instead of API keys.</p>
+<p class="text-secondary">Use your Super Grok Heavy or ChatGPT Plan subscription instead of API keys. Claude Code runs through your local CLI.</p>
 <div class="provider-grid">
 <div class="card provider-card" aria-labelledby="xaiName">
 <div class="provider-card__head"><h3 class="provider-card__name" id="xaiName">Super Grok Heavy</h3><span class="badge badge--neutral" id="oauthXaiStatus">offline</span></div>
@@ -34,10 +34,10 @@
 <div class="card__row"><button class="btn btn--sm btn--primary" onclick="startXaiOAuth()">Sign in with SuperGrok</button><button class="btn btn--sm" onclick="logoutOAuth('xai')">Sign out</button></div>
 </div>
 <div class="card provider-card" aria-labelledby="claudeName">
-<div class="provider-card__head"><h3 class="provider-card__name" id="claudeName">Claude Pro / Max</h3><span class="badge badge--neutral" id="oauthAnthropicStatus">offline</span></div>
-<p class="provider-card__desc">Browser PKCE against Claude.ai. Bills against Claude Pro or Max.</p>
-<div class="provider-card__body" id="oauthAnthropicBody">Sign in, then paste the callback code. Opus / Sonnet run on your subscription.</div>
-<div class="card__row"><button class="btn btn--sm btn--primary" onclick="startAnthropicOAuth()">Sign in with Claude</button><button class="btn btn--sm" onclick="logoutOAuth('anthropic')">Sign out</button></div>
+<div class="provider-card__head"><h3 class="provider-card__name" id="claudeName">Claude Code (local CLI)</h3><span class="badge badge--neutral" id="claudeAgentStatus">unknown</span></div>
+<p class="provider-card__desc">Drive the Claude Code CLI already signed in on this machine — no API key needed.</p>
+<div class="provider-card__body" id="claudeAgentBody">Detect agents, then connect Claude Code as a local backbone.</div>
+<div class="card__row"><button class="btn btn--sm btn--primary" onclick="connectClaudeAgent()">Connect Claude Code</button><button class="btn btn--sm" onclick="disconnectSettingsAgent('claude')">Disconnect</button></div>
 </div>
 <div class="card provider-card" aria-labelledby="chatgptName">
 <div class="provider-card__head"><h3 class="provider-card__name" id="chatgptName">ChatGPT Plan</h3><span class="badge badge--neutral" id="oauthOpenaiStatus">offline</span></div>
@@ -71,7 +71,7 @@
 <option value="nanogpt">NanoGPT · OpenAI-compatible</option>
 <option value="novita">Novita AI · OpenAI-compatible</option>
 <option value="xai">xAI Grok · SuperGrok OAuth or API key</option>
-<option value="anthropic">Claude · Anthropic Messages API / Pro-Max OAuth</option>
+<option value="anthropic">Claude · Anthropic Messages API</option>
 </select></div>
 <div><label class="flabel" for="uacBaseUrl">Base URL (optional)</label><input type="text" class="form-input mono" id="uacBaseUrl" placeholder="https://openrouter.ai/api/v1"></div>
 </div>
@@ -132,7 +132,7 @@
 var settingsState = { settings: {} };
 try { settingsState = JSON.parse(window.localStorage.getItem('t3mp3st_state_v1') || '{"settings":{}}'); } catch (e) { settingsState = { settings: {} }; }
 if (!settingsState.settings) settingsState.settings = {};
-var settingsFlows = { xai: null, anthropic: null, openai: null };
+var settingsFlows = { xai: null, openai: null };
 var settingsAgents = [];
 var settingsConnected = [];
 
@@ -181,7 +181,6 @@ function paintKeyStatus() {
 
 function paintSettingsOAuth(oauth) {
   [['xai', 'oauthXaiStatus', 'oauthXaiBody', 'Super Grok Heavy models are available.'],
-   ['anthropic', 'oauthAnthropicStatus', 'oauthAnthropicBody', 'Claude Opus / Sonnet run on your subscription.'],
    ['openai', 'oauthOpenaiStatus', 'oauthOpenaiBody', 'ChatGPT Plan models run on your subscription.']].forEach(function (t) {
     var info = oauth && oauth[t[0]];
     var badge = document.getElementById(t[1]);
@@ -231,34 +230,6 @@ async function startXaiOAuth() {
   } catch (e) {
     if (body) body.textContent = e.message || String(e);
     Shell.toast('SuperGrok sign-in failed: ' + (e.message || e), 'error');
-  }
-}
-async function startAnthropicOAuth() {
-  var body = document.getElementById('oauthAnthropicBody');
-  try {
-    var r = await settingsApi('/api/oauth/anthropic/start', {});
-    var d = await r.json();
-    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-    settingsFlows.anthropic = d.flowId;
-    if (d.authorizeUrl) window.open(d.authorizeUrl, '_blank', 'noopener');
-    if (body) body.innerHTML = '<div>Authorize in the browser, then paste the callback code:</div><input id="settingsAnthropicCode" class="form-input mono" placeholder="code#state"><button class="btn btn--primary btn--sm" style="margin-top:8px;" onclick="completeAnthropicOAuth()">Complete sign-in</button>';
-  } catch (e) {
-    if (body) body.textContent = e.message || String(e);
-    Shell.toast('Claude sign-in failed: ' + (e.message || e), 'error');
-  }
-}
-async function completeAnthropicOAuth() {
-  var input = document.getElementById('settingsAnthropicCode');
-  var code = input ? input.value.trim() : '';
-  if (!code || !settingsFlows.anthropic) { Shell.toast('Paste the Claude callback code first', 'error'); return; }
-  try {
-    var r = await settingsApi('/api/oauth/anthropic/complete', { flowId: settingsFlows.anthropic, code: code });
-    var d = await r.json();
-    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-    paintSettingsOAuth(d.oauth);
-    Shell.toast('Claude Pro/Max connected', 'success');
-  } catch (e) {
-    Shell.toast('Claude complete failed: ' + (e.message || e), 'error');
   }
 }
 async function startOpenaiOAuth() {
@@ -319,7 +290,7 @@ async function detectLocalAgents() {
     settingsAgents = d.agents || [];
     settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
     renderAgents();
-    paintCursor();
+    paintAgentCards();
   } catch (e) {
     if (list) list.innerHTML = '<p class="text-secondary">Detection failed — is the server running?</p>';
   }
@@ -352,13 +323,42 @@ function paintCursor() {
   }
   if (body && found) body.textContent = 'Cursor ' + (found.version || '') + ' · ' + (connected ? 'connected as a local backbone.' : 'detected — connect to enlist it.');
 }
+function paintAgentCards() {
+  paintCursor();
+  paintClaudeAgent();
+}
+function paintClaudeAgent() {
+  var badge = document.getElementById('claudeAgentStatus');
+  var body = document.getElementById('claudeAgentBody');
+  var found = settingsAgents.find(function (a) { return a.id === 'claude'; });
+  var connected = settingsConnected.indexOf('claude') >= 0;
+  if (badge) {
+    badge.textContent = connected ? 'connected' : (found ? (found.authed ? 'detected' : 'not authed') : 'not detected');
+    badge.className = 'badge ' + (connected ? 'badge--ok' : (found && found.authed ? 'badge--info' : 'badge--neutral'));
+  }
+  if (body && found) body.textContent = 'Claude Code ' + (found.version || '') + ' · ' + (connected ? 'connected as a local backbone.' : 'detected — connect to enlist it.');
+}
+async function connectClaudeAgent() {
+  try {
+    var r = await settingsApi('/api/agents/local/connect', { id: 'claude', ping: false });
+    var d = await r.json();
+    settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
+    renderAgents();
+    paintAgentCards();
+    var res = (d.results || []).find(function (x) { return x.id === 'claude'; });
+    if (res && res.status === 'active') Shell.toast('Claude Code connected', 'success');
+    else Shell.toast('Claude Code not connected: ' + (res ? res.status : 'no result'), 'error');
+  } catch (e) {
+    Shell.toast('Claude Code connect failed: ' + (e.message || e), 'error');
+  }
+}
 async function connectSettingsAgent(id) {
   try {
     var r = await settingsApi('/api/agents/local/connect', { ids: [id], ping: false });
     var d = await r.json();
     settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
     renderAgents();
-    paintCursor();
+    paintAgentCards();
     Shell.toast(id + ' connected', 'success');
   } catch (e) {
     Shell.toast('Connect failed: ' + (e.message || e), 'error');
@@ -370,7 +370,7 @@ async function connectCursorAgent() {
     var d = await r.json();
     settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
     renderAgents();
-    paintCursor();
+    paintAgentCards();
     Shell.toast('Cursor connected', 'success');
   } catch (e) {
     Shell.toast('Cursor connect failed: ' + (e.message || e), 'error');
@@ -382,7 +382,7 @@ async function disconnectSettingsAgent(id) {
     var d = await r.json();
     settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
     renderAgents();
-    paintCursor();
+    paintAgentCards();
     Shell.toast(id + ' disconnected', 'info');
   } catch (e) {
     Shell.toast('Disconnect failed: ' + (e.message || e), 'error');
@@ -396,7 +396,7 @@ async function connectSelectedLocalAgents() {
     var d = await r.json();
     settingsConnected = (d.connected || []).map(function (c) { return c.id || c; });
     renderAgents();
-    paintCursor();
+    paintAgentCards();
     Shell.toast('Connected ' + settingsConnected.length + ' agent(s)', 'success');
   } catch (e) {
     Shell.toast('Connect failed: ' + (e.message || e), 'error');
@@ -475,7 +475,6 @@ async function refreshModelStatus() {
     var line = document.getElementById('modelLine');
     var names = [];
     if (oauth.xai && oauth.xai.connected) names.push('Super Grok Heavy');
-    if (oauth.anthropic && oauth.anthropic.connected) names.push('Claude Pro/Max');
     if (oauth.openai && oauth.openai.connected) names.push('ChatGPT Plan');
     if (line) line.textContent = 'LLM connected: ' + (!!llm.connected) + (llm.provider ? ' · provider ' + llm.provider : '') + (llm.model ? ' · model ' + llm.model : '') + (names.length ? ' · subscriptions: ' + names.join(', ') : '');
     Shell.showState(root, 'data');

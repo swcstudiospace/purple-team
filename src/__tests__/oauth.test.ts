@@ -6,15 +6,13 @@ import {
   __resetOAuthState,
   __setOAuthNow,
   clearOAuth,
-  completeAnthropicPkceFlow,
   ensureOAuthAccessToken,
   hasOAuth,
   oauthStatus,
   oauthStorePath,
-  parseAnthropicAuthCode,
+  parseOpenAiAuthCode,
   peekOAuthAccessToken,
   pollXaiDeviceFlow,
-  startAnthropicPkceFlow,
   startXaiDeviceFlow,
 } from '../llm/oauth.js';
 import { config } from '../config/index.js';
@@ -208,42 +206,8 @@ describe('subscription OAuth', () => {
     expect(peekOAuthAccessToken('xai')).toBe('new-access');
   });
 
-  it('builds a Claude PKCE authorize URL and exchanges the pasted code#state', async () => {
-    tempStore();
-    const start = await startAnthropicPkceFlow();
-    expect(start.authorizeUrl).toContain('https://claude.ai/oauth/authorize');
-    expect(start.authorizeUrl).toContain('code_challenge_method=S256');
-    expect(start.authorizeUrl).toContain('client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e');
-    expect(start.authorizeUrl).toContain(encodeURIComponent('user:inference'));
-    expect(start.state).toBeTruthy();
-
-    const parsed = parseAnthropicAuthCode(`authcode123#${start.state}`);
-    expect(parsed.code).toBe('authcode123');
-    expect(parsed.state).toBe(start.state);
-
-    const f = fakeFetch((url, init) => {
-      expect(url).toBe('https://console.anthropic.com/v1/oauth/token');
-      const body = JSON.parse(String(init?.body));
-      expect(body.grant_type).toBe('authorization_code');
-      expect(body.code).toBe('authcode123');
-      expect(body.code_verifier).toBeTruthy();
-      expect(body.state).toBe(start.state);
-      expect(body.redirect_uri).toBe('https://console.anthropic.com/oauth/code/callback');
-      return {
-        ok: true,
-        status: 200,
-        body: { access_token: 'sk-ant-oat01-secret', refresh_token: 'rt-secret', expires_in: 3600 },
-      };
-    });
-
-    await completeAnthropicPkceFlow(start.flowId, `authcode123#${start.state}`, { fetchImpl: f });
-    expect(hasOAuth('anthropic')).toBe(true);
-    expect(peekOAuthAccessToken('anthropic')).toBe('sk-ant-oat01-secret');
-    expect(JSON.stringify(oauthStatus())).not.toContain('sk-ant-oat01-secret');
-  });
-
-  it('parses a full Claude callback URL into code + state', () => {
-    const p = parseAnthropicAuthCode('https://console.anthropic.com/oauth/code/callback?code=abc&state=xyz');
+  it('parses a full ChatGPT callback URL into code + state', () => {
+    const p = parseOpenAiAuthCode('http://localhost:1455/auth/callback?code=abc&state=xyz');
     expect(p).toEqual({ code: 'abc', state: 'xyz' });
   });
 
@@ -281,12 +245,5 @@ describe('subscription OAuth', () => {
       if (prev === undefined) delete process.env.XAI_API_KEY;
       else process.env.XAI_API_KEY = prev;
     }
-  });
-
-  it('rejects a Claude complete with a mismatched state', async () => {
-    tempStore();
-    const start = await startAnthropicPkceFlow();
-    await expect(completeAnthropicPkceFlow(start.flowId, 'code#other-state')).rejects.toThrow(/state/i);
-    expect(hasOAuth('anthropic')).toBe(false);
   });
 });

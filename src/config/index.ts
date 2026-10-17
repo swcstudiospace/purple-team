@@ -1015,7 +1015,7 @@ class ConfigManager {
 
     if (this.hasApiKey('openrouter')) providers.push('openrouter');
     if (this.hasApiKey('venice')) providers.push('venice');
-    if (this.hasApiKey('anthropic') || hasOAuth('anthropic')) providers.push('anthropic');
+    if (this.hasApiKey('anthropic')) providers.push('anthropic');
     if (this.hasApiKey('openai')) providers.push('openai');
     if (this.hasApiKey('xai') || hasOAuth('xai')) providers.push('xai');
     if (this.hasLiteLLMProxy()) providers.push('litellm');
@@ -1029,7 +1029,7 @@ class ConfigManager {
     providers.push('codex');
 
     // ChatGPT Plan is configured exactly when the 'openai' OAuth vendor has tokens —
-    // same hasOAuth(...) semantics as anthropic/xai (no API key in the mix).
+    // same hasOAuth(...) semantics as xai (no API key in the mix).
     if (hasOAuth('openai')) providers.push('chatgpt');
 
     // Cursor uses the local cursor-agent CLI's own login (keyless), like codex.
@@ -1072,7 +1072,7 @@ class ConfigManager {
         actualModel = model || this.config.get('venice').defaultModel;
         break;
       case 'anthropic':
-        apiKey = peekOAuthAccessToken('anthropic') || this.getApiKey('anthropic');
+        apiKey = this.getApiKey('anthropic');
         baseUrl = this.config.get('anthropic').baseUrl;
         actualModel = model || this.config.get('anthropic').defaultModel;
         break;
@@ -1170,7 +1170,6 @@ class ConfigManager {
     }
 
     const oauthHydrated = (actualProvider === 'xai' && hasOAuth('xai'))
-      || (actualProvider === 'anthropic' && hasOAuth('anthropic'))
       || (actualProvider === 'chatgpt' && hasOAuth('openai'));
 
     return {
@@ -1212,7 +1211,7 @@ class ConfigManager {
     const chain: FallbackEntry[] = [];
     const add = (p: 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'huggingface' | 'nanogpt' | 'novita') => {
       if (p === primary) return;
-      const oauth = (p === 'xai' || p === 'anthropic') && hasOAuth(p);
+      const oauth = p === 'xai' && hasOAuth(p);
       if (p === 'litellm' ? !this.hasLiteLLMProxy() : !(this.hasApiKey(p) || oauth)) return;
       chain.push({
         provider: p,

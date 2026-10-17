@@ -86,20 +86,6 @@ describe('listProviderModels — Anthropic wire', () => {
     expect(headers['anthropic-version']).toBeTruthy();
     expect(headers.Authorization).toBeUndefined();  // Anthropic API keys do NOT use Bearer
   });
-
-  it('uses Bearer + oauth beta for Claude Pro/Max OAuth tokens', async () => {
-    const f = fakeFetch({ data: [{ id: 'claude-opus-4-8' }] });
-    await listProviderModels('anthropic', {
-      baseUrl: 'https://api.anthropic.com',
-      apiKey: 'sk-ant-oat01-test',
-      authType: 'oauth',
-      fetchImpl: f,
-    });
-    const headers = (f.mock.calls[0][1] as { headers: Record<string, string> }).headers;
-    expect(headers.Authorization).toBe('Bearer sk-ant-oat01-test');
-    expect(headers['anthropic-beta']).toContain('oauth-2025-04-20');
-    expect(headers['x-api-key']).toBeUndefined();
-  });
 });
 
 describe('listProviderModels — OpenRouter', () => {

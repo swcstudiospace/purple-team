@@ -21,13 +21,11 @@ import { config, AVAILABLE_MODELS } from './config/index.js';
 import { resolveProviderModels } from './config/provider-models.js';
 import {
   clearOAuth,
-  completeAnthropicPkceFlow,
   completeOpenAiPkceFlow,
   hasOAuth,
   oauthStatus,
   pollXaiDeviceFlow,
   setOAuthFetch,
-  startAnthropicPkceFlow,
   startOpenAiPkceFlow,
   startXaiDeviceFlow,
 } from './llm/oauth.js';
@@ -372,7 +370,6 @@ async function initLLM(): Promise<LLMBackbone | null> {
     let llmConfig = config.getLLMConfig();
     if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
       if (hasOAuth('xai')) llmConfig = config.getLLMConfig('xai');
-      else if (hasOAuth('anthropic')) llmConfig = config.getLLMConfig('anthropic');
       else if (hasOAuth('openai')) llmConfig = config.getLLMConfig('chatgpt');
     }
     if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
@@ -6566,7 +6563,7 @@ app.get('/api/llm/status', (_req: Request, res: Response) => {
   });
 });
 
-// Subscription OAuth (Super Grok Heavy + Claude Pro/Max + ChatGPT Plan). Tokens never leave the server.
+// Subscription OAuth (Super Grok Heavy + ChatGPT Plan). Tokens never leave the server.
 app.get('/api/oauth/status', (_req: Request, res: Response) => {
   res.json(oauthStatus());
 });
@@ -6596,36 +6593,6 @@ app.post('/api/oauth/xai/poll', async (req: Request, res: Response): Promise<voi
 
 app.post('/api/oauth/xai/logout', (_req: Request, res: Response) => {
   clearOAuth('xai');
-  void initLLM().then((next) => { llm = next; });
-  res.json({ ok: true, oauth: oauthStatus() });
-});
-
-app.post('/api/oauth/anthropic/start', async (_req: Request, res: Response): Promise<void> => {
-  try {
-    res.json(await startAnthropicPkceFlow());
-  } catch (e) {
-    res.status(502).json({ error: (e as Error).message });
-  }
-});
-
-app.post('/api/oauth/anthropic/complete', async (req: Request, res: Response): Promise<void> => {
-  const flowId = typeof req.body?.flowId === 'string' ? req.body.flowId : '';
-  const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  if (!flowId || !code) {
-    res.status(400).json({ error: 'flowId and code required' });
-    return;
-  }
-  try {
-    await completeAnthropicPkceFlow(flowId, code);
-    llm = await initLLM();
-    res.json({ ok: true, oauth: oauthStatus() });
-  } catch (e) {
-    res.status(400).json({ error: (e as Error).message });
-  }
-});
-
-app.post('/api/oauth/anthropic/logout', (_req: Request, res: Response) => {
-  clearOAuth('anthropic');
   void initLLM().then((next) => { llm = next; });
   res.json({ ok: true, oauth: oauthStatus() });
 });

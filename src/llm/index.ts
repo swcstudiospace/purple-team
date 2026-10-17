@@ -23,8 +23,6 @@ import { config } from '../config/index.js';
 import { localAgentChat } from '../agent/local-agents.js';
 import { fetchBypassingProxy } from '../net/proxy.js';
 import {
-  ANTHROPIC_OAUTH_BETA,
-  CLAUDE_OAUTH_IDENTITY,
   ensureOAuthAccessToken,
   oauthVendorForProvider,
   peekOAuthIdToken,
@@ -463,9 +461,7 @@ class AnthropicAdapter implements LLMProviderAdapter {
     if (!this.config.apiKey) {
       return {
         valid: false,
-        error: this.config.authType === 'oauth'
-          ? 'Claude Pro/Max OAuth is required. Sign in from Settings → Subscription sign-in.'
-          : 'Anthropic API key is required. Get one at https://console.anthropic.com/ or sign in with Claude Pro/Max.',
+        error: 'Anthropic API key is required. Get one at https://console.anthropic.com/.',
       };
     }
     return { valid: true };
@@ -514,12 +510,7 @@ class AnthropicAdapter implements LLMProviderAdapter {
       temperature: options?.temperature ?? this.config.temperature ?? 0.7,
     };
 
-    if (this.config.authType === 'oauth') {
-      const existing = systemMessage?.content || '';
-      requestBody.system = existing.startsWith(CLAUDE_OAUTH_IDENTITY)
-        ? existing
-        : (existing ? `${CLAUDE_OAUTH_IDENTITY}\n\n${existing}` : CLAUDE_OAUTH_IDENTITY);
-    } else if (systemMessage) {
+    if (systemMessage) {
       requestBody.system = systemMessage.content;
     }
 
@@ -535,13 +526,8 @@ class AnthropicAdapter implements LLMProviderAdapter {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
+      'x-api-key': this.config.apiKey ?? '',
     };
-    if (this.config.authType === 'oauth') {
-      headers.Authorization = `Bearer ${this.config.apiKey ?? ''}`;
-      headers['anthropic-beta'] = ANTHROPIC_OAUTH_BETA;
-    } else {
-      headers['x-api-key'] = this.config.apiKey ?? '';
-    }
 
     const response = await fetch(url, {
       method: 'POST',
