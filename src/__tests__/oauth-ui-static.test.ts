@@ -43,7 +43,6 @@ describe('settings sign-in surface (all five providers)', () => {
     expect(landing).toContain('Super Grok Heavy');
     expect(landing).toContain('Claude Code');
     expect(landing).toContain('startXaiOAuth');
-    expect(landing).toContain('xai:grok-4-heavy');
     expect(landing).toContain("auth: 'oauth'");
   });
 });

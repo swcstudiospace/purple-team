@@ -370,6 +370,16 @@ function oauthApi(path, body) {
     body: body === undefined ? undefined : JSON.stringify(body)
   });
 }
+// Subscription backends pin no model. After sign-in the mission takes the first id from the
+// provider's own live list (the list settings.html offers). undefined leaves the server default in force.
+async function oauthLiveModel(provider) {
+  try {
+    var r = await oauthApi('/api/models', { provider: provider });
+    if (!r.ok) return undefined;
+    var d = await r.json();
+    return d.models && d.models.length ? d.models[0].id : undefined;
+  } catch (e) { return undefined; }
+}
 function paintOAuthStatus(oauth) {
   var x = oauth && oauth.xai;
   var o = oauth && oauth.openai;
@@ -605,7 +615,7 @@ async function launchMissionFromOverview() {
           if (os.ok) {
             var od = await os.json();
             var wiring = [
-              { id: 'xai', name: 'Super Grok Heavy', backend: 'xai', model: 'xai:grok-4-heavy', auth: 'oauth', ready: !!(od.xai && od.xai.connected) },
+              { id: 'xai', name: 'Super Grok Heavy', backend: 'xai', model: null, auth: 'oauth', ready: !!(od.xai && od.xai.connected) },
               { id: 'openai', name: 'ChatGPT Plan', backend: 'openai', model: 'gpt-5', auth: 'oauth', ready: !!(od.openai && od.openai.connected) }
             ];
             oauthPick = wiring.find(function (w) { return w.ready; }) || null;
@@ -621,10 +631,10 @@ async function launchMissionFromOverview() {
           addMissionLog('info', 'LLM backend: local agent (' + dispatchAgent.id + ')' + shownModel + ' — no API key needed');
         } else if (oauthReady) {
           provider = oauthPick.backend;
-          model = oauthPick.model || oauthPick.id;
+          model = oauthPick.model || await oauthLiveModel(provider);
           missionKey = undefined;
           addIntel('BACKEND', 'Subscription OAuth — ' + oauthPick.name + ' (' + provider + ')', 'success');
-          addMissionLog('info', 'LLM backend: ' + provider + '/' + model + ' via OAuth — no API key sent');
+          addMissionLog('info', 'LLM backend: ' + provider + '/' + (model || 'server default') + ' via OAuth — no API key sent');
         } else if (!apiKey) {
           addIntel('BACKEND', 'No browser API key — using the server-configured LLM backend', 'success');
           addMissionLog('info', 'LLM backend: server default — no browser API key sent');
@@ -1053,13 +1063,6 @@ function paintAdmiralBackbone() {
   function setActiveAgentStored(id){ try { if (id) localStorage.setItem('t3mp3st_active_agent', id); else localStorage.removeItem('t3mp3st_active_agent'); } catch(e) {} }
 
   // Which Claude model the local Claude Code CLI should run (passed through as its --model flag).
-  // '' = the CLI's own account default. Claude Code accepts the aliases opus/sonnet/haiku or a full id.
-  const CLAUDE_MODELS = [
-    { id: '',       label: 'Account default (Claude Code setting)' },
-    { id: 'opus',   label: 'Claude Opus (latest)' },
-    { id: 'sonnet', label: 'Claude Sonnet (latest)' },
-    { id: 'haiku',  label: 'Claude Haiku (latest, fast)' }
-  ];
   function getClaudeModel(){ try { return localStorage.getItem('t3mp3st_claude_model') || ''; } catch(e) { return ''; } }
   function setClaudeModelStored(m){ try { if (m) localStorage.setItem('t3mp3st_claude_model', m); else localStorage.removeItem('t3mp3st_claude_model'); } catch(e) {} }
   // The underlying model to run for a given agent id — only Claude Code exposes a picker today.

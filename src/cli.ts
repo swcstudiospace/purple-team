@@ -29,10 +29,11 @@ import {
   hasApiKey,
   setApiKey,
   getConfiguredProviders,
-  AVAILABLE_MODELS,
 } from './config/index.js';
 
 import { LLMBackbone } from './llm/index.js';
+import { resolveProviderModels, type ProviderModelList } from './config/provider-models.js';
+import type { LLMProvider } from './types/index.js';
 
 // =============================================================================
 // DISPLAY HELPERS
@@ -498,6 +499,17 @@ async function generateReport(tempest: Tempest): Promise<void> {
   }
 }
 
+/** Live model list for the provider's configured key. Never throws; `unavailable` carries the note to show. */
+async function liveModelListing(provider: LLMProvider): Promise<ProviderModelList> {
+  let llm: { baseUrl?: string; apiKey?: string; authType?: 'api-key' | 'oauth' } = {};
+  try {
+    llm = config.getLLMConfig(provider);
+  } catch {
+    // No remote config for this provider: the resolver reports it as unavailable.
+  }
+  return resolveProviderModels(provider, { baseUrl: llm.baseUrl, apiKey: llm.apiKey, authType: llm.authType });
+}
+
 async function openSettings(): Promise<void> {
   const { setting } = await inquirer.prompt([
     {
@@ -551,20 +563,18 @@ async function openSettings(): Promise<void> {
 
     case 'model': {
       const currentProvider = config.get('defaultProvider');
-      const availableModels = AVAILABLE_MODELS[currentProvider];
-      if (!availableModels || availableModels.length === 0) {
-        showWarning(`No models available for ${currentProvider}`);
+      const listing = await liveModelListing(currentProvider);
+      if (listing.source === 'unavailable') {
+        showWarning(listing.note ?? `No models available for ${currentProvider}`);
         break;
       }
+      if (listing.note) showWarning(listing.note);
       const { selectedModel } = await inquirer.prompt([
         {
           type: 'list',
           name: 'selectedModel',
           message: 'Select default model:',
-          choices: availableModels.map(m => ({
-            name: `${m.name} (${m.id}) - ${m.contextWindow.toLocaleString()} ctx`,
-            value: m.id,
-          })),
+          choices: listing.models.map(m => ({ name: m.id, value: m.id })),
           default: config.get('defaultModel'),
         },
       ]);
@@ -688,25 +698,26 @@ program
 program
   .command('models')
   .description('List available models')
-  .action(() => {
+  .action(async () => {
     showBanner();
 
     const provider = config.get('defaultProvider');
-    const models = AVAILABLE_MODELS[provider];
+    const listing = await liveModelListing(provider);
+    if (listing.source === 'unavailable') {
+      showWarning(listing.note ?? `No models available for ${provider}`);
+      return;
+    }
+    if (listing.note) showWarning(listing.note);
 
     console.log(chalk.bold(`Available models for ${provider}:\n`));
 
     const table = new Table({
-      head: [chalk.cyan('Model ID'), chalk.cyan('Name'), chalk.cyan('Context')],
+      head: [chalk.cyan('Model ID')],
       style: { head: [], border: [] },
     });
 
-    for (const model of models) {
-      table.push([
-        model.id,
-        model.name,
-        `${model.contextWindow.toLocaleString()} tokens`,
-      ]);
+    for (const model of listing.models) {
+      table.push([model.id]);
     }
 
     console.log(table.toString());
