@@ -38,9 +38,6 @@ describe('local OpenAI-compatible provider hardening', () => {
     const localCase = block(configSource, "case 'local':", 'break;');
 
     expect(localCase).toContain('TEMPEST_LOCAL_API_KEY');
-    // Provider-specific aliases are accepted as a convenience.
-    expect(localCase).toMatch(/ZAI_API_KEY/);
-    expect(localCase).toMatch(/ZHIPUAI_API_KEY/);
   });
 
   it('getLLMConfig treats UI local placeholders as unset model names', () => {

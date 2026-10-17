@@ -1821,6 +1821,8 @@ export class LLMBackbone extends EventEmitter<LLMEvents> {
         return new OpenAIAdapter(config); // Gemini via Google's OpenAI-compatible endpoint (baseUrl ends in /v1beta/openai)
       case 'deepseek':
         return new OpenAIAdapter(config); // DeepSeek native API is OpenAI-compatible
+      case 'zai':
+        return new OpenAIAdapter(config); // Z.ai general API is OpenAI-compatible (baseUrl ends in /api/paas/v4)
       case 'huggingface':
         return new OpenAIAdapter(config); // HF Inference Providers router is OpenAI-compatible (baseUrl ends in /v1)
       case 'nanogpt':
@@ -2144,6 +2146,12 @@ export function createDeepSeekBackbone(apiKey?: string, model?: string): LLMBack
   return new LLMBackbone(llmConfig);
 }
 
+export function createZaiBackbone(apiKey?: string, model?: string): LLMBackbone {
+  const llmConfig = config.getLLMConfig('zai', model);
+  if (apiKey) llmConfig.apiKey = apiKey;
+  return new LLMBackbone(llmConfig);
+}
+
 export function createHuggingFaceBackbone(apiKey?: string, model?: string): LLMBackbone {
   const llmConfig = config.getLLMConfig('huggingface', model);
   if (apiKey) llmConfig.apiKey = apiKey;
@@ -2198,7 +2206,7 @@ export function createLocalBackbone(model?: string, baseUrl?: string): LLMBackbo
  * Create the best available backbone based on configured API keys
  */
 export function createBestAvailableBackbone(): LLMBackbone {
-  // Priority: OpenRouter > Venice > LiteLLM > Anthropic > OpenAI > DeepSeek > HuggingFace > NanoGPT > Novita > Local > Mock
+  // Priority: OpenRouter > Venice > LiteLLM > Anthropic > OpenAI > DeepSeek > Z.ai > HuggingFace > NanoGPT > Novita > Local > Mock
   const providers = config.getConfiguredProviders();
 
   if (providers.includes('openrouter')) {
@@ -2226,6 +2234,9 @@ export function createBestAvailableBackbone(): LLMBackbone {
   }
   if (providers.includes('deepseek')) {
     return createDeepSeekBackbone();
+  }
+  if (providers.includes('zai')) {
+    return createZaiBackbone();
   }
   if (providers.includes('huggingface')) {
     return createHuggingFaceBackbone();

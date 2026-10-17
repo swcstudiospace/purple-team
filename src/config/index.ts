@@ -12,7 +12,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import type { LLMProvider, LLMConfig, FallbackEntry, OpsecLevel } from '../types/index.js';
 import { hasOAuth, peekOAuthAccessToken } from '../llm/oauth.js';
 
-type ApiKeyProvider = 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'huggingface' | 'nanogpt' | 'novita' | 'local';
+type ApiKeyProvider = 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'zai' | 'huggingface' | 'nanogpt' | 'novita' | 'local';
 
 // =============================================================================
 // CONFIGURATION SCHEMA
@@ -28,6 +28,7 @@ export interface TempestSettings {
     xai?: string;
     gemini?: string;
     deepseek?: string;
+    zai?: string;
     huggingface?: string;
     nanogpt?: string;
     litellm?: string;
@@ -85,6 +86,12 @@ export interface TempestSettings {
 
   // DeepSeek — OpenAI-compatible API
   deepseek: {
+    baseUrl: string;
+    defaultModel: string;
+  };
+
+  // Z.ai — general API only (not the GLM Coding Plan endpoint)
+  zai: {
     baseUrl: string;
     defaultModel: string;
   };
@@ -196,6 +203,12 @@ const DEFAULT_SETTINGS: TempestSettings = {
   deepseek: {
     baseUrl: 'https://api.deepseek.com',
     defaultModel: 'deepseek-v4-pro',
+  },
+
+  // Z.ai — general API only (not the GLM Coding Plan endpoint)
+  zai: {
+    baseUrl: 'https://api.z.ai/api/paas/v4',
+    defaultModel: 'glm-5.3',
   },
 
   // Hugging Face Inference Providers expose a unified OpenAI-compatible router at
@@ -661,6 +674,8 @@ export const AVAILABLE_MODELS: Record<LLMProvider, ModelInfo[]> = {
       capabilities: ['reasoning', 'code', 'analysis', 'vision', 'fast', 'tools'],
     },
   ],
+  // Z.ai: no static model list. Models come from the live /models call or the configured default.
+  zai: [],
   deepseek: [
     {
       id: 'deepseek-v4-pro',
@@ -850,7 +865,7 @@ class ConfigManager {
         const envContent = readFileSync(envPath, 'utf-8');
         const lines = envContent.split('\n');
         // Validation variables added
-        const VALID_PROVIDERS = ['openrouter', 'venice', 'anthropic', 'openai', 'xai', 'gemini', 'litellm', 'deepseek', 'huggingface', 'nanogpt', 'local'];
+        const VALID_PROVIDERS = ['openrouter', 'venice', 'anthropic', 'openai', 'xai', 'gemini', 'litellm', 'deepseek', 'zai', 'huggingface', 'nanogpt', 'local'];
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -937,9 +952,9 @@ class ConfigManager {
   getApiKey(provider: ApiKeyProvider): string | undefined {
     // First check environment variables (highest priority)
     // local provider: a self-hosted/OpenAI-compatible server MAY require a bearer
-    // (Zhipu/z.ai, Together, etc.) — accept TEMPEST_LOCAL_API_KEY or provider-specific vars.
+    // (Together, etc.) — accept TEMPEST_LOCAL_API_KEY only. Provider keys are never reused for a custom endpoint.
     if (provider === 'local') {
-      const localKey = process.env.TEMPEST_LOCAL_API_KEY?.trim() || process.env.ZAI_API_KEY?.trim() || process.env.ZHIPUAI_API_KEY?.trim();
+      const localKey = process.env.TEMPEST_LOCAL_API_KEY?.trim();
       if (localKey) return localKey;
       return this.config.get('apiKeys')[provider];
     }
@@ -951,6 +966,7 @@ class ConfigManager {
       xai: 'XAI_API_KEY',
       gemini: 'GEMINI_API_KEY',
       deepseek: 'DEEPSEEK_API_KEY',
+      zai: 'ZAI_API_KEY',
       huggingface: 'HF_TOKEN',
       nanogpt: 'NANOGPT_API_KEY',
       novita: 'NOVITA_API_KEY',
@@ -1021,6 +1037,7 @@ class ConfigManager {
     if (this.hasLiteLLMProxy()) providers.push('litellm');
     if (this.hasApiKey('gemini')) providers.push('gemini');
     if (this.hasApiKey('deepseek')) providers.push('deepseek');
+    if (this.hasApiKey('zai')) providers.push('zai');
     if (this.hasApiKey('huggingface')) providers.push('huggingface');
     if (this.hasApiKey('nanogpt')) providers.push('nanogpt');
     if (this.hasApiKey('novita')) providers.push('novita');
@@ -1100,6 +1117,12 @@ class ConfigManager {
         baseUrl = this.config.get('gemini').baseUrl;
         actualModel = model || this.config.get('gemini').defaultModel;
         break;
+      case 'zai':
+        // Z.ai general API (OpenAI-compatible). The GLM Coding Plan endpoint is intentionally not used.
+        apiKey = this.getApiKey('zai');
+        baseUrl = this.config.get('zai').baseUrl;
+        actualModel = model || this.config.get('zai').defaultModel;
+        break;
       case 'deepseek':
         // DeepSeek native API is OpenAI-compatible.
         apiKey = this.getApiKey('deepseek');
@@ -1157,13 +1180,13 @@ class ConfigManager {
         // any OpenAI-compatible server (LM Studio :1234/v1, vLLM :8000/v1, llama.cpp, Zhipu/z.ai
         // /api/paas/v4) and TEMPEST_LOCAL_MODEL at the model tag you're serving.
         // Some OpenAI-compatible servers require a real bearer (Zhipu, Together, etc.) —
-        // TEMPEST_LOCAL_API_KEY (or a provider-specific env like ZAI_API_KEY) provides it.
+        // TEMPEST_LOCAL_API_KEY provides it. Provider keys (e.g. ZAI_API_KEY) are never sent to this endpoint.
         baseUrl = process.env.TEMPEST_LOCAL_BASE_URL?.trim() || 'http://localhost:11434/api';
         // Placeholder ids from AVAILABLE_MODELS / the static UI are not real served model tags.
         // Treat them as unset so TEMPEST_LOCAL_MODEL (or the llama3 default) wins; a real tag
         // passed in still takes priority.
         actualModel = (model && !['local-model', 'local/ollama'].includes(model) ? model : undefined) || process.env.TEMPEST_LOCAL_MODEL?.trim() || 'llama3';
-        apiKey = process.env.TEMPEST_LOCAL_API_KEY?.trim() || process.env.ZAI_API_KEY?.trim() || process.env.ZHIPUAI_API_KEY?.trim();
+        apiKey = process.env.TEMPEST_LOCAL_API_KEY?.trim();
         break;
       default:
         throw new Error(`Unknown provider: ${actualProvider}`);
@@ -1209,7 +1232,7 @@ class ConfigManager {
     const flag = (process.env.TEMPEST_MODEL_FALLBACK || '').trim().toLowerCase();
     if (!flag || ['0', 'false', 'off', 'no'].includes(flag)) return [];
     const chain: FallbackEntry[] = [];
-    const add = (p: 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'huggingface' | 'nanogpt' | 'novita') => {
+    const add = (p: 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'zai' | 'huggingface' | 'nanogpt' | 'novita') => {
       if (p === primary) return;
       const oauth = p === 'xai' && hasOAuth(p);
       if (p === 'litellm' ? !this.hasLiteLLMProxy() : !(this.hasApiKey(p) || oauth)) return;
@@ -1229,6 +1252,7 @@ class ConfigManager {
     add('xai');
     add('gemini');
     add('deepseek');
+    add('zai');
     add('huggingface');
     add('nanogpt');
     add('novita');
@@ -1254,6 +1278,9 @@ class ConfigManager {
         break;
       case 'openai':
         this.config.set('defaultModel', this.config.get('openai').defaultModel);
+        break;
+      case 'zai':
+        this.config.set('defaultModel', this.config.get('zai').defaultModel);
         break;
       case 'deepseek':
         this.config.set('defaultModel', this.config.get('deepseek').defaultModel);
@@ -1298,6 +1325,9 @@ class ConfigManager {
         break;
       case 'openai':
         this.config.set('openai', { ...this.config.get('openai'), defaultModel: model });
+        break;
+      case 'zai':
+        this.config.set('zai', { ...this.config.get('zai'), defaultModel: model });
         break;
       case 'deepseek':
         this.config.set('deepseek', { ...this.config.get('deepseek'), defaultModel: model });
@@ -1357,6 +1387,7 @@ class ConfigManager {
         xai: settings.apiKeys.xai ? '***REDACTED***' : undefined,
         gemini: settings.apiKeys.gemini ? '***REDACTED***' : undefined,
         deepseek: settings.apiKeys.deepseek ? '***REDACTED***' : undefined,
+        zai: settings.apiKeys.zai ? '***REDACTED***' : undefined,
         huggingface: settings.apiKeys.huggingface ? '***REDACTED***' : undefined,
         nanogpt: settings.apiKeys.nanogpt ? '***REDACTED***' : undefined,
         novita: settings.apiKeys.novita ? '***REDACTED***' : undefined,
@@ -1408,6 +1439,9 @@ GEMINI_API_KEY=
 # Get your key at: https://platform.deepseek.com/api_keys
 DEEPSEEK_API_KEY=
 
+# Z.ai API Key (general API only; the GLM Coding Plan endpoint is not used)
+ZAI_API_KEY=
+
 # Hugging Face access token (open models via the OpenAI-compatible Inference Providers router)
 # Get your token at: https://huggingface.co/settings/tokens
 # HUGGINGFACE_API_KEY / HUGGINGFACE_TOKEN are also accepted as aliases.
@@ -1427,7 +1461,7 @@ NOVITA_API_KEY=
 # vLLM :8000/v1, or e.g. Zhipu/z.ai /api/paas/v4 — any /vN path speaks the
 # OpenAI wire (/chat/completions, choices[]); otherwise the Ollama native format is used.
 # Most local servers are keyless; if yours requires a bearer (Zhipu, Together, …)
-# set TEMPEST_LOCAL_API_KEY (ZAI_API_KEY / ZHIPUAI_API_KEY are accepted as aliases).
+# set TEMPEST_LOCAL_API_KEY. Provider keys (ZAI_API_KEY, etc.) are never sent to this endpoint.
 TEMPEST_LOCAL_BASE_URL=http://localhost:11434/api
 TEMPEST_LOCAL_MODEL=llama3
 TEMPEST_LOCAL_API_KEY=

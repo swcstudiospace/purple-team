@@ -35,7 +35,7 @@ const MODEL_CACHE_MAX_ENTRIES = 64;
 // Pseudo-providers with no remote model list (CLI-driven, OAuth-only with a static
 // catalog, or in-process).
 const NO_REMOTE_LIST = new Set(['codex', 'mock', 'local-agent', 'chatgpt', 'cursor']);
-const OPENAI_COMPATIBLE_REMOTE_LIST = new Set(['openai', 'venice', 'xai', 'gemini', 'nanogpt', 'novita', 'local']);
+const OPENAI_COMPATIBLE_REMOTE_LIST = new Set(['openai', 'venice', 'xai', 'gemini', 'nanogpt', 'novita', 'zai', 'local']);
 const DIRECT_REMOTE_LIST = new Set(['anthropic', 'openrouter']);
 
 const stripTrailingSlash = (u: string): string => u.replace(/\/+$/, '');
