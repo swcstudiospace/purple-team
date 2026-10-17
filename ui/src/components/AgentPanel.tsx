@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { filterCommands, parseComposerInput } from '../../../src/ui-commands/parser';
 import { COMMANDS, type AgentId, type ArgSpec, type CommandSpec } from '../../../src/ui-commands/registry';
+import ChatStream, { type ChatStreamHandle } from './ChatStream';
 import './agent-panel.css';
 
 type TabId = 'red' | 'blue' | 'white' | 'black' | 'unified';
@@ -55,7 +56,7 @@ const STATUS_LABEL: Record<EntryStatus, string> = {
   help: 'Help',
 };
 
-const TEXT_NOTE = 'Free-text dispatch is not wired yet; use a slash command.';
+const BUSY_NOTE = 'A reply is still in progress. Wait for it to finish or press Stop, then send again.';
 const PREVIEW_CHARS = 480;
 const ECHO_VALUE_CHARS = 60;
 
@@ -250,6 +251,7 @@ export default function AgentPanel() {
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({});
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const chatRef = useRef<ChatStreamHandle | null>(null);
 
   useEffect(() => {
     const controllers = controllersRef.current;
@@ -381,7 +383,16 @@ export default function AgentPanel() {
       return;
     }
     if (parsed.kind === 'text') {
-      setNote(TEXT_NOTE);
+      if (parsed.text === '') return;
+      if (chatRef.current?.send(parsed.text)) {
+        setDraft('');
+        setHighlight(0);
+        setDismissed(false);
+        setPendingConfirm(false);
+        setNote(null);
+      } else {
+        setNote(BUSY_NOTE);
+      }
       return;
     }
     if (parsed.kind === 'unknown') {
@@ -463,7 +474,7 @@ export default function AgentPanel() {
   } else if (parsed.kind === 'unknown') {
     statusMessage = `Unknown command "/${parsed.name}". Type / to browse commands.`;
   } else if (draft.trim() === '') {
-    statusMessage = 'Type / to browse commands. Enter runs a command.';
+    statusMessage = 'Type / to browse commands. Enter runs a command or sends a message.';
   }
 
   const activeOptionId = activeSpec ? `${listboxId}-opt-${activeSpec.name}` : undefined;
@@ -472,7 +483,7 @@ export default function AgentPanel() {
     <section className="agent-panel" aria-labelledby={`${baseId}-title`}>
       <header className="ap-header">
         <h2 id={`${baseId}-title`} className="ap-title">Agent console</h2>
-        <p className="ap-subtitle">Slash commands call server routes. Free text is not sent yet.</p>
+        <p className="ap-subtitle">Slash commands call server routes. Free text goes to the configured default model.</p>
       </header>
 
       <div className="ap-tablist" role="tablist" aria-label="Agent lanes">
@@ -553,6 +564,7 @@ export default function AgentPanel() {
           </ol>
         )}
       </div>
+      <ChatStream ref={chatRef} />
 
       <div className="ap-composer">
         <label htmlFor={composerId} className="ap-label">Command</label>
