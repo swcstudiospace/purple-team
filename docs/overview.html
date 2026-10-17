@@ -268,7 +268,7 @@ function getApiBase() { return (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_AP
 function getApiKey() {
   var s = state.settings || {};
   var p = s.activeProvider || 'openrouter';
-  var byProvider = { openrouter: s.openrouterKey, venice: s.veniceKey, anthropic: s.anthropicKey, openai: s.openaiKey, xai: s.xaiKey, huggingface: s.huggingfaceKey, nanogpt: s.nanogptKey, novita: s.novitaKey };
+  var byProvider = { openrouter: s.openrouterKey, venice: s.veniceKey, anthropic: s.anthropicKey, openai: s.openaiKey, xai: s.xaiKey, huggingface: s.huggingfaceKey, nanogpt: s.nanogptKey, novita: s.novitaKey, zai: s.zaiKey };
   return byProvider[p] || s.openrouterKey || s.veniceKey || s.anthropicKey || s.openaiKey || '';
 }
 function buildLocalBaseUrl() {

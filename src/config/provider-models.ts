@@ -35,13 +35,16 @@ const MODEL_CACHE_MAX_ENTRIES = 64;
 // Pseudo-providers with no remote model list (CLI-driven, OAuth-only with a static
 // catalog, or in-process).
 const NO_REMOTE_LIST = new Set(['codex', 'mock', 'local-agent', 'chatgpt', 'cursor']);
-const OPENAI_COMPATIBLE_REMOTE_LIST = new Set(['openai', 'venice', 'xai', 'gemini', 'nanogpt', 'novita', 'zai', 'local']);
+const OPENAI_COMPATIBLE_REMOTE_LIST: Record<string, true> = {
+  openai: true, venice: true, xai: true, gemini: true, nanogpt: true, novita: true, zai: true,
+  litellm: true, huggingface: true, local: true,
+};
 const DIRECT_REMOTE_LIST = new Set(['anthropic', 'openrouter']);
 
 const stripTrailingSlash = (u: string): string => u.replace(/\/+$/, '');
 
 export function providerCanListModels(provider: string): boolean {
-  return DIRECT_REMOTE_LIST.has(provider) || OPENAI_COMPATIBLE_REMOTE_LIST.has(provider);
+  return DIRECT_REMOTE_LIST.has(provider) || OPENAI_COMPATIBLE_REMOTE_LIST[provider] === true;
 }
 
 function timeoutSignal(timeoutMs: number): AbortSignal | undefined {

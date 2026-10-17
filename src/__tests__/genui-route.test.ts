@@ -84,7 +84,7 @@ afterEach(() => {
 
 describe('POST /api/genui/generate handler', () => {
   it('returns 400 for a body without a string prompt', async () => {
-    const handler = createGenUiHandler({ getConfig: () => openAiConfig() });
+    const handler = createGenUiHandler({ getConfig: () => Promise.resolve(openAiConfig()) });
 
     const nullBody = fakeRes();
     await handler(fakeReq(null), nullBody);
@@ -98,7 +98,7 @@ describe('POST /api/genui/generate handler', () => {
 
   it('returns 400 for an empty, whitespace-only, or over-length prompt', async () => {
     const createModel = vi.fn();
-    const handler = createGenUiHandler({ getConfig: () => openAiConfig(), createModel });
+    const handler = createGenUiHandler({ getConfig: () => Promise.resolve(openAiConfig()), createModel });
 
     for (const prompt of ['', '   \n\t ', 'x'.repeat(8001)]) {
       const res = fakeRes();
@@ -112,7 +112,7 @@ describe('POST /api/genui/generate handler', () => {
   it('returns 409 for a provider with no OpenAI-compatible streaming path', async () => {
     const createModel = vi.fn();
     const handler = createGenUiHandler({
-      getConfig: () => openAiConfig({ provider: 'anthropic' }),
+      getConfig: () => Promise.resolve(openAiConfig({ provider: 'anthropic' })),
       createModel,
     });
     const res = fakeRes();
@@ -125,7 +125,7 @@ describe('POST /api/genui/generate handler', () => {
   it('returns 503 when the API key is missing and never echoes a key', async () => {
     const createModel = vi.fn();
     const handler = createGenUiHandler({
-      getConfig: () => openAiConfig({ apiKey: '' }),
+      getConfig: () => Promise.resolve(openAiConfig({ apiKey: '' })),
       createModel,
     });
     const res = fakeRes();
@@ -136,7 +136,7 @@ describe('POST /api/genui/generate handler', () => {
   });
 
   it('returns 503 when the base URL is missing', async () => {
-    const handler = createGenUiHandler({ getConfig: () => openAiConfig({ baseUrl: '' }) });
+    const handler = createGenUiHandler({ getConfig: () => Promise.resolve(openAiConfig({ baseUrl: '' })) });
     const res = fakeRes();
     await handler(fakeReq(validBody()), res);
     expect(res.statusCode).toBe(503);
@@ -163,7 +163,7 @@ describe('POST /api/genui/generate handler', () => {
       },
     });
     const createModel = vi.fn(() => model);
-    const handler = createGenUiHandler({ getConfig: () => openAiConfig(), createModel });
+    const handler = createGenUiHandler({ getConfig: () => Promise.resolve(openAiConfig()), createModel });
 
     const res = fakeRes();
     await handler(fakeReq({ prompt: '  Summarise the open findings  ' }), res);
@@ -196,7 +196,7 @@ describe('POST /api/genui/generate handler', () => {
       },
     });
     const handler = createGenUiHandler({
-      getConfig: () => openAiConfig(),
+      getConfig: () => Promise.resolve(openAiConfig()),
       createModel: () => failing,
     });
 

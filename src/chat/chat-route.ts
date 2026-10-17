@@ -14,16 +14,12 @@ import type { Request, Response } from 'express';
 import { convertToModelMessages, pipeUIMessageStreamToResponse, streamText } from 'ai';
 import type { LanguageModel, UIMessage } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
+import type { StreamingModelConfig } from './streaming-config.js';
 
-export interface ChatModelConfig {
-  provider: string;
-  model: string;
-  apiKey?: string;
-  baseUrl?: string;
-}
+export type ChatModelConfig = StreamingModelConfig;
 
 export interface ChatRouteDeps {
-  getConfig: () => ChatModelConfig;
+  getConfig: () => Promise<ChatModelConfig>;
   createModel?: (cfg: ChatModelConfig) => LanguageModel;
 }
 
@@ -110,7 +106,7 @@ export function createChatHandler(deps: ChatRouteDeps) {
 
     let cfg: ChatModelConfig;
     try {
-      cfg = deps.getConfig();
+      cfg = await deps.getConfig();
     } catch {
       res.status(503).json({ error: 'LLM configuration is unavailable' });
       return;

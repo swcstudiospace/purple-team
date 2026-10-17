@@ -1,5 +1,5 @@
 import { useChat } from '@ai-sdk/react';
-import { useEffect, useId, useImperativeHandle, useRef, type Ref } from 'react';
+import { useEffect, useId, useImperativeHandle, useRef, useState, type Ref } from 'react';
 import { DefaultChatTransport, type ChatStatus, type UIMessage } from 'ai';
 import './chat-stream.css';
 
@@ -20,9 +20,12 @@ interface ErrorView {
 
 const transport = new DefaultChatTransport<UIMessage>({
   api: '/api/chat',
-  // Send only the message list, matching the server contract `{ messages: UIMessage[] }`.
-  prepareSendMessagesRequest: ({ messages }) => ({ body: { messages } }),
+  // Send only the message list, trimmed to the server's history limits: `{ messages: UIMessage[] }`.
+  prepareSendMessagesRequest: ({ messages }) => ({ body: { messages: trimHistory(messages) } }),
 });
+
+/** Per-message ceiling; keeps any single message under the server's trim budget. */
+const MAX_MESSAGE_CHARS = 8000;
 
 const STATUS_TEXT: Record<ChatStatus, string> = {
   ready: 'Ready.',
@@ -79,18 +82,52 @@ function describeError(error: Error): ErrorView {
   return { title: `Chat request failed with HTTP ${statusCode}.`, detail };
 }
 
+/** Client-side history cap, kept under the server's `/api/chat` limits (60 messages, 64000 characters). */
+export const MAX_HISTORY_MESSAGES = 40;
+export const MAX_HISTORY_CHARS = 48000;
+
+function textLength(message: UIMessage): number {
+  let total = 0;
+  for (const part of message.parts) {
+    if (part.type === 'text') total += part.text.length;
+  }
+  return total;
+}
+
+/**
+ * Returns the most recent contiguous messages that fit both history limits, dropping the oldest first.
+ * Does not modify the input. May return an empty list if the newest message alone exceeds the character cap.
+ */
+export function trimHistory(messages: UIMessage[]): UIMessage[] {
+  const kept: UIMessage[] = [];
+  let chars = 0;
+  for (let i = messages.length - 1; i >= 0 && kept.length < MAX_HISTORY_MESSAGES; i--) {
+    const size = textLength(messages[i]);
+    if (chars + size > MAX_HISTORY_CHARS) break;
+    chars += size;
+    kept.unshift(messages[i]);
+  }
+  return kept;
+}
+
 function ChatStream({ ref }: ChatStreamProps) {
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const logRef = useRef<HTMLOListElement | null>(null);
 
-  const { messages, sendMessage, status, stop, error, clearError } = useChat<UIMessage>({ transport });
+  const [limitError, setLimitError] = useState<string | null>(null);
+  const { messages, sendMessage, setMessages, status, stop, error, clearError } = useChat<UIMessage>({ transport });
   const busy = status === 'submitted' || status === 'streaming';
 
   useImperativeHandle(ref, () => ({
     send(text: string): boolean {
       const trimmed = text.trim();
       if (trimmed === '' || busy) return false;
+      if (trimmed.length > MAX_MESSAGE_CHARS) {
+        setLimitError(`Message is ${trimmed.length} characters; the limit is ${MAX_MESSAGE_CHARS}. Shorten it and try again.`);
+        return false;
+      }
+      setLimitError(null);
       clearError();
       void sendMessage({ text: trimmed });
       return true;
@@ -116,8 +153,24 @@ function ChatStream({ ref }: ChatStreamProps) {
             Stop
           </button>
         )}
+        <button
+          type="button"
+          className="chat-stream-new"
+          onClick={() => {
+            clearError();
+            setMessages([]);
+          }}
+          disabled={busy}
+        >
+          New chat
+        </button>
       </div>
 
+      {limitError && (
+        <p className="chat-stream-error" role="alert">
+          <strong>{limitError}</strong>
+        </p>
+      )}
       {errorView && (
         <p className="chat-stream-error" role="alert">
           <strong>{errorView.title}</strong>

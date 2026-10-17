@@ -20,7 +20,7 @@ import { GENUI_LIBRARY } from './library-spec.js';
 import { STREAMABLE_PROVIDERS } from '../chat/chat-route.js';
 
 export interface GenUiRouteDeps {
-  getConfig: () => ChatModelConfig;
+  getConfig: () => Promise<ChatModelConfig>;
   createModel?: (cfg: ChatModelConfig) => LanguageModel;
 }
 
@@ -109,7 +109,7 @@ export function createGenUiHandler(deps: GenUiRouteDeps) {
 
     let cfg: ChatModelConfig;
     try {
-      cfg = deps.getConfig();
+      cfg = await deps.getConfig();
     } catch {
       res.status(503).json({ error: 'LLM configuration is unavailable' });
       return;

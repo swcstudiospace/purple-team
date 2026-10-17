@@ -22,7 +22,6 @@ import { resolveProviderModels } from './config/provider-models.js';
 import {
   clearOAuth,
   completeOpenAiPkceFlow,
-  hasOAuth,
   oauthStatus,
   pollXaiDeviceFlow,
   setOAuthFetch,
@@ -50,6 +49,7 @@ import { OPERATOR_SYSTEM_PROMPTS, PLINIAN_OPERATOR_DOCTRINE, THE_FIXER_SYSTEM_PR
 import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
 import { createChatHandler } from './chat/chat-route.js';
 import { createGenUiHandler } from './genui/generate-route.js';
+import { resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
 import type { OperatorArchetype, LLMProvider } from './types/index.js';
 import { listOperatorPrompts, setOperatorOverride, resetOperatorOverride, type OperatorOverride } from './operators/index.js';
 import { ingestRepoToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError } from './recon/whitebox.js';
@@ -369,11 +369,7 @@ let llm: LLMBackbone | null = null;
 
 async function initLLM(): Promise<LLMBackbone | null> {
   try {
-    let llmConfig = config.getLLMConfig();
-    if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
-      if (hasOAuth('xai')) llmConfig = config.getLLMConfig('xai');
-      else if (hasOAuth('openai')) llmConfig = config.getLLMConfig('chatgpt');
-    }
+    const llmConfig = selectServerLLMConfig();
     if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
       console.warn('[purple-team] No API key configured - LLM features disabled');
       return null;
@@ -6554,13 +6550,15 @@ app.get('/api/selfimprove/ledger', async (_req: Request, res: Response): Promise
 });
 
 app.get('/api/llm/status', (_req: Request, res: Response) => {
-  const llmConfig = config.getLLMConfig();
+  // Same resolution as the streaming routes; reports only whether a key exists, never the key.
+  const resolved = selectServerLLMConfig();
+  const configured = Boolean(resolved.apiKey) || providerRunsKeyless(resolved.provider);
   res.json({
-    connected: !!llm,
-    provider: llmConfig.provider,
-    model: llmConfig.model,
-    hasApiKey: !!llmConfig.apiKey,
-    configured: Boolean(llmConfig.apiKey) || providerRunsKeyless(llmConfig.provider),
+    connected: !!llm && configured,
+    provider: resolved.provider,
+    model: resolved.model,
+    hasApiKey: !!resolved.apiKey,
+    configured,
     oauth: oauthStatus(),
   });
 });
@@ -7363,8 +7361,8 @@ app.get('/api/tools', (_req: Request, res: Response) => {
   });
 });
 
-app.post('/api/chat', createChatHandler({ getConfig: () => config.getLLMConfig() }));
-app.post('/api/genui/generate', createGenUiHandler({ getConfig: () => config.getLLMConfig() }));
+app.post('/api/chat', createChatHandler({ getConfig: resolveStreamingConfig }));
+app.post('/api/genui/generate', createGenUiHandler({ getConfig: resolveStreamingConfig }));
 
 app.post('/api/llm/chat', async (req: Request, res: Response): Promise<void> => {
   // Caller-supplied systemPrompt is a local-operator convenience (the UI uses it);

@@ -7,6 +7,12 @@ export default defineConfig({
   root: 'ui',
   base: '/app/',
   plugins: [react()],
+  server: {
+    proxy: {
+      '/api': 'http://127.0.0.1:3333',
+      '/ui': 'http://127.0.0.1:3333',
+    },
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

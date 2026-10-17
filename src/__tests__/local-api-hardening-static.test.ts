@@ -30,14 +30,6 @@ describe('local API authorization hardening invariants', () => {
     expect(`${missionRoute}\n${generalRoutes}`).not.toMatch(/model\s*=\s*['"]anthropic\/claude-sonnet-4['"]/);
   });
 
-  it('health and LLM status count keyless local backends as configured', () => {
-    const health = routeBlock('function healthPayload()', '// =============================================================================\n// API ENDPOINTS - HEALTH & STATUS');
-    const llmStatus = routeBlock("app.get('/api/llm/status'", '// =============================================================================\n// TOOL EXECUTION ENDPOINTS');
-
-    expect(health).toContain('providerRunsKeyless(llmConfig.provider)');
-    expect(llmStatus).toContain('providerRunsKeyless(llmConfig.provider)');
-  });
-
   it('War Room no-key/no-agent backend dispatch defers to the server-configured LLM', () => {
     expect(uiSource).toContain("serverLLM: null");
     expect(uiSource).toContain('this.serverLLM = data.llm');

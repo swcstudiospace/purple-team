@@ -84,7 +84,7 @@ afterEach(() => {
 
 describe('POST /api/chat handler', () => {
   it('returns 400 for a body that is not an object with messages', async () => {
-    const handler = createChatHandler({ getConfig: () => openAiConfig() });
+    const handler = createChatHandler({ getConfig: () => Promise.resolve(openAiConfig()) });
     const res = fakeRes();
     await handler(fakeReq(null), res);
     expect(res.statusCode).toBe(400);
@@ -92,7 +92,7 @@ describe('POST /api/chat handler', () => {
   });
 
   it('returns 400 when messages is empty or over 60 entries', async () => {
-    const handler = createChatHandler({ getConfig: () => openAiConfig() });
+    const handler = createChatHandler({ getConfig: () => Promise.resolve(openAiConfig()) });
 
     const empty = fakeRes();
     await handler(fakeReq({ messages: [] }), empty);
@@ -105,7 +105,7 @@ describe('POST /api/chat handler', () => {
   });
 
   it('returns 400 for an unknown role or non-array parts', async () => {
-    const handler = createChatHandler({ getConfig: () => openAiConfig() });
+    const handler = createChatHandler({ getConfig: () => Promise.resolve(openAiConfig()) });
 
     const badRole = fakeRes();
     await handler(fakeReq({ messages: [{ id: 'a', role: 'tool', parts: [] }] }), badRole);
@@ -117,7 +117,7 @@ describe('POST /api/chat handler', () => {
   });
 
   it('returns 400 when total text exceeds 64000 characters', async () => {
-    const handler = createChatHandler({ getConfig: () => openAiConfig() });
+    const handler = createChatHandler({ getConfig: () => Promise.resolve(openAiConfig()) });
     const big = 'x'.repeat(64001);
     const res = fakeRes();
     await handler(
@@ -130,7 +130,7 @@ describe('POST /api/chat handler', () => {
   it('returns 409 for a provider with no OpenAI-compatible streaming path', async () => {
     const createModel = vi.fn();
     const handler = createChatHandler({
-      getConfig: () => openAiConfig({ provider: 'anthropic' }),
+      getConfig: () => Promise.resolve(openAiConfig({ provider: 'anthropic' })),
       createModel,
     });
     const res = fakeRes();
@@ -143,7 +143,7 @@ describe('POST /api/chat handler', () => {
   it('returns 503 when the API key is missing and never echoes a key', async () => {
     const createModel = vi.fn();
     const handler = createChatHandler({
-      getConfig: () => openAiConfig({ apiKey: '' }),
+      getConfig: () => Promise.resolve(openAiConfig({ apiKey: '' })),
       createModel,
     });
     const res = fakeRes();
@@ -155,7 +155,7 @@ describe('POST /api/chat handler', () => {
 
   it('returns 503 when the base URL is missing', async () => {
     const handler = createChatHandler({
-      getConfig: () => openAiConfig({ baseUrl: '' }),
+      getConfig: () => Promise.resolve(openAiConfig({ baseUrl: '' })),
     });
     const res = fakeRes();
     await handler(fakeReq(validBody()), res);
@@ -184,7 +184,7 @@ describe('POST /api/chat handler', () => {
       },
     });
     const createModel = vi.fn(() => model);
-    const handler = createChatHandler({ getConfig: () => openAiConfig(), createModel });
+    const handler = createChatHandler({ getConfig: () => Promise.resolve(openAiConfig()), createModel });
 
     const res = fakeRes();
     await handler(fakeReq(validBody()), res);
@@ -205,7 +205,7 @@ describe('POST /api/chat handler', () => {
       },
     });
     const handler = createChatHandler({
-      getConfig: () => openAiConfig(),
+      getConfig: () => Promise.resolve(openAiConfig()),
       createModel: () => failing,
     });
     const res = fakeRes();
@@ -219,7 +219,7 @@ describe('POST /api/chat handler', () => {
   it('returns a generic 500 and redacts the key from the log when setup throws', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const handler = createChatHandler({
-      getConfig: () => openAiConfig(),
+      getConfig: () => Promise.resolve(openAiConfig()),
       createModel: () => {
         throw new Error(`bad credential ${SECRET}`);
       },
