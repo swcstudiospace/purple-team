@@ -1041,6 +1041,7 @@ function paintAdmiralBackbone() {
     let provider, model, resolvedKey = apiKey || undefined, resolvedBase = undefined;
     if (localCfg) { provider = localCfg.provider; model = localCfg.model; resolvedKey = localCfg.apiKey; resolvedBase = localCfg.baseUrl; }
     else if (dispatchAgent) { provider = 'local-agent'; model = dispatchAgent.model; }
+    else if (apiKey && (document.getElementById('quickProvider') || {}).value && !['openrouter', 'openai', 'anthropic'].includes(document.getElementById('quickProvider').value)) { provider = document.getElementById('quickProvider').value; model = ''; }
     else if (apiKey && apiKey.startsWith('sk-ant-')) { provider = 'anthropic'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4').replace('anthropic/', ''); }
     else if (apiKey && apiKey.startsWith('sk-') && !apiKey.startsWith('sk-or-')) { provider = 'openai'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4'); }
     else if (apiKey) { provider = 'openrouter'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4'); }
