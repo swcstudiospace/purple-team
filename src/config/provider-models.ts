@@ -43,6 +43,10 @@ const DIRECT_REMOTE_LIST = new Set(['anthropic', 'openrouter']);
 
 const stripTrailingSlash = (u: string): string => u.replace(/\/+$/, '');
 
+// Providers whose model list is public or served without a key: OpenRouter's catalog and a
+// user-run local OpenAI-compatible server. Every other provider needs a key to list models.
+const KEYLESS_LIST_PROVIDERS: ReadonlySet<string> = new Set(['openrouter', 'local']);
+
 export function providerCanListModels(provider: string): boolean {
   return DIRECT_REMOTE_LIST.has(provider) || OPENAI_COMPATIBLE_REMOTE_LIST[provider] === true;
 }
@@ -173,7 +177,7 @@ export function clearProviderModelCache(): void {
 /**
  * Live model list for one provider with a per-key TTL cache. NEVER throws.
  *
- * - No remote list for the provider, or no API key → `unavailable` with a note saying which.
+ * - No remote list for the provider, or no API key for a provider that needs one → `unavailable` with a note saying which.
  * - Fresh cache entry (younger than MODEL_LIST_TTL_MS) and no `refresh` → `live` from cache, no fetch.
  * - Successful fetch → `live`; replaces the cache entry.
  * - Failed fetch with an existing entry (any age) → `stale` with the cached list.
@@ -189,11 +193,11 @@ export async function resolveProviderModels(
   if (!providerCanListModels(provider)) {
     return unavailable(provider, `provider '${provider}' is not supported for remote model listing`);
   }
-  if (!opts.apiKey) {
+  if (!opts.apiKey && !KEYLESS_LIST_PROVIDERS.has(provider)) {
     return unavailable(provider, `no API key configured for '${provider}'`);
   }
 
-  const key = modelCacheKey(provider, opts.baseUrl, opts.apiKey);
+  const key = modelCacheKey(provider, opts.baseUrl, opts.apiKey ?? '');
   const cached = modelCache.get(key);
   if (cached && !opts.refresh && Date.now() - cached.fetchedAt < MODEL_LIST_TTL_MS) {
     return { provider, source: 'live', models: copyModels(cached.models), fetchedAt: cached.fetchedAt };
