@@ -2,14 +2,12 @@
  * Model-list fetching for the Universal API Config panel (issue #90).
  *
  * The Settings "Fetch models" button can't call api.openai.com/v1/models etc. directly from the
- * browser (CORS), and today there are TWO hardcoded, already-drifting model lists (config
- * AVAILABLE_MODELS vs the UI's MODELS array). `listProviderModels` is the server-side, testable core
- * that queries a provider's own model endpoint with the OpenAI-compatible / Anthropic wire shape.
- * It THROWS on any failure so the caller (the /api/models route) can fail open to the static list —
- * a broken/keyless provider must never leave the panel empty.
+ * browser (CORS). `listProviderModels` is the server-side, testable core that queries a provider's
+ * own model endpoint with the OpenAI-compatible / Anthropic wire shape. It THROWS on any failure;
+ * the cached, never-throwing wrapper (`resolveProviderModels`) is covered in provider-models-live.test.ts.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { listProviderModels, resolveModels } from '../config/provider-models.js';
+import { listProviderModels } from '../config/provider-models.js';
 
 /** A fake fetch returning `body` as JSON with the given ok/status. Records the call. */
 function fakeFetch(body: unknown, ok = true, status = 200) {
@@ -127,7 +125,7 @@ describe('listProviderModels — base URL normalization', () => {
   });
 });
 
-describe('listProviderModels — failure modes (caller fails open to the static list)', () => {
+describe('listProviderModels — failure modes (the resolver turns these into unavailable/stale)', () => {
   it('throws on a non-ok HTTP response', async () => {
     const f = fakeFetch({ error: 'unauthorized' }, false, 401);
     await expect(listProviderModels('openai', { baseUrl: 'https://api.openai.com/v1', apiKey: 'bad', fetchImpl: f }))
@@ -151,43 +149,5 @@ describe('listProviderModels — failure modes (caller fails open to the static 
     const f = fakeFetch({ nonsense: true });
     await expect(listProviderModels('openai', { baseUrl: 'https://api.openai.com/v1', apiKey: 'k', fetchImpl: f }))
       .rejects.toThrow();
-  });
-});
-
-describe('resolveModels — fail-open orchestrator (never throws; the panel is never empty)', () => {
-  const STATIC = [{ id: 'static-fallback-model' }];
-
-  it('returns live models when the fetch succeeds', async () => {
-    const f = fakeFetch({ data: [{ id: 'gpt-4o' }] });
-    const r = await resolveModels('openai', { baseUrl: 'https://api.openai.com/v1', apiKey: 'k', fetchImpl: f, staticFallback: STATIC });
-    expect(r.source).toBe('live');
-    expect(r.models.map((m) => m.id)).toEqual(['gpt-4o']);
-  });
-
-  it('fails open to the static list (with a note) when the fetch errors', async () => {
-    const f = fakeFetch({ error: 'nope' }, false, 500);
-    const r = await resolveModels('openai', { baseUrl: 'https://api.openai.com/v1', apiKey: 'k', fetchImpl: f, staticFallback: STATIC });
-    expect(r.source).toBe('static');
-    expect(r.models).toEqual(STATIC);
-    expect(r.note).toContain('500');
-  });
-
-  it('fails open for a keyless provider with no remote list', async () => {
-    const r = await resolveModels('codex', { staticFallback: STATIC, fetchImpl: fakeFetch({}) });
-    expect(r.source).toBe('static');
-    expect(r.models).toEqual(STATIC);
-  });
-
-  it('fails open for an unknown provider without calling a caller-supplied base URL', async () => {
-    const f = fakeFetch({});
-    const r = await resolveModels('not-a-provider', {
-      baseUrl: 'https://example.test/v1',
-      staticFallback: STATIC,
-      fetchImpl: f,
-    });
-
-    expect(r.source).toBe('static');
-    expect(r.models).toEqual(STATIC);
-    expect(f).not.toHaveBeenCalled();
   });
 });

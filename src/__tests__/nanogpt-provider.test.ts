@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AVAILABLE_MODELS, config } from '../config/index.js';
+import { config } from '../config/index.js';
 import { createNanoGPTBackbone } from '../llm/index.js';
 
 const KEY = 'sk-nano-12345678-1234-1234-1234-123456789abc';
@@ -68,7 +68,5 @@ describe('NanoGPT provider wiring', () => {
 
     process.env.NANOGPT_API_KEY = KEY;
     expect(config.getConfiguredProviders()).toContain('nanogpt');
-    expect(AVAILABLE_MODELS.nanogpt.map((model) => model.id))
-      .toEqual(['minimax/minimax-m2.7']);
   });
 });

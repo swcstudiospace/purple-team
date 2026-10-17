@@ -6,7 +6,7 @@
  * the provider resolves end-to-end so a refactor can't silently drop it.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { config, AVAILABLE_MODELS } from '../config/index.js';
+import { config } from '../config/index.js';
 import { createVeniceBackbone } from '../llm/index.js';
 
 const KEY = 'venice-key-abcdef123456';
@@ -30,9 +30,8 @@ describe('Venice provider wiring (parity with OpenRouter)', () => {
     expect(bb.validateConfig().valid).toBe(true);
   });
 
-  it('surfaces venice in AVAILABLE_MODELS and getConfiguredProviders', () => {
+  it('surfaces venice in getConfiguredProviders', () => {
     process.env.VENICE_API_KEY = KEY;
-    expect(AVAILABLE_MODELS.venice?.length).toBeGreaterThan(0);
     expect(config.getConfiguredProviders()).toContain('venice');
   });
 });

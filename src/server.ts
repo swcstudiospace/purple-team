@@ -18,7 +18,7 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { createHash, randomUUID } from 'crypto';
 import { config, AVAILABLE_MODELS } from './config/index.js';
-import { resolveModels } from './config/provider-models.js';
+import { resolveProviderModels } from './config/provider-models.js';
 import {
   clearOAuth,
   completeAnthropicPkceFlow,
@@ -7308,18 +7308,20 @@ app.post('/api/teams/skills/run', async (req: Request, res: Response): Promise<v
 // POST (not GET) so the browser can pass its own localStorage-held key/baseUrl in the body — the
 // standalone UI holds the key, not the server (consistent with the existing per-request mission key,
 // and it stays on localhost). Body values override server config; missing → server config. Runs
-// server-side so the browser dodges provider CORS, and fails open to the static AVAILABLE_MODELS list
-// (source:'static') so a missing key / network error never leaves the panel empty.
+// server-side so the browser dodges provider CORS. The provider's live list is the only source of
+// ids; it is cached per provider/baseUrl/key-hash for 6h. Response: { provider, source: 'live' |
+// 'stale' | 'unavailable', models, fetchedAt, note? }. Refresh bypasses the TTL: ?refresh=1 or body refresh:true.
+// Always answers 200 with that shape.
 app.post('/api/models', async (req: Request, res: Response): Promise<void> => {
-  const body = (req.body ?? {}) as { provider?: string; apiKey?: string; baseUrl?: string };
+  const body = (req.body ?? {}) as { provider?: string; apiKey?: string; baseUrl?: string; refresh?: unknown };
   const defaultProvider = config.getLLMConfig().provider;
   const requestedProvider = (typeof body.provider === 'string' && body.provider.trim()) || defaultProvider;
   const provider = isKnownLLMProvider(requestedProvider) ? requestedProvider : defaultProvider;
   // getLLMConfig throws for any provider it doesn't switch on (e.g. the legitimate 'local-agent', or a
   // garbage string). A synchronous throw inside this async handler would hang the request (Express 4
-  // never responds), so swallow it and fall through to the static list — the route must always answer.
+  // never responds), so swallow it and fall through with no server config — the route must always answer.
   let cfg: { baseUrl?: string; apiKey?: string; authType?: 'api-key' | 'oauth' } = {};
-  try { cfg = config.getLLMConfig(provider); } catch { /* provider has no remote/server config → static fallback */ }
+  try { cfg = config.getLLMConfig(provider); } catch { /* provider has no remote/server config → unavailable */ }
   const bodyBaseUrl = typeof body.baseUrl === 'string' && body.baseUrl.trim() ? body.baseUrl : undefined;
   const bodyKey = typeof body.apiKey === 'string' && body.apiKey ? body.apiKey : undefined;
   // Bind key+baseUrl by source: a caller-supplied custom baseUrl must bring its OWN key — never lend
@@ -7327,9 +7329,9 @@ app.post('/api/models', async (req: Request, res: Response): Promise<void> => {
   // server key is only ever sent to the server's own configured provider endpoint.
   const baseUrl = bodyBaseUrl ?? cfg.baseUrl;
   const apiKey = bodyBaseUrl ? bodyKey : (bodyKey ?? cfg.apiKey);
-  const staticFallback = AVAILABLE_MODELS[provider].map((m: { id: string }) => ({ id: m.id }));
-  const resolved = await resolveModels(provider, { baseUrl, apiKey, authType: bodyKey ? undefined : cfg.authType, staticFallback });
-  res.json({ provider, ...resolved });
+  const refresh = body.refresh === true || req.query.refresh === '1';
+  const listing = await resolveProviderModels(provider, { baseUrl, apiKey, authType: bodyKey ? undefined : cfg.authType, refresh });
+  res.json(listing);
 });
 
 // =============================================================================

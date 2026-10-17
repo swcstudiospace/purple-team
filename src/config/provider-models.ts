@@ -4,9 +4,15 @@
  * The Settings "Fetch models" button can't hit api.openai.com/v1/models (etc.) directly from the
  * browser (CORS), so the /api/models route calls this. It queries a provider's own model endpoint
  * using the correct wire shape (OpenAI-compatible Bearer `/models`, or the Anthropic `x-api-key`
- * `/v1/models`), and THROWS on any failure so the route can fail open to the static AVAILABLE_MODELS
- * list — a broken/keyless provider must never leave the panel empty.
+ * `/v1/models`).
+ *
+ * The provider's live list is the only source of model ids shown to the UI. `listProviderModels`
+ * is the raw fetch and THROWS on failure; `resolveProviderModels` wraps it with a per-provider
+ * in-memory TTL cache and never throws. The cache key is provider + normalised baseUrl + a SHA-256
+ * of the API key, so the key itself is never stored or returned.
  */
+
+import { createHash } from 'node:crypto';
 
 export interface ProviderModel {
   id: string;
@@ -20,6 +26,11 @@ type FetchLike = (
 const ANTHROPIC_VERSION = '2023-06-01';
 const OPENROUTER_MODELS_URL = 'https://openrouter.ai/api/v1/models';
 const DEFAULT_MODEL_LIST_TIMEOUT_MS = 15_000;
+
+/** How long a successful live list is served without contacting the provider. */
+export const MODEL_LIST_TTL_MS = 6 * 60 * 60 * 1000;
+/** Upper bound on cached (provider, baseUrl, key-hash) entries; oldest insertion is evicted first. */
+const MODEL_CACHE_MAX_ENTRIES = 64;
 
 // Pseudo-providers with no remote model list (CLI-driven, OAuth-only with a static
 // catalog, or in-process).
@@ -60,7 +71,8 @@ function parseModelList(body: unknown): ProviderModel[] {
 
 /**
  * List a provider's available models via its own endpoint. Throws on any failure (missing baseUrl,
- * non-2xx, malformed/empty body, or a provider with no remote list) — the caller fails open.
+ * non-2xx, malformed/empty body, or a provider with no remote list). Callers that need caching or
+ * fail-open behaviour use `resolveProviderModels`.
  */
 export async function listProviderModels(
   provider: string,
@@ -111,24 +123,104 @@ export async function listProviderModels(
   return parseModelList(await res.json());
 }
 
-export interface ResolvedModels {
-  source: 'live' | 'static';
+export type ModelListSource = 'live' | 'stale' | 'unavailable';
+
+export interface ProviderModelList {
+  provider: string;
+  /** live: fetched now or within TTL · stale: last good list, refresh failed · unavailable: no list. */
+  source: ModelListSource;
   models: ProviderModel[];
+  /** Epoch ms of the last successful live list for this key, or null when there is none. */
+  fetchedAt: number | null;
   note?: string;
 }
 
+interface CacheEntry {
+  models: ProviderModel[];
+  fetchedAt: number;
+}
+
+const modelCache = new Map<string, CacheEntry>();
+
+/** Cache key: provider + normalised baseUrl (trimmed, no trailing slashes) + SHA-256 of the API key. The raw key never enters the map. */
+function modelCacheKey(provider: string, baseUrl: string | undefined, apiKey: string): string {
+  const normalisedBase = stripTrailingSlash((baseUrl ?? '').trim());
+  const keyFingerprint = createHash('sha256').update(apiKey).digest('hex');
+  return [provider, normalisedBase, keyFingerprint].join('\n');
+}
+
+function cacheStore(key: string, entry: CacheEntry): void {
+  modelCache.delete(key);                       // re-insert so a refreshed entry is the newest
+  modelCache.set(key, entry);
+  while (modelCache.size > MODEL_CACHE_MAX_ENTRIES) {
+    const oldest = modelCache.keys().next().value;
+    if (oldest === undefined) break;
+    modelCache.delete(oldest);
+  }
+}
+
+const copyModels = (models: ProviderModel[]): ProviderModel[] => models.map((m) => ({ id: m.id }));
+
+function unavailable(provider: string, note: string): ProviderModelList {
+  return { provider, source: 'unavailable', models: [], fetchedAt: null, note };
+}
+
+/** Test/introspection helper: the opaque cache keys currently held. Keys never contain the API key. */
+export function providerModelCacheKeys(): string[] {
+  return [...modelCache.keys()];
+}
+
+/** Test helper: drop every cached model list. */
+export function clearProviderModelCache(): void {
+  modelCache.clear();
+}
+
 /**
- * Live models with a guaranteed fail-open to `staticFallback` — NEVER throws. The /api/models route
- * uses this so a missing key, CORS/network error, or unlisted provider still returns the static
- * AVAILABLE_MODELS list (the panel is never empty) with `source:'static'` so the UI can flag it.
+ * Live model list for one provider with a per-key TTL cache. NEVER throws.
+ *
+ * - No remote list for the provider, or no API key → `unavailable` with a note saying which.
+ * - Fresh cache entry (younger than MODEL_LIST_TTL_MS) and no `refresh` → `live` from cache, no fetch.
+ * - Successful fetch → `live`; replaces the cache entry.
+ * - Failed fetch with an existing entry (any age) → `stale` with the cached list.
+ * - Failed fetch with no entry → `unavailable` with empty models.
  */
-export async function resolveModels(
+export async function resolveProviderModels(
   provider: string,
-  opts: { baseUrl?: string; apiKey?: string; authType?: 'api-key' | 'oauth'; fetchImpl?: FetchLike; timeoutMs?: number; staticFallback: ProviderModel[] },
-): Promise<ResolvedModels> {
+  opts: { baseUrl?: string; apiKey?: string; authType?: 'api-key' | 'oauth'; fetchImpl?: FetchLike; timeoutMs?: number; refresh?: boolean } = {},
+): Promise<ProviderModelList> {
+  if (NO_REMOTE_LIST.has(provider)) {
+    return unavailable(provider, `provider '${provider}' has no remote model list`);
+  }
+  if (!providerCanListModels(provider)) {
+    return unavailable(provider, `provider '${provider}' is not supported for remote model listing`);
+  }
+  if (!opts.apiKey) {
+    return unavailable(provider, `no API key configured for '${provider}'`);
+  }
+
+  const key = modelCacheKey(provider, opts.baseUrl, opts.apiKey);
+  const cached = modelCache.get(key);
+  if (cached && !opts.refresh && Date.now() - cached.fetchedAt < MODEL_LIST_TTL_MS) {
+    return { provider, source: 'live', models: copyModels(cached.models), fetchedAt: cached.fetchedAt };
+  }
+
   try {
-    return { source: 'live', models: await listProviderModels(provider, opts) };
+    const models = await listProviderModels(provider, opts);
+    const fetchedAt = Date.now();
+    cacheStore(key, { models, fetchedAt });
+    return { provider, source: 'live', models: copyModels(models), fetchedAt };
   } catch (e) {
-    return { source: 'static', models: opts.staticFallback, note: (e as Error).message };
+    const note = e instanceof Error ? e.message : String(e);
+    const previous = modelCache.get(key);
+    if (previous) {
+      return {
+        provider,
+        source: 'stale',
+        models: copyModels(previous.models),
+        fetchedAt: previous.fetchedAt,
+        note: `live refresh failed: ${note}`,
+      };
+    }
+    return unavailable(provider, note);
   }
 }

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { AVAILABLE_MODELS, config } from '../config/index.js';
+import { config } from '../config/index.js';
 import { LLMBackbone } from '../llm/index.js';
 import { detectLocalAgents, getSpec, localAgentChat } from '../agent/local-agents.js';
 
@@ -103,7 +103,6 @@ describe('Cursor provider', () => {
     const bare = config.getLLMConfig('cursor');
     expect(bare.model).toBe('cursor');
     expect(() => config.getLLMConfig('cursor')).not.toThrow();
-    expect(AVAILABLE_MODELS.cursor.map((m) => m.id)).toEqual(['composer-1', 'auto']);
     expect(config.getConfiguredProviders()).toContain('cursor');
   });
 

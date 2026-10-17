@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { config, AVAILABLE_MODELS } from '../config/index.js';
+import { config } from '../config/index.js';
 
 // Regression guard for #118: getLLMConfig had no `case 'local-agent'`, so it fell
 // through to `default` and threw `Unknown provider: local-agent`, aborting every
@@ -34,11 +34,5 @@ describe("local-agent provider wiring (#118)", () => {
 
   it('does not throw "Unknown provider" for local-agent', () => {
     expect(() => config.getLLMConfig('local-agent')).not.toThrow();
-  });
-
-  it('surfaces the connected-agent ids as available local-agent models', () => {
-    expect(AVAILABLE_MODELS['local-agent']?.map(m => m.id)).toEqual(
-      expect.arrayContaining(['codex', 'claude', 'hermes', 'opencode', 'omp']),
-    );
   });
 });

@@ -77,7 +77,7 @@
 </div>
 <div class="form-row" style="margin-top:8px">
 <div><label class="flabel" for="uacApiKey">API Key</label><div class="key-row"><input type="password" class="form-input mono" id="uacApiKey" placeholder="sk-..." autocomplete="off"><button class="btn btn--sm" onclick="toggleApiKey('uacApiKey')">Show</button></div></div>
-<div><label class="flabel" for="uacModel">Model</label><div class="key-row"><select class="form-input" id="uacModel"><option value="">— none selected —</option></select><button class="btn btn--sm" id="uacFetchBtn" onclick="uacFetchModels()">Fetch models</button></div><div class="form-hint" id="uacModelHint"></div></div>
+<div><label class="flabel" for="uacModel">Model</label><div class="key-row"><select class="form-input" id="uacModel"><option value="">Select a model after connecting</option></select><button class="btn btn--sm" id="uacFetchBtn" onclick="uacFetchModels()">Fetch models</button></div><div class="key-row" style="margin-top:4px"><span class="badge badge--warn" id="uacModelBadge" hidden>Stale cache. Retry refresh.</span></div><div class="form-hint" id="uacModelHint"></div></div>
 </div>
 <div style="margin-top:8px"><label class="flabel" for="uacMaxTokens">Max Context Tokens (optional)</label><input type="number" class="form-input" id="uacMaxTokens" placeholder="e.g. 200000" min="0" step="1000" style="max-width:240px"></div>
 <div class="card__row" style="margin-top:8px"><button class="btn btn--sm btn--primary" onclick="uacSave()">Save config</button></div>
@@ -429,23 +429,32 @@ function uacSave() {
 async function uacFetchModels() {
   var btn = document.getElementById('uacFetchBtn');
   var hint = document.getElementById('uacModelHint');
+  var badge = document.getElementById('uacModelBadge');
+  var sel = document.getElementById('uacModel');
   var p = uacProvider();
   var key = document.getElementById('uacApiKey').value || settingsState.settings[p + 'Key'] || '';
   var base = document.getElementById('uacBaseUrl').value || UAC_BASE[p] || '';
   if (btn) { btn.disabled = true; }
   try {
-    var r = await settingsApi('/api/models', { provider: p, apiKey: key, baseUrl: base });
+    // The button is an explicit user action, so it bypasses the server's TTL cache.
+    var r = await settingsApi('/api/models', { provider: p, apiKey: key, baseUrl: base, refresh: true });
     var d = await r.json();
     var models = d.models || [];
-    var sel = document.getElementById('uacModel');
-    sel.innerHTML = '<option value="">— none selected —</option>' + models.map(function (m) {
-      var id = typeof m === 'string' ? m : m.id;
-      var opt = document.createElement('option');
-      opt.value = id;
-      opt.textContent = id;
-      return opt.outerHTML;
-    }).join('');
-    if (hint) hint.textContent = models.length + ' model(s) · ' + (d.source === 'live' ? 'live from provider' : 'built-in list');
+    sel.innerHTML = '';
+    sel.appendChild(new Option('Select a model after connecting', ''));
+    models.forEach(function (m) { sel.appendChild(new Option(m.id, m.id)); });
+    sel.disabled = d.source === 'unavailable';
+    if (badge) badge.hidden = d.source !== 'stale';
+    var when = d.fetchedAt ? new Date(d.fetchedAt).toLocaleString() : '';
+    if (hint) {
+      if (d.source === 'unavailable') {
+        hint.textContent = d.note || 'No model list available for this provider.';
+      } else if (d.source === 'stale') {
+        hint.textContent = models.length + ' model(s) · cached ' + when + (d.note ? ' · ' + d.note : '');
+      } else {
+        hint.textContent = models.length + ' model(s) · live from provider · fetched ' + when;
+      }
+    }
   } catch (e) {
     if (hint) hint.textContent = 'Fetch failed: ' + (e.message || e);
   } finally {

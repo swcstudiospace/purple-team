@@ -11,7 +11,7 @@ import {
   setOAuthFetch,
   startOpenAiPkceFlow,
 } from '../llm/oauth.js';
-import { AVAILABLE_MODELS, config } from '../config/index.js';
+import { config } from '../config/index.js';
 import { createChatGPTBackbone } from '../llm/index.js';
 
 const dirs: string[] = [];
@@ -75,8 +75,6 @@ describe('ChatGPT Plan provider', () => {
     expect(cfg.baseUrl).toBe('https://chatgpt.com/backend-api/codex');
     expect(cfg.model).toBe('gpt-5.1');
     expect(config.getConfiguredProviders()).toContain('chatgpt');
-    expect(AVAILABLE_MODELS.chatgpt.map((m) => m.id))
-      .toEqual(['gpt-5.1', 'gpt-5.1-codex', 'gpt-5.1-codex-max', 'gpt-5']);
   });
 
   it('POSTs the Responses wire shape with Bearer + account-id headers and parses message/function_call output', async () => {

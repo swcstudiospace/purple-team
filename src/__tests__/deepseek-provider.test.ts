@@ -1,7 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import {
   config,
-  AVAILABLE_MODELS,
   migrateLegacyDeepSeekSettings,
 } from '../config/index.js';
 import { createDeepSeekBackbone } from '../llm/index.js';
@@ -27,11 +26,8 @@ describe('DeepSeek provider wiring (#62)', () => {
     expect(bb.validateConfig().valid).toBe(true);
   });
 
-  it('surfaces native DeepSeek models and configured provider state', () => {
+  it('surfaces configured provider state', () => {
     process.env.DEEPSEEK_API_KEY = KEY;
-    expect(AVAILABLE_MODELS.deepseek?.map(m => m.id)).toEqual(
-      expect.arrayContaining(['deepseek-v4-flash', 'deepseek-v4-pro']),
-    );
     expect(config.getConfiguredProviders()).toContain('deepseek');
   });
 

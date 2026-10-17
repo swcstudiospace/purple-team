@@ -17,7 +17,7 @@ import {
   startAnthropicPkceFlow,
   startXaiDeviceFlow,
 } from '../llm/oauth.js';
-import { AVAILABLE_MODELS, config } from '../config/index.js';
+import { config } from '../config/index.js';
 
 function fakeFetch(handler: (url: string, init?: { body?: string; headers?: Record<string, string> }) => { ok: boolean; status: number; body: unknown }) {
   return vi.fn(async (url: string, init?: { body?: string; headers?: Record<string, string> }) => ({
@@ -281,10 +281,6 @@ describe('subscription OAuth', () => {
       if (prev === undefined) delete process.env.XAI_API_KEY;
       else process.env.XAI_API_KEY = prev;
     }
-  });
-
-  it('publishes Super Grok Heavy in the xAI catalog', () => {
-    expect(AVAILABLE_MODELS.xai.some((m) => m.id === 'grok-4-heavy')).toBe(true);
   });
 
   it('rejects a Claude complete with a mismatched state', async () => {
