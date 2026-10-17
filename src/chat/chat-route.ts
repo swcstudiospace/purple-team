@@ -27,7 +27,7 @@ export interface ChatRouteDeps {
   createModel?: (cfg: ChatModelConfig) => LanguageModel;
 }
 
-const STREAMABLE_PROVIDERS: Record<string, true> = {
+export const STREAMABLE_PROVIDERS: Record<string, true> = {
   openrouter: true,
   venice: true,
   openai: true,
@@ -91,7 +91,7 @@ function validateBody(body: unknown): Validated {
   return { ok: true, messages: uiMessages };
 }
 
-const defaultCreateModel = (cfg: ChatModelConfig): LanguageModel =>
+export const defaultCreateModel = (cfg: ChatModelConfig): LanguageModel =>
   createOpenAICompatible({
     name: cfg.provider,
     baseURL: cfg.baseUrl as string,

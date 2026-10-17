@@ -49,6 +49,7 @@ import { AI_REDTEAM_PLAYBOOK, AI_REDTEAM_TECHNIQUE_IDS, aiRedTeamBriefing } from
 import { OPERATOR_SYSTEM_PROMPTS, PLINIAN_OPERATOR_DOCTRINE, THE_FIXER_SYSTEM_PROMPT } from './prompts/index.js';
 import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
 import { createChatHandler } from './chat/chat-route.js';
+import { createGenUiHandler } from './genui/generate-route.js';
 import type { OperatorArchetype, LLMProvider } from './types/index.js';
 import { listOperatorPrompts, setOperatorOverride, resetOperatorOverride, type OperatorOverride } from './operators/index.js';
 import { ingestRepoToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError } from './recon/whitebox.js';
@@ -7363,6 +7364,7 @@ app.get('/api/tools', (_req: Request, res: Response) => {
 });
 
 app.post('/api/chat', createChatHandler({ getConfig: () => config.getLLMConfig() }));
+app.post('/api/genui/generate', createGenUiHandler({ getConfig: () => config.getLLMConfig() }));
 
 app.post('/api/llm/chat', async (req: Request, res: Response): Promise<void> => {
   // Caller-supplied systemPrompt is a local-operator convenience (the UI uses it);
