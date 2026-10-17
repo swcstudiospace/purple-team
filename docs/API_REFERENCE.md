@@ -243,9 +243,6 @@ or `GET /api/llm/status` (includes an `oauth` summary).
 | `POST` | `/api/oauth/openai/start` | Start ChatGPT Plan PKCE flow; returns `{ flowId, authorizeUrl, state }` |
 | `POST` | `/api/oauth/openai/complete` | Complete ChatGPT Plan sign-in; body `{ flowId, code }`, returns `{ ok: true, oauth }` |
 | `POST` | `/api/oauth/openai/logout` | Clear the ChatGPT Plan session |
-| `POST` | `/api/oauth/anthropic/start` | Start Claude Plan PKCE flow; returns `{ flowId, authorizeUrl, state }` |
-| `POST` | `/api/oauth/anthropic/complete` | Complete Claude Plan sign-in; body `{ flowId, code }` |
-| `POST` | `/api/oauth/anthropic/logout` | Clear the Claude Plan session |
 | `POST` | `/api/oauth/xai/start` | Start Grok plan device flow; returns `{ flowId, userCode, verificationUri, expiresIn, interval }` |
 | `POST` | `/api/oauth/xai/poll` | Poll Grok plan authorization; body `{ flowId }` |
 | `POST` | `/api/oauth/xai/logout` | Clear the Grok plan session |

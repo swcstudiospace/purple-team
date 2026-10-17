@@ -8,17 +8,18 @@ other file under `docs/` may carry literal colors.
 
 Programming-desk ships no light theme, so there was no upstream light palette
 to inherit. The values below are planner-chosen defaults for this milestone,
-picked for a white compartmentalized console with one red accent:
+picked for a white compartmentalized console with one purple accent:
 
 - White surfaces step down gently (background, surface, alternate surface)
   with a single neutral border, so cards read as compartments without chrome.
-- Body copy stays near-black or mid-gray; red-as-text uses a darkened red
-  that holds contrast on white. Bright red never sets body copy.
-- Red is reserved for accents, active states, primary actions, and danger.
+- Body copy stays near-black or mid-gray; purple-as-text uses the darkened
+  brand purple that holds contrast on white. Bright purple never sets body copy.
+- Red is reserved for danger only. Purple is the brand and interactive accent
+  for active states, primary actions, and focus.
   Status uses its own hues (green, amber, blue) as full-color text on a
   low-alpha tinted surface — the opacity pattern — so status never competes
-  with the single red accent.
-- Focus is always visible with a two-pixel ring in the accent red; reduced
+  with the purple accent.
+- Focus is always visible with a two-pixel ring in the brand purple; reduced
   motion removes transitions and animations entirely.
 
 ## Rules for contributors
@@ -26,7 +27,7 @@ picked for a white compartmentalized console with one red accent:
 - Add a color by adding a variable in `tokens.css`, then reference it with
   the `var()` function. Never write a literal color in a page, a script, or
   a stylesheet outside `tokens.css`.
-- Keep red usage to accents, active states, primary actions, and danger.
+- Keep purple usage to accents, active states, and primary actions; red to danger.
 - Status tints pair full-color text with the matching low-alpha surface.
 - Honor reduced motion and the collapsed-nav breakpoint when adding layout.
 
@@ -39,10 +40,10 @@ drawer, modals, toasts, tabs) without touching the frozen palette:
   the quiet `--surface` compartments, plus modal/drawer overlays.
 - `--border-strong` (`#D4D4D4`): input and button borders that stay visible
   on white without adding chrome.
-- `--text-faint` (`#8A8A8A`): group labels and placeholders only — never
+- `--text-faint` (`#6B6B6B`): group labels and placeholders only — never
   body copy.
-- `--accent-red-crisp` (`#DC2626`): brand mark and the active-nav bar. Bright
-  red never sets body copy; text accents stay on the darkened reds.
+- `--brand-crisp` (`#7C3AED`): brand mark and the active-nav bar. Bright
+  purple never sets body copy; text accents stay on `--brand-hover`.
 - `--success` / `--warning` with `--tint-success` / `--tint-warning`: plain
   aliases of the `--ok` / `--warn` hues in the same 12%-opacity pattern, so
   new component classes read without forking the status scale.

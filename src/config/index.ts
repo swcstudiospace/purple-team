@@ -12,7 +12,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import type { LLMProvider, LLMConfig, FallbackEntry, OpsecLevel } from '../types/index.js';
 import { hasOAuth, peekOAuthAccessToken } from '../llm/oauth.js';
 
-type ApiKeyProvider = 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'huggingface' | 'nanogpt' | 'novita' | 'local';
+type ApiKeyProvider = 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'zai' | 'huggingface' | 'nanogpt' | 'novita' | 'local';
 
 // =============================================================================
 // CONFIGURATION SCHEMA
@@ -28,6 +28,7 @@ export interface TempestSettings {
     xai?: string;
     gemini?: string;
     deepseek?: string;
+    zai?: string;
     huggingface?: string;
     nanogpt?: string;
     litellm?: string;
@@ -85,6 +86,12 @@ export interface TempestSettings {
 
   // DeepSeek — OpenAI-compatible API
   deepseek: {
+    baseUrl: string;
+    defaultModel: string;
+  };
+
+  // Z.ai — general API only (not the GLM Coding Plan endpoint)
+  zai: {
     baseUrl: string;
     defaultModel: string;
   };
@@ -198,6 +205,12 @@ const DEFAULT_SETTINGS: TempestSettings = {
     defaultModel: 'deepseek-v4-pro',
   },
 
+  // Z.ai — general API only (not the GLM Coding Plan endpoint)
+  zai: {
+    baseUrl: 'https://api.z.ai/api/paas/v4',
+    defaultModel: 'glm-5.3',
+  },
+
   // Hugging Face Inference Providers expose a unified OpenAI-compatible router at
   // /v1. The OpenAIAdapter posts to `${baseUrl}/chat/completions`, so the base URL
   // ends at /v1 → https://router.huggingface.co/v1/chat/completions. Model ids are
@@ -277,532 +290,15 @@ export function migrateLegacyDeepSeekSettings(
 // MODEL REGISTRY
 // =============================================================================
 
-export interface ModelInfo {
-  id: string;
-  name: string;
-  provider: string;
-  contextWindow: number;
-  maxOutput: number;
-  pricing?: {
-    prompt: number;
-    completion: number;
-  };
-  capabilities: string[];
-}
-
-export const AVAILABLE_MODELS: Record<LLMProvider, ModelInfo[]> = {
-  venice: [
-    {
-      id: 'llama-3.3-70b',
-      name: 'Llama 3.3 70B (Venice)',
-      provider: 'Venice',
-      contextWindow: 65536,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'uncensored', 'tools'],
-    },
-    {
-      id: 'venice-uncensored',
-      name: 'Venice Uncensored',
-      provider: 'Venice',
-      contextWindow: 32768,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'uncensored'],
-    },
-  ],
-
-  openrouter: [
-    // Anthropic (Feb 2026)
-    {
-      id: 'anthropic/claude-opus-4.8',
-      name: 'Claude Opus 4.8',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 32000,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'complex-tasks', 'agents', 'tools'],
-    },
-    {
-      id: 'anthropic/claude-sonnet-4.5',
-      name: 'Claude Sonnet 4.5',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 16384,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'agents', 'tools'],
-    },
-    {
-      id: 'anthropic/claude-haiku-4.5',
-      name: 'Claude Haiku 4.5',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'fast', 'tools'],
-    },
-    {
-      id: 'anthropic/claude-sonnet-4',
-      name: 'Claude Sonnet 4',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision'],
-    },
-    // OpenAI
-    {
-      id: 'openai/gpt-4o',
-      name: 'GPT-4o',
-      provider: 'OpenAI',
-      contextWindow: 128000,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'fast'],
-    },
-    {
-      id: 'openai/o1',
-      name: 'o1',
-      provider: 'OpenAI',
-      contextWindow: 200000,
-      maxOutput: 100000,
-      capabilities: ['reasoning', 'code', 'analysis', 'complex-tasks'],
-    },
-    // Google (Dec 2025)
-    {
-      id: 'google/gemini-3.1-pro-preview',
-      name: 'Gemini 3 Pro',
-      provider: 'Google',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'multimodal'],
-    },
-    {
-      id: 'google/gemini-3-flash-preview',
-      name: 'Gemini 3 Flash',
-      provider: 'Google',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'fast'],
-    },
-    {
-      id: 'google/gemini-2.5-flash',
-      name: 'Gemini 2.5 Flash',
-      provider: 'Google',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision'],
-    },
-    // xAI (Dec 2025)
-    {
-      id: 'x-ai/grok-4',
-      name: 'Grok 4',
-      provider: 'xAI',
-      contextWindow: 256000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision'],
-    },
-    {
-      id: 'x-ai/grok-4-fast',
-      name: 'Grok 4 Fast',
-      provider: 'xAI',
-      contextWindow: 2000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'fast'],
-    },
-    {
-      id: 'x-ai/grok-4.1-fast',
-      name: 'Grok 4.1 Fast',
-      provider: 'xAI',
-      contextWindow: 2000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools'],
-    },
-    // Z.AI (Dec 2025)
-    {
-      id: 'z-ai/glm-4.7',
-      name: 'GLM 4.7',
-      provider: 'Z.AI',
-      contextWindow: 203000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents'],
-    },
-    // Meta
-    {
-      id: 'meta-llama/llama-3.3-70b',
-      name: 'Llama 3.3 70B',
-      provider: 'Meta',
-      contextWindow: 131072,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'analysis'],
-    },
-    // DeepSeek (Jul 2026 — V4)
-    {
-      id: 'deepseek/deepseek-v4-pro',
-      name: 'DeepSeek V4 Pro',
-      provider: 'DeepSeek',
-      contextWindow: 1000000,
-      maxOutput: 384000,
-      capabilities: ['reasoning', 'code', 'analysis', 'complex-tasks', 'agents', 'tools'],
-    },
-    {
-      id: 'deepseek/deepseek-v4-flash',
-      name: 'DeepSeek V4 Flash',
-      provider: 'DeepSeek',
-      contextWindow: 1000000,
-      maxOutput: 384000,
-      capabilities: ['reasoning', 'code', 'analysis', 'tools'],
-    },
-    // Mistral
-    {
-      id: 'mistralai/mistral-large',
-      name: 'Mistral Large',
-      provider: 'Mistral',
-      contextWindow: 128000,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'analysis'],
-    },
-  ],
-  anthropic: [
-    {
-      id: 'claude-opus-4-8',
-      name: 'Claude Opus 4.8 (Pro/Max)',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 32000,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'complex-tasks', 'agents', 'tools', 'oauth'],
-    },
-    {
-      id: 'claude-sonnet-4-5-20250929',
-      name: 'Claude Sonnet 4.5',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 16384,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'agents', 'tools'],
-    },
-    {
-      id: 'claude-haiku-4-5-20251001',
-      name: 'Claude Haiku 4.5',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'fast', 'tools'],
-    },
-    {
-      id: 'claude-sonnet-4-20250514',
-      name: 'Claude Sonnet 4',
-      provider: 'Anthropic',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision'],
-    },
-  ],
-  openai: [
-    {
-      id: 'gpt-4-turbo-preview',
-      name: 'GPT-4 Turbo',
-      provider: 'OpenAI',
-      contextWindow: 128000,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision'],
-    },
-    {
-      id: 'gpt-4o',
-      name: 'GPT-4o',
-      provider: 'OpenAI',
-      contextWindow: 128000,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'fast'],
-    },
-  ],
-  litellm: [
-    {
-      id: 'gpt-4o',
-      name: 'Any model via LiteLLM proxy (default: gpt-4o)',
-      provider: 'LiteLLM',
-      contextWindow: 128000,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'tools'],
-    },
-  ],
-  codex: [
-    {
-      id: 'codex-default',
-      name: 'Codex Account Default',
-      provider: 'Codex',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-  ],
-  // ChatGPT Plan (Codex backend over a ChatGPT subscription — OAuth, no API key).
-  // Curated defaults; any model id the subscription exposes can be passed via
-  // config/CLI/model arg.
-  chatgpt: [
-    {
-      id: 'gpt-5.1',
-      name: 'GPT-5.1 (ChatGPT Plan)',
-      provider: 'OpenAI',
-      contextWindow: 400000,
-      maxOutput: 128000,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools', 'oauth'],
-    },
-    {
-      id: 'gpt-5.1-codex',
-      name: 'GPT-5.1 Codex (ChatGPT Plan)',
-      provider: 'OpenAI',
-      contextWindow: 400000,
-      maxOutput: 128000,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools', 'oauth'],
-    },
-    {
-      id: 'gpt-5.1-codex-max',
-      name: 'GPT-5.1 Codex Max (ChatGPT Plan)',
-      provider: 'OpenAI',
-      contextWindow: 400000,
-      maxOutput: 128000,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools', 'oauth', 'heavy'],
-    },
-    {
-      id: 'gpt-5',
-      name: 'GPT-5 (ChatGPT Plan)',
-      provider: 'OpenAI',
-      contextWindow: 400000,
-      maxOutput: 128000,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools', 'oauth'],
-    },
-  ],
-  // Cursor rides the local cursor-agent CLI (keyless — its own login). The agent id
-  // travels in the `model` field (see src/llm/index.ts LocalAgentAdapter); 'auto' is
-  // the CLI's own pick-a-model sentinel.
-  cursor: [
-    {
-      id: 'composer-1',
-      name: 'Composer 1 (Cursor CLI)',
-      provider: 'Cursor',
-      contextWindow: 200000,
-      maxOutput: 32000,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-    {
-      id: 'auto',
-      name: 'Auto (Cursor CLI default selection)',
-      provider: 'Cursor',
-      contextWindow: 200000,
-      maxOutput: 32000,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-  ],
-  mock: [
-    {
-      id: 'mock-model',
-      name: 'Mock Model',
-      provider: 'Mock',
-      contextWindow: 100000,
-      maxOutput: 4096,
-      capabilities: ['testing'],
-    },
-  ],
-  // Model IDs verified against xAI's published model list (docs.x.ai/docs/models, 2026-07-05):
-  // grok-build-0.1 = coding model (256K ctx); grok-4.3 = general (1M ctx). Any current xAI
-  // model id can be passed via config/CLI/model arg — these are just the curated defaults.
-  xai: [
-    {
-      id: 'grok-4-heavy',
-      name: 'Super Grok Heavy',
-      provider: 'xAI',
-      contextWindow: 1000000,
-      maxOutput: 16384,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools', 'oauth', 'heavy'],
-    },
-    {
-      id: 'grok-4.20-multi-agent-0309',
-      name: 'Grok 4.20 Multi-Agent (Heavy)',
-      provider: 'xAI',
-      contextWindow: 1000000,
-      maxOutput: 16384,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools', 'oauth', 'heavy'],
-    },
-    {
-      id: 'grok-build-0.1',
-      name: 'Grok Build (grok-build-0.1, 256K)',
-      provider: 'xAI',
-      contextWindow: 256000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools'],
-    },
-    {
-      id: 'grok-4.3',
-      name: 'Grok 4.3 (general, 1M)',
-      provider: 'xAI',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools'],
-    },
-  ],
-  // Native Gemini model ids (bare, no `google/` prefix) for Google's OpenAI-compatible endpoint.
-  // Distinct from the `google/gemini-*` ids under `openrouter`, which route through OpenRouter.
-  gemini: [
-    {
-      id: 'gemini-2.5-flash',
-      name: 'Gemini 2.5 Flash (native)',
-      provider: 'Google',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'fast', 'tools'],
-    },
-    {
-      id: 'gemini-2.5-pro',
-      name: 'Gemini 2.5 Pro (native)',
-      provider: 'Google',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'multimodal', 'tools'],
-    },
-    {
-      id: 'gemini-2.0-flash',
-      name: 'Gemini 2.0 Flash (native)',
-      provider: 'Google',
-      contextWindow: 1000000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'vision', 'fast', 'tools'],
-    },
-  ],
-  deepseek: [
-    {
-      id: 'deepseek-v4-pro',
-      name: 'DeepSeek V4 Pro (native)',
-      provider: 'DeepSeek',
-      contextWindow: 1000000,
-      maxOutput: 384000,
-      capabilities: ['reasoning', 'code', 'analysis', 'complex-tasks', 'agents', 'tools'],
-    },
-    {
-      id: 'deepseek-v4-flash',
-      name: 'DeepSeek V4 Flash (native)',
-      provider: 'DeepSeek',
-      contextWindow: 1000000,
-      maxOutput: 384000,
-      capabilities: ['reasoning', 'code', 'analysis', 'tools'],
-    },
-  ],
-  // Full HF repo ids for the OpenAI-compatible Inference Providers router. Any model
-  // served by an HF inference provider can be passed via config/CLI/model arg — these
-  // are just curated, tool-capable defaults.
-  huggingface: [
-    {
-      id: 'meta-llama/Llama-3.3-70B-Instruct',
-      name: 'Llama 3.3 70B Instruct (Hugging Face)',
-      provider: 'HuggingFace',
-      contextWindow: 131072,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'tools'],
-    },
-    {
-      id: 'Qwen/Qwen2.5-72B-Instruct',
-      name: 'Qwen2.5 72B Instruct (Hugging Face)',
-      provider: 'HuggingFace',
-      contextWindow: 131072,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'tools'],
-    },
-    {
-      id: 'deepseek-ai/DeepSeek-R1',
-      name: 'DeepSeek R1 (Hugging Face)',
-      provider: 'HuggingFace',
-      contextWindow: 64000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'complex-tasks'],
-    },
-    {
-      id: 'mistralai/Mistral-Small-24B-Instruct-2501',
-      name: 'Mistral Small 24B Instruct (Hugging Face)',
-      provider: 'HuggingFace',
-      contextWindow: 32000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'tools'],
-    },
-  ],
-  // NanoGPT's catalog is dynamic; this documented model is only a fail-open
-  // fallback for the UI when GET /api/v1/models is unavailable.
-  nanogpt: [
-    {
-      id: 'minimax/minimax-m2.7',
-      name: 'MiniMax M2.7 (NanoGPT)',
-      provider: 'NanoGPT',
-      contextWindow: 204800,
-      maxOutput: 131072,
-      capabilities: ['reasoning', 'code', 'analysis', 'tools'],
-    },
-  ],
-  // Model ids verified live against api.novita.ai/openai/v1/models (2026-08-15).
-  novita: [
-    {
-      id: 'zai-org/glm-5.2',
-      name: 'GLM-5.2 (Novita)',
-      provider: 'Novita',
-      contextWindow: 1048576,
-      maxOutput: 131072,
-      capabilities: ['reasoning', 'code', 'analysis', 'complex-tasks', 'agents', 'tools'],
-    },
-    {
-      id: 'deepseek/deepseek-v4-pro-0813',
-      name: 'DeepSeek V4 Pro 0813 (Novita)',
-      provider: 'Novita',
-      contextWindow: 1048576,
-      maxOutput: 393216,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'tools'],
-    },
-  ],
-  local: [
-    {
-      id: 'local-model',
-      name: 'Local model (Ollama / LM Studio / vLLM — set TEMPEST_LOCAL_MODEL)',
-      provider: 'Local',
-      contextWindow: 32000,
-      maxOutput: 4096,
-      capabilities: ['reasoning', 'code', 'tools'],
-    },
-  ],
-  'local-agent': [
-    // Connected local agent CLIs used AS the LLM backend — no API key (each uses its own login).
-    // The chosen agent id (codex|claude|hermes|opencode|omp) travels in the `model` field.
-    {
-      id: 'codex',
-      name: 'Codex (local CLI)',
-      provider: 'LocalAgent',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-    {
-      id: 'claude',
-      name: 'Claude Code (local CLI)',
-      provider: 'LocalAgent',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-    {
-      id: 'hermes',
-      name: 'Hermes (local CLI)',
-      provider: 'LocalAgent',
-      contextWindow: 32000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'agents', 'local-cli'],
-    },
-    {
-      id: 'opencode',
-      name: 'OpenCode (local CLI)',
-      provider: 'LocalAgent',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-    {
-      id: 'omp',
-      name: 'Oh My Pi (local CLI)',
-      provider: 'LocalAgent',
-      contextWindow: 200000,
-      maxOutput: 8192,
-      capabilities: ['reasoning', 'code', 'analysis', 'agents', 'local-cli'],
-    },
-  ],
+export const KNOWN_LLM_PROVIDERS: Record<LLMProvider, true> = {
+  openrouter: true, venice: true, anthropic: true, openai: true, xai: true,
+  gemini: true, litellm: true, deepseek: true, zai: true, huggingface: true,
+  nanogpt: true, novita: true, codex: true, chatgpt: true, cursor: true,
+  mock: true, local: true, "local-agent": true,
 };
 
+// Provider ids only. Model lists come from each provider live catalog via /api/models.
+export const LLM_PROVIDER_IDS: readonly LLMProvider[] = Object.keys(KNOWN_LLM_PROVIDERS) as LLMProvider[];
 // =============================================================================
 // CONFIGURATION MANAGER
 // =============================================================================
@@ -850,7 +346,7 @@ class ConfigManager {
         const envContent = readFileSync(envPath, 'utf-8');
         const lines = envContent.split('\n');
         // Validation variables added
-        const VALID_PROVIDERS = ['openrouter', 'venice', 'anthropic', 'openai', 'xai', 'gemini', 'litellm', 'deepseek', 'huggingface', 'nanogpt', 'local'];
+        const VALID_PROVIDERS = ['openrouter', 'venice', 'anthropic', 'openai', 'xai', 'gemini', 'litellm', 'deepseek', 'zai', 'huggingface', 'nanogpt', 'local'];
 
         for (const line of lines) {
           const trimmed = line.trim();
@@ -937,9 +433,9 @@ class ConfigManager {
   getApiKey(provider: ApiKeyProvider): string | undefined {
     // First check environment variables (highest priority)
     // local provider: a self-hosted/OpenAI-compatible server MAY require a bearer
-    // (Zhipu/z.ai, Together, etc.) — accept TEMPEST_LOCAL_API_KEY or provider-specific vars.
+    // (Together, etc.) — accept TEMPEST_LOCAL_API_KEY only. Provider keys are never reused for a custom endpoint.
     if (provider === 'local') {
-      const localKey = process.env.TEMPEST_LOCAL_API_KEY?.trim() || process.env.ZAI_API_KEY?.trim() || process.env.ZHIPUAI_API_KEY?.trim();
+      const localKey = process.env.TEMPEST_LOCAL_API_KEY?.trim();
       if (localKey) return localKey;
       return this.config.get('apiKeys')[provider];
     }
@@ -951,6 +447,7 @@ class ConfigManager {
       xai: 'XAI_API_KEY',
       gemini: 'GEMINI_API_KEY',
       deepseek: 'DEEPSEEK_API_KEY',
+      zai: 'ZAI_API_KEY',
       huggingface: 'HF_TOKEN',
       nanogpt: 'NANOGPT_API_KEY',
       novita: 'NOVITA_API_KEY',
@@ -1015,12 +512,13 @@ class ConfigManager {
 
     if (this.hasApiKey('openrouter')) providers.push('openrouter');
     if (this.hasApiKey('venice')) providers.push('venice');
-    if (this.hasApiKey('anthropic') || hasOAuth('anthropic')) providers.push('anthropic');
+    if (this.hasApiKey('anthropic')) providers.push('anthropic');
     if (this.hasApiKey('openai')) providers.push('openai');
     if (this.hasApiKey('xai') || hasOAuth('xai')) providers.push('xai');
     if (this.hasLiteLLMProxy()) providers.push('litellm');
     if (this.hasApiKey('gemini')) providers.push('gemini');
     if (this.hasApiKey('deepseek')) providers.push('deepseek');
+    if (this.hasApiKey('zai')) providers.push('zai');
     if (this.hasApiKey('huggingface')) providers.push('huggingface');
     if (this.hasApiKey('nanogpt')) providers.push('nanogpt');
     if (this.hasApiKey('novita')) providers.push('novita');
@@ -1029,7 +527,7 @@ class ConfigManager {
     providers.push('codex');
 
     // ChatGPT Plan is configured exactly when the 'openai' OAuth vendor has tokens —
-    // same hasOAuth(...) semantics as anthropic/xai (no API key in the mix).
+    // same hasOAuth(...) semantics as xai (no API key in the mix).
     if (hasOAuth('openai')) providers.push('chatgpt');
 
     // Cursor uses the local cursor-agent CLI's own login (keyless), like codex.
@@ -1072,7 +570,7 @@ class ConfigManager {
         actualModel = model || this.config.get('venice').defaultModel;
         break;
       case 'anthropic':
-        apiKey = peekOAuthAccessToken('anthropic') || this.getApiKey('anthropic');
+        apiKey = this.getApiKey('anthropic');
         baseUrl = this.config.get('anthropic').baseUrl;
         actualModel = model || this.config.get('anthropic').defaultModel;
         break;
@@ -1099,6 +597,12 @@ class ConfigManager {
         apiKey = this.getApiKey('gemini');
         baseUrl = this.config.get('gemini').baseUrl;
         actualModel = model || this.config.get('gemini').defaultModel;
+        break;
+      case 'zai':
+        // Z.ai general API (OpenAI-compatible). The GLM Coding Plan endpoint is intentionally not used.
+        apiKey = this.getApiKey('zai');
+        baseUrl = this.config.get('zai').baseUrl;
+        actualModel = model || this.config.get('zai').defaultModel;
         break;
       case 'deepseek':
         // DeepSeek native API is OpenAI-compatible.
@@ -1157,20 +661,19 @@ class ConfigManager {
         // any OpenAI-compatible server (LM Studio :1234/v1, vLLM :8000/v1, llama.cpp, Zhipu/z.ai
         // /api/paas/v4) and TEMPEST_LOCAL_MODEL at the model tag you're serving.
         // Some OpenAI-compatible servers require a real bearer (Zhipu, Together, etc.) —
-        // TEMPEST_LOCAL_API_KEY (or a provider-specific env like ZAI_API_KEY) provides it.
+        // TEMPEST_LOCAL_API_KEY provides it. Provider keys (e.g. ZAI_API_KEY) are never sent to this endpoint.
         baseUrl = process.env.TEMPEST_LOCAL_BASE_URL?.trim() || 'http://localhost:11434/api';
-        // Placeholder ids from AVAILABLE_MODELS / the static UI are not real served model tags.
+        // Placeholder ids from the static UI are not real served model tags.
         // Treat them as unset so TEMPEST_LOCAL_MODEL (or the llama3 default) wins; a real tag
         // passed in still takes priority.
         actualModel = (model && !['local-model', 'local/ollama'].includes(model) ? model : undefined) || process.env.TEMPEST_LOCAL_MODEL?.trim() || 'llama3';
-        apiKey = process.env.TEMPEST_LOCAL_API_KEY?.trim() || process.env.ZAI_API_KEY?.trim() || process.env.ZHIPUAI_API_KEY?.trim();
+        apiKey = process.env.TEMPEST_LOCAL_API_KEY?.trim();
         break;
       default:
         throw new Error(`Unknown provider: ${actualProvider}`);
     }
 
     const oauthHydrated = (actualProvider === 'xai' && hasOAuth('xai'))
-      || (actualProvider === 'anthropic' && hasOAuth('anthropic'))
       || (actualProvider === 'chatgpt' && hasOAuth('openai'));
 
     return {
@@ -1210,9 +713,9 @@ class ConfigManager {
     const flag = (process.env.TEMPEST_MODEL_FALLBACK || '').trim().toLowerCase();
     if (!flag || ['0', 'false', 'off', 'no'].includes(flag)) return [];
     const chain: FallbackEntry[] = [];
-    const add = (p: 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'huggingface' | 'nanogpt' | 'novita') => {
+    const add = (p: 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'zai' | 'huggingface' | 'nanogpt' | 'novita') => {
       if (p === primary) return;
-      const oauth = (p === 'xai' || p === 'anthropic') && hasOAuth(p);
+      const oauth = p === 'xai' && hasOAuth(p);
       if (p === 'litellm' ? !this.hasLiteLLMProxy() : !(this.hasApiKey(p) || oauth)) return;
       chain.push({
         provider: p,
@@ -1230,6 +733,7 @@ class ConfigManager {
     add('xai');
     add('gemini');
     add('deepseek');
+    add('zai');
     add('huggingface');
     add('nanogpt');
     add('novita');
@@ -1255,6 +759,9 @@ class ConfigManager {
         break;
       case 'openai':
         this.config.set('defaultModel', this.config.get('openai').defaultModel);
+        break;
+      case 'zai':
+        this.config.set('defaultModel', this.config.get('zai').defaultModel);
         break;
       case 'deepseek':
         this.config.set('defaultModel', this.config.get('deepseek').defaultModel);
@@ -1299,6 +806,9 @@ class ConfigManager {
         break;
       case 'openai':
         this.config.set('openai', { ...this.config.get('openai'), defaultModel: model });
+        break;
+      case 'zai':
+        this.config.set('zai', { ...this.config.get('zai'), defaultModel: model });
         break;
       case 'deepseek':
         this.config.set('deepseek', { ...this.config.get('deepseek'), defaultModel: model });
@@ -1358,6 +868,7 @@ class ConfigManager {
         xai: settings.apiKeys.xai ? '***REDACTED***' : undefined,
         gemini: settings.apiKeys.gemini ? '***REDACTED***' : undefined,
         deepseek: settings.apiKeys.deepseek ? '***REDACTED***' : undefined,
+        zai: settings.apiKeys.zai ? '***REDACTED***' : undefined,
         huggingface: settings.apiKeys.huggingface ? '***REDACTED***' : undefined,
         nanogpt: settings.apiKeys.nanogpt ? '***REDACTED***' : undefined,
         novita: settings.apiKeys.novita ? '***REDACTED***' : undefined,
@@ -1409,6 +920,9 @@ GEMINI_API_KEY=
 # Get your key at: https://platform.deepseek.com/api_keys
 DEEPSEEK_API_KEY=
 
+# Z.ai API Key (general API only; the GLM Coding Plan endpoint is not used)
+ZAI_API_KEY=
+
 # Hugging Face access token (open models via the OpenAI-compatible Inference Providers router)
 # Get your token at: https://huggingface.co/settings/tokens
 # HUGGINGFACE_API_KEY / HUGGINGFACE_TOKEN are also accepted as aliases.
@@ -1428,7 +942,7 @@ NOVITA_API_KEY=
 # vLLM :8000/v1, or e.g. Zhipu/z.ai /api/paas/v4 — any /vN path speaks the
 # OpenAI wire (/chat/completions, choices[]); otherwise the Ollama native format is used.
 # Most local servers are keyless; if yours requires a bearer (Zhipu, Together, …)
-# set TEMPEST_LOCAL_API_KEY (ZAI_API_KEY / ZHIPUAI_API_KEY are accepted as aliases).
+# set TEMPEST_LOCAL_API_KEY. Provider keys (ZAI_API_KEY, etc.) are never sent to this endpoint.
 TEMPEST_LOCAL_BASE_URL=http://localhost:11434/api
 TEMPEST_LOCAL_MODEL=llama3
 TEMPEST_LOCAL_API_KEY=

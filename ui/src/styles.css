@@ -1,0 +1,245 @@
+/* Fonts are self-hosted under /ui/assets/fonts (served from docs/). No external URLs. */
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/ui/assets/fonts/dm-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('/ui/assets/fonts/dm-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/ui/assets/fonts/dm-sans-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/ui/assets/fonts/space-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/ui/assets/fonts/space-mono-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Anybody';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('/ui/assets/fonts/anybody-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Anybody';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/ui/assets/fonts/anybody-latin-700-normal.woff2') format('woff2');
+}
+
+/* White and Purple tokens (values from docs/assets/tokens.css). */
+:root {
+  --bg: #FFFFFF;
+  --surface: #FAFAFE;
+  --surface-alt: #F4F1FA;
+  --border: #E6E0F2;
+  --brand: #6D28D9;
+  --brand-hover: #5B21B6;
+  --text-primary: #1A1A1A;
+  --text-secondary: #595959;
+
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-display: 'Anybody', 'DM Sans', system-ui, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+a:focus-visible,
+button:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+
+.rail {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem 1rem;
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--brand);
+  margin-bottom: 1.5rem;
+}
+
+.rail-links {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rail-link {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.rail-link:hover {
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+
+.rail-link[aria-current='page'] {
+  background: var(--surface-alt);
+  color: var(--brand-hover);
+  font-weight: 600;
+}
+
+.content {
+  padding: 2rem 2.5rem;
+  min-width: 0;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+.muted {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.hat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1rem;
+}
+
+.hat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem;
+  font-weight: 600;
+}
+
+.agent-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 640px;
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.composer textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.composer-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.send {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 0;
+  border-radius: 6px;
+  background: var(--brand);
+  color: var(--bg);
+  cursor: pointer;
+}
+
+.send:hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+.send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .content {
+    padding: 1.5rem 1rem;
+  }
+}

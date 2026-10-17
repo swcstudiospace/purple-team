@@ -9,39 +9,6 @@ describe('OAuth-aware provider adapters', () => {
     vi.restoreAllMocks();
   });
 
-  it('sends Claude Pro/Max OAuth as Bearer + oauth beta and prefixes the required identity', async () => {
-    const fetchSpy = vi.fn(async (_url: string | URL, _init?: RequestInit) => ({
-      ok: true,
-      json: async () => ({
-        model: 'claude-opus-4-8',
-        content: [{ type: 'text', text: 'ok' }],
-        stop_reason: 'end_turn',
-        usage: { input_tokens: 1, output_tokens: 1 },
-      }),
-    }));
-    global.fetch = fetchSpy as unknown as typeof fetch;
-
-    const bb = new LLMBackbone({
-      provider: 'anthropic',
-      model: 'claude-opus-4-8',
-      apiKey: 'sk-ant-oat01-test-token',
-      authType: 'oauth',
-      baseUrl: 'https://api.anthropic.com',
-    });
-    const response = await bb.chat([{ role: 'system', content: 'Hunt this target.' }, { role: 'user', content: 'hello' }]);
-    expect(response.content).toBe('ok');
-
-    const [url, init] = fetchSpy.mock.calls[0];
-    expect(url).toBe('https://api.anthropic.com/v1/messages');
-    const headers = init?.headers as Record<string, string>;
-    expect(headers.Authorization).toBe('Bearer sk-ant-oat01-test-token');
-    expect(headers['x-api-key']).toBeUndefined();
-    expect(headers['anthropic-beta']).toContain('oauth-2025-04-20');
-    const body = JSON.parse(String(init?.body));
-    expect(String(body.system)).toContain("You are Claude Code, Anthropic's official CLI for Claude.");
-    expect(String(body.system)).toContain('Hunt this target.');
-  });
-
   it('keeps API-key Anthropic on x-api-key with no identity prefix', async () => {
     const fetchSpy = vi.fn(async (_url: string | URL, _init?: RequestInit) => ({
       ok: true,

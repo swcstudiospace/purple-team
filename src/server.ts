@@ -12,22 +12,19 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { execFile, spawn } from 'child_process';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { createHash, randomUUID } from 'crypto';
-import { config, AVAILABLE_MODELS } from './config/index.js';
-import { resolveModels } from './config/provider-models.js';
+import { config, LLM_PROVIDER_IDS } from './config/index.js';
+import { resolveProviderModels } from './config/provider-models.js';
 import {
   clearOAuth,
-  completeAnthropicPkceFlow,
   completeOpenAiPkceFlow,
-  hasOAuth,
   oauthStatus,
   pollXaiDeviceFlow,
   setOAuthFetch,
-  startAnthropicPkceFlow,
   startOpenAiPkceFlow,
   startXaiDeviceFlow,
 } from './llm/oauth.js';
@@ -50,6 +47,9 @@ import { AGENT_PROMPT_PACKS, FOREFRONT_PRESSURE_LANES, OPERATOR_RUNBOOKS, RESOUR
 import { AI_REDTEAM_PLAYBOOK, AI_REDTEAM_TECHNIQUE_IDS, aiRedTeamBriefing } from './resources/ai-redteam-playbook.js';
 import { OPERATOR_SYSTEM_PROMPTS, PLINIAN_OPERATOR_DOCTRINE, THE_FIXER_SYSTEM_PROMPT } from './prompts/index.js';
 import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
+import { createChatHandler } from './chat/chat-route.js';
+import { createGenUiHandler } from './genui/generate-route.js';
+import { resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
 import type { OperatorArchetype, LLMProvider } from './types/index.js';
 import { listOperatorPrompts, setOperatorOverride, resetOperatorOverride, type OperatorOverride } from './operators/index.js';
 import { ingestRepoToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError } from './recon/whitebox.js';
@@ -87,7 +87,7 @@ const execFileAsync = promisify(execFile);
 setOAuthFetch(fetchBypassingProxy as Parameters<typeof setOAuthFetch>[0]);
 
 function isKnownLLMProvider(provider: string): provider is LLMProvider {
-  return Object.prototype.hasOwnProperty.call(AVAILABLE_MODELS, provider);
+  return (LLM_PROVIDER_IDS as readonly string[]).includes(provider);
 }
 
 // =============================================================================
@@ -369,12 +369,7 @@ let llm: LLMBackbone | null = null;
 
 async function initLLM(): Promise<LLMBackbone | null> {
   try {
-    let llmConfig = config.getLLMConfig();
-    if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
-      if (hasOAuth('xai')) llmConfig = config.getLLMConfig('xai');
-      else if (hasOAuth('anthropic')) llmConfig = config.getLLMConfig('anthropic');
-      else if (hasOAuth('openai')) llmConfig = config.getLLMConfig('chatgpt');
-    }
+    const llmConfig = selectServerLLMConfig();
     if (providerNeedsApiKey(llmConfig.provider) && !llmConfig.apiKey) {
       console.warn('[purple-team] No API key configured - LLM features disabled');
       return null;
@@ -6555,18 +6550,20 @@ app.get('/api/selfimprove/ledger', async (_req: Request, res: Response): Promise
 });
 
 app.get('/api/llm/status', (_req: Request, res: Response) => {
-  const llmConfig = config.getLLMConfig();
+  // Same resolution as the streaming routes; reports only whether a key exists, never the key.
+  const resolved = selectServerLLMConfig();
+  const configured = Boolean(resolved.apiKey) || providerRunsKeyless(resolved.provider);
   res.json({
-    connected: !!llm,
-    provider: llmConfig.provider,
-    model: llmConfig.model,
-    hasApiKey: !!llmConfig.apiKey,
-    configured: Boolean(llmConfig.apiKey) || providerRunsKeyless(llmConfig.provider),
+    connected: !!llm && configured,
+    provider: resolved.provider,
+    model: resolved.model,
+    hasApiKey: !!resolved.apiKey,
+    configured,
     oauth: oauthStatus(),
   });
 });
 
-// Subscription OAuth (Super Grok Heavy + Claude Pro/Max + ChatGPT Plan). Tokens never leave the server.
+// Subscription OAuth (Super Grok Heavy + ChatGPT Plan). Tokens never leave the server.
 app.get('/api/oauth/status', (_req: Request, res: Response) => {
   res.json(oauthStatus());
 });
@@ -6596,36 +6593,6 @@ app.post('/api/oauth/xai/poll', async (req: Request, res: Response): Promise<voi
 
 app.post('/api/oauth/xai/logout', (_req: Request, res: Response) => {
   clearOAuth('xai');
-  void initLLM().then((next) => { llm = next; });
-  res.json({ ok: true, oauth: oauthStatus() });
-});
-
-app.post('/api/oauth/anthropic/start', async (_req: Request, res: Response): Promise<void> => {
-  try {
-    res.json(await startAnthropicPkceFlow());
-  } catch (e) {
-    res.status(502).json({ error: (e as Error).message });
-  }
-});
-
-app.post('/api/oauth/anthropic/complete', async (req: Request, res: Response): Promise<void> => {
-  const flowId = typeof req.body?.flowId === 'string' ? req.body.flowId : '';
-  const code = typeof req.body?.code === 'string' ? req.body.code : '';
-  if (!flowId || !code) {
-    res.status(400).json({ error: 'flowId and code required' });
-    return;
-  }
-  try {
-    await completeAnthropicPkceFlow(flowId, code);
-    llm = await initLLM();
-    res.json({ ok: true, oauth: oauthStatus() });
-  } catch (e) {
-    res.status(400).json({ error: (e as Error).message });
-  }
-});
-
-app.post('/api/oauth/anthropic/logout', (_req: Request, res: Response) => {
-  clearOAuth('anthropic');
   void initLLM().then((next) => { llm = next; });
   res.json({ ok: true, oauth: oauthStatus() });
 });
@@ -7308,18 +7275,20 @@ app.post('/api/teams/skills/run', async (req: Request, res: Response): Promise<v
 // POST (not GET) so the browser can pass its own localStorage-held key/baseUrl in the body — the
 // standalone UI holds the key, not the server (consistent with the existing per-request mission key,
 // and it stays on localhost). Body values override server config; missing → server config. Runs
-// server-side so the browser dodges provider CORS, and fails open to the static AVAILABLE_MODELS list
-// (source:'static') so a missing key / network error never leaves the panel empty.
+// server-side so the browser dodges provider CORS. The provider's live list is the only source of
+// ids; it is cached per provider/baseUrl/key-hash for 6h. Response: { provider, source: 'live' |
+// 'stale' | 'unavailable', models, fetchedAt, note? }. Refresh bypasses the TTL: ?refresh=1 or body refresh:true.
+// Always answers 200 with that shape.
 app.post('/api/models', async (req: Request, res: Response): Promise<void> => {
-  const body = (req.body ?? {}) as { provider?: string; apiKey?: string; baseUrl?: string };
+  const body = (req.body ?? {}) as { provider?: string; apiKey?: string; baseUrl?: string; refresh?: unknown };
   const defaultProvider = config.getLLMConfig().provider;
   const requestedProvider = (typeof body.provider === 'string' && body.provider.trim()) || defaultProvider;
   const provider = isKnownLLMProvider(requestedProvider) ? requestedProvider : defaultProvider;
   // getLLMConfig throws for any provider it doesn't switch on (e.g. the legitimate 'local-agent', or a
   // garbage string). A synchronous throw inside this async handler would hang the request (Express 4
-  // never responds), so swallow it and fall through to the static list — the route must always answer.
+  // never responds), so swallow it and fall through with no server config — the route must always answer.
   let cfg: { baseUrl?: string; apiKey?: string; authType?: 'api-key' | 'oauth' } = {};
-  try { cfg = config.getLLMConfig(provider); } catch { /* provider has no remote/server config → static fallback */ }
+  try { cfg = config.getLLMConfig(provider); } catch { /* provider has no remote/server config → unavailable */ }
   const bodyBaseUrl = typeof body.baseUrl === 'string' && body.baseUrl.trim() ? body.baseUrl : undefined;
   const bodyKey = typeof body.apiKey === 'string' && body.apiKey ? body.apiKey : undefined;
   // Bind key+baseUrl by source: a caller-supplied custom baseUrl must bring its OWN key — never lend
@@ -7327,9 +7296,9 @@ app.post('/api/models', async (req: Request, res: Response): Promise<void> => {
   // server key is only ever sent to the server's own configured provider endpoint.
   const baseUrl = bodyBaseUrl ?? cfg.baseUrl;
   const apiKey = bodyBaseUrl ? bodyKey : (bodyKey ?? cfg.apiKey);
-  const staticFallback = AVAILABLE_MODELS[provider].map((m: { id: string }) => ({ id: m.id }));
-  const resolved = await resolveModels(provider, { baseUrl, apiKey, authType: bodyKey ? undefined : cfg.authType, staticFallback });
-  res.json({ provider, ...resolved });
+  const refresh = body.refresh === true || req.query.refresh === '1';
+  const listing = await resolveProviderModels(provider, { baseUrl, apiKey, authType: bodyKey ? undefined : cfg.authType, refresh });
+  res.json(listing);
 });
 
 // =============================================================================
@@ -7391,6 +7360,9 @@ app.get('/api/tools', (_req: Request, res: Response) => {
     },
   });
 });
+
+app.post('/api/chat', createChatHandler({ getConfig: resolveStreamingConfig }));
+app.post('/api/genui/generate', createGenUiHandler({ getConfig: resolveStreamingConfig }));
 
 app.post('/api/llm/chat', async (req: Request, res: Response): Promise<void> => {
   // Caller-supplied systemPrompt is a local-operator convenience (the UI uses it);
@@ -9298,6 +9270,11 @@ app.get('/api/agents/local/status', async (req: Request, res: Response): Promise
 app.get('/', (_req: Request, res: Response) => res.redirect('/ui/'));
 
 app.use('/ui', express.static('docs'));
+
+// Built React UI (`npm run ui:build` writes ui/dist). Mounted only when the bundle
+// exists, so the server still starts without a build.
+const APP_DIST = 'ui/dist';
+if (existsSync(APP_DIST)) app.use('/app', express.static(APP_DIST));
 
 // =============================================================================
 // ERROR HANDLING

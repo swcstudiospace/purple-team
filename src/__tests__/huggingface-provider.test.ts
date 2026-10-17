@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach } from 'vitest';
-import { config, AVAILABLE_MODELS } from '../config/index.js';
+import { config } from '../config/index.js';
 import { createHuggingFaceBackbone } from '../llm/index.js';
 
 const KEY = 'hf_abcdef1234567890';
@@ -47,13 +47,8 @@ describe('HuggingFace provider wiring', () => {
     expect(bb.validateConfig().valid).toBe(true);
   });
 
-  it('publishes full HF repo-id models and surfaces configured provider state', () => {
+  it('surfaces configured provider state', () => {
     process.env.HF_TOKEN = KEY;
-    const ids = AVAILABLE_MODELS.huggingface?.map(m => m.id) ?? [];
-    expect(ids.length).toBeGreaterThan(0);
-    expect(ids).toContain('meta-llama/Llama-3.3-70B-Instruct');
-    // HF ids are the full `org/repo` slug — must carry a slash, unlike bare native ids.
-    for (const id of ids) expect(id).toContain('/');
     expect(config.getConfiguredProviders()).toContain('huggingface');
   });
 });

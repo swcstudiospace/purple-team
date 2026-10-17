@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { config, AVAILABLE_MODELS } from '../config/index.js';
+import { config } from '../config/index.js';
 import { createLiteLLMBackbone } from '../llm/index.js';
 
 const PREV_BASE = process.env.LITELLM_BASE_URL;
@@ -35,10 +35,5 @@ describe('LiteLLM provider wiring (#45)', () => {
 
     expect(backbone.getProvider()).toBe('litellm');
     expect(backbone.validateConfig().valid).toBe(true);
-  });
-
-  it('surfaces a static LiteLLM model catalog entry', () => {
-    expect(AVAILABLE_MODELS.litellm?.length ?? 0).toBeGreaterThan(0);
-    expect(AVAILABLE_MODELS.litellm[0].provider).toBe('LiteLLM');
   });
 });

@@ -6,7 +6,7 @@
 // LLM CONFIGURATION
 // =============================================================================
 
-export type LLMProvider = 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'huggingface' | 'nanogpt' | 'novita' | 'codex' | 'chatgpt' | 'cursor' | 'mock' | 'local' | 'local-agent';
+export type LLMProvider = 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'zai' | 'huggingface' | 'nanogpt' | 'novita' | 'codex' | 'chatgpt' | 'cursor' | 'mock' | 'local' | 'local-agent';
 
 export interface LLMConfig {
   provider: LLMProvider;
@@ -14,7 +14,7 @@ export interface LLMConfig {
   apiKey?: string;
   /**
    * How `apiKey` should be presented on the wire.
-   * `oauth` = subscription Bearer (SuperGrok / Claude Pro-Max); omit or `api-key` = provider API key.
+   * `oauth` = subscription Bearer (SuperGrok); omit or `api-key` = provider API key.
    */
   authType?: 'api-key' | 'oauth';
   baseUrl?: string;
