@@ -17,7 +17,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { promisify } from 'util';
 import { createHash, randomUUID } from 'crypto';
-import { config, AVAILABLE_MODELS } from './config/index.js';
+import { config, LLM_PROVIDER_IDS } from './config/index.js';
 import { resolveProviderModels } from './config/provider-models.js';
 import {
   clearOAuth,
@@ -85,7 +85,7 @@ const execFileAsync = promisify(execFile);
 setOAuthFetch(fetchBypassingProxy as Parameters<typeof setOAuthFetch>[0]);
 
 function isKnownLLMProvider(provider: string): provider is LLMProvider {
-  return Object.prototype.hasOwnProperty.call(AVAILABLE_MODELS, provider);
+  return (LLM_PROVIDER_IDS as readonly string[]).includes(provider);
 }
 
 // =============================================================================
