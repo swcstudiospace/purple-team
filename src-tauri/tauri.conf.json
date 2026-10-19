@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../docs",
     "devUrl": "http://127.0.0.1:3333/ui",
-    "beforeDevCommand": "npm run server",
-    "beforeBuildCommand": "npm run build"
+    "beforeDevCommand": "npm run ui:build && npm run server",
+    "beforeBuildCommand": "npm run build && npm run ui:build"
   },
   "app": {
     "windows": [
@@ -33,7 +33,8 @@
     "longDescription": "Purple Team — single-operator localhost console. Desktop shell over the loopback API server.",
     "externalBin": ["binaries/t3mp3st-server"],
     "resources": {
-      "../docs/": "docs/"
+      "../docs/": "docs/",
+      "../ui/dist/": "ui/dist/"
     }
   }
 }

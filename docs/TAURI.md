@@ -218,3 +218,14 @@ the re-probe above); after the strict-JSON fix: `Finished 'dev' profile
 `wry 0.57.0` / `tauri-runtime-wry 2.12.1` resolved. CI (section 7) runs the
 real bundle build on pushes touching `src-tauri/**` — re-record the bundle
 artifact outcome there after the first CI-backed `tauri build`.
+
+## 11. React dashboard in the bundle (PASS — 2026-10-19)
+
+The desktop window lands on the React dashboard (`/app/`), not the static pages.
+
+- `bundle.resources` maps `../ui/dist/` to `ui/dist/` beside `../docs/`. The sidecar's working directory is the resource dir, so its cwd-relative `ui/dist` mount (`/app`) resolves inside the bundle. `src-tauri/src/lib.rs` navigates the window to `/app/` when `<resource dir>/ui/dist/index.html` exists and to `/ui/` otherwise.
+- `beforeBuildCommand` is `npm run build && npm run ui:build`, so `tauri build` always bundles a fresh UI. `beforeDevCommand` runs `npm run ui:build` first, so `tauri dev` works from a clean checkout.
+- Tauri validates resource paths at build time. A bare `cargo check` in `src-tauri/` fails with `resource path ../ui/dist doesn't exist` until `npm run ui:build` has run; a glob source is rejected the same way (`path not found or didn't match any files`). The sidecar binary is a prerequisite in the same way (`npm run sidecar:build`).
+- Smoke on this host (Linux x86_64): `npm run build && npm run sidecar:build && npx tauri build --bundles deb` produced `Purple Team_1.0.0_amd64.deb` (43.4 MB) containing `usr/bin/t3mp3st`, the 117 MB `usr/bin/t3mp3st-server` sidecar, and `usr/lib/Purple Team/{docs,ui/dist}`. The extracted binary was launched under Xvfb: it logged `sidecar spawned`, the sidecar answered `/app/` with 200 and `/` with a 302 to `/app/`, and a screenshot of the window showed the dashboard Overview with live status cards.
+- Headless hosts: GTK and WebKitGTK stall before `setup` when the session bus cannot finish portal activation. Stock `MiniBrowser` showed the same blank window, so this is the host, not the app. Run under a private bus: `xvfb-run -a -s "-screen 0 1280x800x24" dbus-run-session -- env NO_AT_BRIDGE=1 GSETTINGS_BACKEND=memory WEBKIT_DISABLE_COMPOSITING_MODE=1 WEBKIT_DISABLE_DMABUF_RENDERER=1 LIBGL_ALWAYS_SOFTWARE=1 <extracted>/usr/bin/t3mp3st`. The packaged app uses fixed port 3333, so stop any other server on it first.
+- Not exercised here: the Windows and macOS bundles are built in CI only, and their windows were not launched. Installers built before this section (for example prerelease `build-965beb0`) open the static UI.

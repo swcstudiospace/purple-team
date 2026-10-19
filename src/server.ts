@@ -9265,9 +9265,10 @@ app.get('/api/agents/local/status', async (req: Request, res: Response): Promise
 // STATIC FILE SERVING
 // =============================================================================
 
-// Bare root → land on the UI. Registered right beside the /ui mount so it only
-// matches the exact '/' path and never shadows the /api/* routes above.
-app.get('/', (_req: Request, res: Response) => res.redirect('/ui/'));
+// Bare root → land on the React dashboard when its build exists (npm run ui:build),
+// else the static UI. Registered right beside the /ui mount so it only matches the
+// exact '/' path and never shadows the /api/* routes above.
+app.get('/', (_req: Request, res: Response) => res.redirect(existsSync('ui/dist/index.html') ? '/app/' : '/ui/'));
 
 app.use('/ui', express.static('docs'));
 
