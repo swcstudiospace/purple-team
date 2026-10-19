@@ -131,7 +131,10 @@ export interface IngestResult {
 // =============================================================================
 
 // Default directory/path fragments we never descend into or analyze.
-const DEFAULT_EXCLUDES = [
+// Exported (phase 35): the repo-URL fetch adapter skips the SAME fragments
+// while streaming the tarball, so local-crawl and fetched-file flows share
+// ONE exclusion authority instead of drifting copies.
+export const DEFAULT_EXCLUDES: readonly string[] = [
   'node_modules',
   '.git',
   'dist',
@@ -146,6 +149,29 @@ const DEFAULT_EXCLUDES = [
   '__tests__',
   'testing',
 ];
+
+/**
+ * File extensions the multi-language extractor can analyze. Exported (phase
+ * 35) so the repo-URL fetch adapter's tar-entry extension filter and
+ * createMultiLangIngestConfig's crawl filter are the SAME list — one
+ * authority, no drift between the disk and fetched paths.
+ */
+export const MULTI_LANG_INCLUDE_EXTS: readonly string[] = [
+  '.py',
+  '.js',
+  '.ts',
+  '.tsx',
+  '.go',
+  '.java',
+  '.c',
+  '.cpp',
+];
+
+/**
+ * Cumulative-byte ceiling shared by the multi-lang configs and the in-memory
+ * ingest seam (ingestFiles callers) — the 1 GB runaway-repo sentinel.
+ */
+export const MULTI_LANG_MAX_TOTAL_BYTES = 1_000_000_000;
 
 // def / class detectors (line-anchored; capture the leading indent).
 const DEF_RE = /^(\s*)(async\s+)?def\s+(\w+)\s*\(([^)]*)\)/;
@@ -753,31 +779,45 @@ export function prioritize(unit: {
 // =============================================================================
 
 /**
- * Run the full pipeline: crawl → parse → call graph → entry points →
- * reachability → classify → prioritize → emit (sorted by priority desc).
+ * A file already read into memory — the in-memory ingest seam (phase 35).
+ * `path` is a repo-relative POSIX path (label + exclusion input only, never
+ * opened); `content` is exactly what `readFileSync(path, 'utf8')` would have
+ * returned for the disk flow, so both paths parse identical input.
  */
-export function ingestRepository(config: IngestConfig): IngestResult {
-  const files = crawl(config);
-  const maxTotalBytes = config.maxTotalBytes;
+export interface SourceFileInput {
+  path: string;
+  content: string;
+}
+
+/**
+ * In-memory core of the ingest pipeline: parse → call graph → entry points →
+ * reachability → classify → prioritize → emit. This is the historical
+ * `ingestRepository` loop verbatim minus the `readFileSync` disk coupling;
+ * the repo-URL fetch path feeds it fetched files, the disk path feeds it
+ * crawled files. Extension/exclusion filtering happens upstream of this seam.
+ *
+ * Byte-identical outputs with `ingestRepository` are a pinned contract
+ * (phase-35 parity tests): same blocks, same stats, same `truncated` shape.
+ */
+export function ingestFiles(
+  files: SourceFileInput[],
+  limits: { maxTotalBytes?: number; truncatedAtStart?: boolean } = {},
+): IngestResult {
+  const maxTotalBytes = limits.maxTotalBytes;
   let totalBytes = 0;
-  // truncated if crawl already hit the file ceiling, or the byte ceiling trips below.
-  let truncated = config.maxFiles !== undefined && files.length >= config.maxFiles;
+  // truncated when the caller's file ceiling already fired (crawl maxFiles),
+  // or the byte ceiling trips below.
+  let truncated = limits.truncatedAtStart === true;
 
   const allBlocks: CodeBlock[] = [];
   let processedFiles = 0;
-  for (const path of files) {
-    let content: string;
-    try {
-      content = readFileSync(path, 'utf8');
-    } catch {
-      continue;
-    }
+  for (const file of files) {
     processedFiles += 1;
-    totalBytes += content.length;
+    totalBytes += file.content.length;
     // Multi-language dispatch: .py uses the legacy regex parser; supported
     // non-Python languages use tree-sitter and yield [] when their grammar is
     // unavailable. Stays sync — parseFileMultiLang does not await.
-    allBlocks.push(...parseFileMultiLang(path, content, extname(path).toLowerCase()));
+    allBlocks.push(...parseFileMultiLang(file.path, file.content, extname(file.path).toLowerCase()));
     if (maxTotalBytes !== undefined && totalBytes >= maxTotalBytes) {
       truncated = true;
       console.warn(`[code-ingest] ingest reached maxTotalBytes ceiling (${maxTotalBytes}) after ${totalBytes} bytes; remaining files skipped — raise IngestConfig.maxTotalBytes to analyze more.`);
@@ -841,6 +881,30 @@ export function ingestRepository(config: IngestConfig): IngestResult {
 }
 
 /**
+ * Run the full pipeline: crawl → parse → call graph → entry points →
+ * reachability → classify → prioritize → emit (sorted by priority desc).
+ * Disk wrapper: crawls `config.repoRoot`, reads each file once, and delegates
+ * to the in-memory `ingestFiles` seam (phase-35 refactor).
+ */
+export function ingestRepository(config: IngestConfig): IngestResult {
+  const paths = crawl(config);
+  const files: SourceFileInput[] = [];
+  for (const path of paths) {
+    let content: string;
+    try {
+      content = readFileSync(path, 'utf8');
+    } catch {
+      continue;
+    }
+    files.push({ path, content });
+  }
+  return ingestFiles(files, {
+    maxTotalBytes: config.maxTotalBytes,
+    truncatedAtStart: config.maxFiles !== undefined && paths.length >= config.maxFiles,
+  });
+}
+
+/**
  * Sensible default config for a Python repo. Python-only by design (see header).
  */
 export function createPythonIngestConfig(repoRoot: string): IngestConfig {
@@ -870,11 +934,11 @@ export function createPythonIngestConfig(repoRoot: string): IngestConfig {
 export function createMultiLangIngestConfig(repoRoot: string): IngestConfig {
   return {
     repoRoot,
-    includeExts: ['.py', '.js', '.ts', '.tsx', '.go', '.java', '.c', '.cpp'],
+    includeExts: [...MULTI_LANG_INCLUDE_EXTS],
     excludeGlobs: [...DEFAULT_EXCLUDES],
     maxFileBytes: 1_000_000,
     maxFiles: 50_000,
-    maxTotalBytes: 1_000_000_000,
+    maxTotalBytes: MULTI_LANG_MAX_TOTAL_BYTES,
   };
 }
 

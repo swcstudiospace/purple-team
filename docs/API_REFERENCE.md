@@ -95,6 +95,66 @@ Tool requests should be scoped to authorized targets. External binary availabili
 | `GET` | `/api/mission-bundles/:missionId` | Read mission bundle |
 | `POST` | `/api/mission-gate` | Evaluate mission readiness gate |
 
+### Mission White-Box Source And Ingest Cancellation
+
+`POST /api/mission/start` takes an optional white-box repository source —
+exactly one per run, on either the structured or the legacy start branch:
+
+- `repoPath` — absolute path to a local repository you own (local ingest).
+- `repoUrl` — a `github.com` repository URL (`https://github.com/{owner}/{repo}`,
+  optionally `/tree/{ref}/{subpath}`). The server fetches it as a streamed
+  codeload tarball with per-hop SSRF allowlisting, size/file caps, and a skip
+  engine. Slash-branch URLs (`/tree/feature/login-flow`) parse as
+  `ref=feature` + `subpath=login-flow`; when that fetch 404s the server
+  retries with progressively longer refs consuming subpath segments
+  (`ref=feature/login-flow`, `subpath=''`) before classifying not-found.
+- Passing both → `400 conflicting-repo-source` (one repo source per run); a
+  non-string `repoUrl` → `400 invalid_url`. An invalid URL answers `400` with
+  the validator's fault text and `errorCode: "invalid_url"`; a private or
+  missing repo answers `402` (`private_inaccessible` authed,
+  `not_connected` anonymous); a genuine ref miss after the metadata redirect
+  answers `404` (`repo_not_found`); an oversized repo answers `413`
+  (`oversized`); rate limiting answers `429` (`rate_limited`).
+
+On success the response carries a `whitebox` object:
+
+```json
+{
+  "whitebox": {
+    "includedUnits": 12,
+    "droppedUnits": 0,
+    "stats": {},
+    "source": "github",
+    "skipSummary": { "total": 3, "byReason": { "ext-not-analyzable": 3 }, "example": {} },
+    "runId": "run-9af1…",
+    "label": "octocat/Hello-World@feature/login-flow"
+  }
+}
+```
+
+`label` is the canonical `owner/repo@ref[/subpath]` run label (invariant
+across slash-branch retries); `runId` joins the `purple-run` SSE events for
+the fetch to this POST.
+
+`POST /api/mission/stop` cancels an in-flight repo-URL ingest FIRST — during
+the synchronous ingest inside a mission start no command exists yet, so the
+ingest's AbortController is the only cancellable work:
+
+| Body | Behavior |
+|---|---|
+| `{ "runId": "run-…" }` | Aborts that run's in-flight ingest (if registered), then runs the stop path |
+| absent / `{}` | Aborts every in-flight ingest (usually ≤ 1), then runs the stop path |
+| Ingest cancelled, no active mission | `200 { "success": true, "cancelledIngest": true, "cancelledRunIds": ["run-…"] }` — not the mission 404 |
+| Nothing in flight, no active mission | `404 { "error": "No active mission" }` |
+| Active mission stopped | `200 { "success": true, "message": "Mission stopped", "cancelAcknowledged": false, "cancelledIngest"?: true, "cancelledRunIds"?: […] }` |
+
+`cancelAcknowledged` stays `false` (honest cancellation, phase 26): a
+transport stop halts work but is never an acknowledged cancel. A cancelled
+ingest surfaces on `purple-run` SSE as `state: "cancelled"` and in
+`GET /api/mission/status` as the mirrored `whitebox` summary with
+`state: "cancelled"`. A client disconnect on the mission-start POST aborts
+the ingest the same way.
+
 ## General Planner And Admiral
 
 | Method | Path | Purpose |
@@ -251,6 +311,13 @@ Claude Pro/Max sign-in additionally reports a `tier` label (e.g. `Max 20x`) and 
 | `POST` | `/api/oauth/xai/start` | Start Grok plan device flow; returns `{ flowId, userCode, verificationUri, expiresIn, interval }` |
 | `POST` | `/api/oauth/xai/poll` | Poll Grok plan authorization; body `{ flowId }` |
 | `POST` | `/api/oauth/xai/logout` | Clear the Grok plan session |
+| `GET` | `/api/oauth/github/status` | GitHub connection state — `{ configured, connected, redirectUri, login?, avatarUrl?, scopes?, expiresAt?, mode }` |
+| `GET` | `/api/oauth/github/start` | Begin GitHub OAuth (PKCE + secret + state); redirects the browser to GitHub consent |
+| `GET` | `/api/oauth/github/callback` | OAuth redirect target; serves a token-free status page |
+| `POST` | `/api/oauth/github/complete` | Pasted-code fallback completion; body `{ state, code }` |
+| `POST` | `/api/oauth/github/logout` | Revoke the grant at GitHub (best-effort) and clear the local session |
+| `GET` | `/api/github/repositories` | Proxy of the connected account's repositories (paginated); `401 auth-required` when anonymous |
+| `GET` | `/api/github/resolve?url=` | Validate a GitHub URL and resolve owner/repo/default-branch/visibility |
 
 `complete` returns `400` when `flowId`/`code` are missing or invalid, `502`
 from `start` when the provider is unreachable. OAuth runs inside the same

@@ -50,13 +50,40 @@ import { AI_REDTEAM_PLAYBOOK, AI_REDTEAM_TECHNIQUE_IDS, aiRedTeamBriefing } from
 import { OPERATOR_SYSTEM_PROMPTS, PLINIAN_OPERATOR_DOCTRINE, THE_FIXER_SYSTEM_PROMPT } from './prompts/index.js';
 import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
 import { createChatHandler } from './chat/chat-route.js';
+import { createConversationRoutes } from './chat/conversation-routes.js';
 import { createGenUiHandler } from './genui/generate-route.js';
 import { resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
 import type { OperatorArchetype, LLMProvider } from './types/index.js';
 import { listOperatorPrompts, setOperatorOverride, resetOperatorOverride, type OperatorOverride } from './operators/index.js';
-import { ingestRepoToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError } from './recon/whitebox.js';
+import { ingestRepoToSourceContext, ingestFetchedFilesToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError } from './recon/whitebox.js';
+import {
+  fetchRepoFiles,
+  parseRepoUrlForIngest,
+  RepoIngestError,
+  type RepoIngestCounters,
+  type RepoSkipSummary,
+} from './recon/github-ingest.js';
 import { initGrammars } from './recon/ts-grammars.js';
 import { redactCredential } from './evidence/index.js';
+import {
+  GitHubOAuthError,
+  completeGitHubFlow,
+  consumeGitHubFlowState,
+  disconnectGitHub,
+  ensureGitHubAccessToken,
+  forceGitHubTokenRefresh,
+  githubCallbackPage,
+  githubStatus,
+  setGitHubFetch,
+  startGitHubPkceFlow,
+} from './github/oauth.js';
+import {
+  GitHubApiError,
+  listGitHubRepos,
+  parseGitHubRepoUrl,
+  resolveGitHubRepo,
+  setGitHubApiFetch,
+} from './github/api.js';
 import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/index.js';
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
 import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, artifactHash, ArtifactValidationError, RED_ARCHETYPES } from './teams/contracts.js';
@@ -87,6 +114,10 @@ import { type ToolHatScope, type HatDomain } from './teams/guardrails.js';
 const execFileAsync = promisify(execFile);
 
 setOAuthFetch(fetchBypassingProxy as Parameters<typeof setOAuthFetch>[0]);
+
+// GitHub OAuth + REST proxy ride the same proxy-bypassing fetch as the LLM vendors.
+setGitHubFetch(fetchBypassingProxy as Parameters<typeof setGitHubFetch>[0]);
+setGitHubApiFetch(fetchBypassingProxy as Parameters<typeof setGitHubApiFetch>[0]);
 
 function isKnownLLMProvider(provider: string): provider is LLMProvider {
   return (LLM_PROVIDER_IDS as readonly string[]).includes(provider);
@@ -6661,6 +6692,153 @@ app.post('/api/oauth/claude/logout', (_req: Request, res: Response) => {
 });
 
 // =============================================================================
+// GITHUB OAUTH APP + REPO PROXY (SPE-15994) — env-gated user-owned connection
+// with an anonymous public-repo fallback. Tokens never leave the server; every
+// status/complete/logout body carries the githubStatus() projection only. The
+// browser-facing callback serves a tiny HTML result page (no JSON, no tokens);
+// the SPA consumes the JSON routes.
+// =============================================================================
+
+/** Shared error mapping for the GitHub routes: classified codes ride beside `error`. */
+function sendGitHubError(res: Response, e: unknown): void {
+  if (e instanceof GitHubApiError) {
+    const body: Record<string, unknown> = { error: e.message, code: e.code };
+    if (e.retryAt !== undefined) body.retryAt = e.retryAt;
+    res.status(e.httpStatus).json(body);
+    return;
+  }
+  if (e instanceof GitHubOAuthError) {
+    res.status(e.httpStatus).json({ error: e.message, code: e.code });
+    return;
+  }
+  res.status(502).json({ error: (e as Error).message });
+}
+
+app.get('/api/oauth/github/status', (_req: Request, res: Response) => {
+  res.json(githubStatus());
+});
+
+app.get('/api/oauth/github/start', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await startGitHubPkceFlow());
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+// Primary completion path: GitHub redirects the operator's browser here with
+// ?code&state (or ?error=access_denied). Top-level navigation — GETs bypass
+// the CSRF guard and the loopback host passes the rebinding guard.
+app.get('/api/oauth/github/callback', async (req: Request, res: Response): Promise<void> => {
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  const code = typeof req.query.code === 'string' ? req.query.code : '';
+  const error = typeof req.query.error === 'string' ? req.query.error : '';
+  if (error) {
+    // Consent denied (or upstream error): the state is still spent — deny is
+    // a terminal answer for that flow.
+    consumeGitHubFlowState(state);
+    res.status(200).type('html').send(githubCallbackPage(
+      error === 'access_denied' ? 'denied' : 'failed',
+      { message: `GitHub authorization failed: ${error}` },
+    ));
+    return;
+  }
+  if (!code) {
+    res.status(400).type('html').send(githubCallbackPage('expired'));
+    return;
+  }
+  try {
+    const status = await completeGitHubFlow(state, code);
+    res.status(200).type('html').send(githubCallbackPage('connected', { login: status.login }));
+  } catch (e) {
+    const staleFlow = e instanceof GitHubOAuthError
+      && (e.code === 'unknown-state' || e.code === 'expired-state' || e.code === 'state-mismatch');
+    res.status(staleFlow ? 400 : 502).type('html').send(githubCallbackPage(
+      staleFlow ? 'expired' : 'failed',
+      { message: (e as Error).message },
+    ));
+  }
+});
+
+// Paste fallback for operators whose browser blocks the loopback redirect:
+// accepts a raw code, code#state, or the whole pasted callback URL.
+app.post('/api/oauth/github/complete', async (req: Request, res: Response): Promise<void> => {
+  const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  const state = typeof req.body?.state === 'string' ? req.body.state : undefined;
+  if (!code) {
+    res.status(400).json({ error: 'code required' });
+    return;
+  }
+  try {
+    const status = await completeGitHubFlow(state, code);
+    res.json({ ok: true, github: status });
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+// Local disconnection is the guarantee; the remote DELETE /applications/:id/
+// grant revocation inside disconnectGitHub is best-effort. No initLLM() —
+// GitHub is not an LLM backbone.
+app.post('/api/oauth/github/logout', async (_req: Request, res: Response): Promise<void> => {
+  await disconnectGitHub();
+  res.json({ ok: true, github: githubStatus() });
+});
+
+// Connected-only: GET /user/repos requires authentication and "my repos" has
+// no anonymous meaning. Anonymous callers get the explicit auth-required code.
+app.get('/api/github/repositories', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const token = await ensureGitHubAccessToken();
+    if (!token) {
+      res.status(401).json({ error: 'Connect a GitHub account to list repositories', code: 'auth-required' });
+      return;
+    }
+    const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
+    const perPage = Math.min(100, Math.max(1, Math.floor(Number(req.query.per_page)) || 30));
+    const visibilityRaw = typeof req.query.visibility === 'string' ? req.query.visibility : '';
+    const visibility = visibilityRaw === 'public' || visibilityRaw === 'private' ? visibilityRaw : 'all';
+    const result = await listGitHubRepos({
+      token,
+      page,
+      perPage,
+      visibility,
+      onAuthFailure: () => forceGitHubTokenRefresh(),
+    });
+    res.json(result);
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+// URL resolve works tokened AND anonymous (public repos, 60 req/h): the 404
+// code differs by mode so the UI can show the connect hint for private misses.
+app.get('/api/github/resolve', async (req: Request, res: Response): Promise<void> => {
+  const raw = typeof req.query.url === 'string' ? req.query.url : '';
+  const parsed = parseGitHubRepoUrl(raw);
+  if (!parsed) {
+    res.status(400).json({
+      error: 'Not a GitHub repository URL — expected github.com/owner/repo (optionally /tree/<ref>)',
+      code: 'invalid-url',
+    });
+    return;
+  }
+  try {
+    const token = await ensureGitHubAccessToken();
+    const resolution = await resolveGitHubRepo({
+      owner: parsed.owner,
+      repo: parsed.repo,
+      ref: parsed.ref,
+      token,
+      onAuthFailure: () => forceGitHubTokenRefresh(),
+    });
+    res.json(resolution);
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+// =============================================================================
 // DARK PURPLE TEAMS (SPE-9601) — spawnable team archetypes + purple synthesis.
 // Dependency direction: server → teams, never reverse. The teams modules stay pure
 // (no server state, no I/O); the purple synthesis below reads findingsLedger
@@ -7395,6 +7573,7 @@ app.get('/api/tools', (_req: Request, res: Response) => {
 });
 
 app.post('/api/chat', createChatHandler({ getConfig: resolveStreamingConfig }));
+app.use('/api/conversations', createConversationRoutes());
 app.post('/api/genui/generate', createGenUiHandler({ getConfig: resolveStreamingConfig }));
 
 app.post('/api/llm/chat', async (req: Request, res: Response): Promise<void> => {
@@ -7413,11 +7592,183 @@ app.post('/api/llm/chat', async (req: Request, res: Response): Promise<void> => 
 // MISSION DISPATCH & OPERATOR MANAGEMENT ENDPOINTS
 // =============================================================================
 
+// =============================================================================
+// REPO-URL INGEST (phase 35) — purple-run events + in-flight cancel registry
+// =============================================================================
+
+/** In-flight repo ingests keyed by runId — /api/mission/stop consults this FIRST. */
+const inFlightRepoIngests = new Map<string, AbortController>();
+
+/**
+ * Last repo-ingest terminal summary (module-level record), mirrored into
+ * GET /api/mission/status as `whitebox` — the polling fallback for SSE-less
+ * clients (35-CONTEXT §5.1). In-memory only; deliberately not persisted.
+ */
+let lastRepoIngestSummary: Record<string, unknown> | null = null;
+
+/** purple-run progress throttle: ≤1 event / 250 ms / 100 files (64-client SSE fan-out). */
+const PURPLE_RUN_PROGRESS_MIN_INTERVAL_MS = 250;
+const PURPLE_RUN_PROGRESS_MIN_FILES = 100;
+
+interface RepoUrlIngestPack {
+  sourceContext: string;
+  includedUnits: number;
+  droppedUnits: number;
+  stats: unknown;
+  skipSummary: RepoSkipSummary;
+  label: string;
+  counters: RepoIngestCounters;
+}
+
+type RepoUrlIngestOutcome =
+  | { ok: true; pack: RepoUrlIngestPack }
+  | { ok: false; error: RepoIngestError };
+
+/**
+ * Run the phase-35 repo-URL ingest for a mission start: validate → fetch
+ * (codeload tarball, redirect allowlist, caps, skip engine) → pack through
+ * the in-memory whitebox seam. Emits the pinned `purple-run` SSE contract
+ * (`{ runId, repo, state, counters?, errorCode?, message? }` — the phase-36
+ * UI requires `repo` on every event, so invalid_url failures — which have no
+ * parseable target — surface only in the POST response, never on SSE).
+ *
+ * Registers the ingest's AbortController in `inFlightRepoIngests` so
+ * /api/mission/stop can cancel it pre-mission; a client disconnect on the
+ * POST aborts it too (honest-cancel stance). NEVER responds itself — the
+ * caller maps `{ ok: false }` to `{ error, errorCode, retryHint }` with the
+ * classified httpStatus.
+ */
+async function runRepoUrlIngestPhase(
+  repoUrl: string,
+  runId: string,
+  res: Response,
+): Promise<RepoUrlIngestOutcome> {
+  const controller = new AbortController();
+  inFlightRepoIngests.set(runId, controller);
+  const onClose = (): void => {
+    if (!res.writableEnded) controller.abort();
+  };
+  res.on('close', onClose);
+
+  const startedAt = Date.now();
+  let repoMeta: { owner: string; repo: string; ref: string; subpath?: string } | undefined;
+  let label = '';
+  let lastCounters: RepoIngestCounters = { discovered: 0, fetched: 0, skipped: 0, bytes: 0 };
+
+  const emit = (payload: Record<string, unknown>): void => {
+    broadcastEvent('purple-run', {
+      runId,
+      ...(repoMeta !== undefined ? { repo: repoMeta } : {}),
+      ...payload,
+    });
+  };
+
+  let lastEmitMs = 0;
+  let lastEmitFiles = 0;
+  const emitProgress = (counters: RepoIngestCounters): void => {
+    const now = Date.now();
+    if (
+      now - lastEmitMs < PURPLE_RUN_PROGRESS_MIN_INTERVAL_MS &&
+      counters.fetched - lastEmitFiles < PURPLE_RUN_PROGRESS_MIN_FILES
+    ) {
+      return;
+    }
+    lastEmitMs = now;
+    lastEmitFiles = counters.fetched;
+    emit({ state: 'fetching', counters: { ...counters } });
+  };
+
+  try {
+    const target = parseRepoUrlForIngest(repoUrl);
+    label = target.canonical;
+    repoMeta = target.subpath
+      ? { owner: target.owner, repo: target.repo, ref: target.ref, subpath: target.subpath }
+      : { owner: target.owner, repo: target.repo, ref: target.ref };
+
+    emit({ state: 'fetching', message: `Fetching ${label} from GitHub` });
+
+    const fetched = await fetchRepoFiles(target, {
+      signal: controller.signal,
+      onProgress: (counters) => {
+        lastCounters = counters;
+        emitProgress(counters);
+      },
+    });
+    lastCounters = fetched.counters;
+
+    emit({
+      state: 'analyzing',
+      counters: { ...fetched.counters },
+      message: `Packing ${fetched.counters.fetched} fetched files (${label}) into the white-box source`,
+    });
+
+    const wb = ingestFetchedFilesToSourceContext(fetched.files);
+    const endedAt = new Date().toISOString();
+    emit({
+      state: 'completed',
+      counters: { ...fetched.counters },
+      skipSummary: fetched.skipSummary,
+      message: `Ingested ${label}: ${fetched.counters.fetched} files fetched, ${fetched.counters.skipped} skipped`,
+    });
+    lastRepoIngestSummary = {
+      runId,
+      label,
+      source: 'github',
+      state: 'completed',
+      counters: fetched.counters,
+      skipSummary: fetched.skipSummary,
+      includedUnits: wb.includedUnits,
+      droppedUnits: wb.droppedUnits,
+      stats: wb.stats,
+      startedAt: new Date(startedAt).toISOString(),
+      endedAt,
+    };
+    return {
+      ok: true,
+      pack: {
+        sourceContext: wb.sourceContext,
+        includedUnits: wb.includedUnits,
+        droppedUnits: wb.droppedUnits,
+        stats: wb.stats,
+        skipSummary: fetched.skipSummary,
+        label,
+        counters: fetched.counters,
+      },
+    };
+  } catch (error) {
+    const ingestError =
+      error instanceof RepoIngestError
+        ? error
+        : new RepoIngestError('network', error instanceof Error ? error.message : String(error), {
+            httpStatus: 502,
+          });
+    const state = ingestError.code === 'cancelled' ? 'cancelled' : 'failed';
+    emit({ state, errorCode: ingestError.code, message: ingestError.message, counters: { ...lastCounters } });
+    lastRepoIngestSummary = {
+      runId,
+      ...(label !== '' ? { label } : {}),
+      source: 'github',
+      state,
+      errorCode: ingestError.code,
+      message: ingestError.message,
+      counters: lastCounters,
+      startedAt: new Date(startedAt).toISOString(),
+      endedAt: new Date().toISOString(),
+    };
+    return { ok: false, error: ingestError };
+  } finally {
+    res.removeListener('close', onClose);
+    inFlightRepoIngests.delete(runId);
+  }
+}
+
+
 /**
  * POST /api/mission/start — Start a mission with real backend operators
  *
  * Body: { name, targets: [{ host, scope?, ports? }], operators: string[],
- *         apiKey, provider?, model?, opsecLevel? }
+ *         apiKey, provider?, model?, opsecLevel?,
+ *         repoPath? (LOCAL white-box source) | repoUrl? (GitHub white-box source, phase 35) }
  */
 app.post('/api/mission/start', async (req: Request, res: Response): Promise<void> => {
   const {
@@ -7433,6 +7784,9 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     // command via setWhiteboxSource BEFORE start(), so operators reason over the
     // real source instead of black-box probing. Absent = unchanged behavior.
     repoPath,
+    // OPTIONAL white-box source (phase 35): a github.com repo URL
+    // (optionally /tree/{ref}/{subpath}). Mutually exclusive with repoPath.
+    repoUrl,
   } = req.body;
 
   // Use the request-selected backend, or fall back to the server's configured default.
@@ -7473,6 +7827,22 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     throw e;
   }
 
+
+  // Phase 35: repoUrl is the URL-source discriminator (both branches below).
+  // One repo source per run — repoUrl and repoPath are mutually exclusive.
+  // Shape/URL validation itself happens inside the ingest phase (after
+  // guards, per 35-CONTEXT §6.2); only the source-conflict and type checks
+  // gate here, before any branch-specific work.
+  if (repoUrl !== undefined && typeof repoUrl !== 'string') {
+    res.status(400).json({ error: 'repoUrl must be a string containing a GitHub repository URL', errorCode: 'invalid_url' });
+    return;
+  }
+  const repoUrlInput = typeof repoUrl === 'string' ? repoUrl.trim() : '';
+  const repoPathPresent = typeof repoPath === 'string' && repoPath.trim() !== '';
+  if (repoUrlInput !== '' && repoPathPresent) {
+    res.status(400).json({ error: 'conflicting-repo-source: pass repoUrl (GitHub repository URL) or repoPath (local path), not both — one repo source per run' });
+    return;
+  }
   // Structured role-bound start: validate objective, role membership, and
   // uniqueness before createTempestCommandInstance; 400 names the role.
   if (structured) {
@@ -7499,6 +7869,27 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       const targetValue = normalizeTargetValue(target);
       const guard = guardAction(req.body as Record<string, unknown>, 'mission_execution', targetValue, `Start mission ${name} against ${targetValue}`);
       if (!guard.allowed) { blockForApproval(res, guard); return; }
+    }
+
+    // Phase 35 repo-URL ingest (structured branch): pre-mission, pre-spawn —
+    // guards already approved the run. The packed source is set on the command
+    // AFTER spawn (setWhiteboxSource re-propagates to spawned operators) but
+    // BEFORE start(). runId reuses start.runId so the UI can join purple-run
+    // SSE events to this POST.
+    let repoUrlPack: RepoUrlIngestPack | undefined;
+    if (repoUrlInput !== '') {
+      const outcome = await runRepoUrlIngestPhase(repoUrlInput, start.runId, res);
+      if (!outcome.ok) {
+        res.status(outcome.error.httpStatus).json({
+          error: outcome.error.message,
+          errorCode: outcome.error.code,
+          ...(outcome.error.retryHint !== undefined ? { retryHint: outcome.error.retryHint } : {}),
+          ...(outcome.error.retryAfterSeconds !== undefined ? { retryAfterSeconds: outcome.error.retryAfterSeconds } : {}),
+          runId: start.runId,
+        });
+        return;
+      }
+      repoUrlPack = outcome.pack;
     }
 
     try {
@@ -7576,6 +7967,14 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
         });
       }
 
+      // Phase 35 repo-URL pack: real fetched source WINS over the staged
+      // snippet — set AFTER configureStructuredRun so it supersedes
+      // stagedArtifact.raw, BEFORE start() so operators see it on their first
+      // tick. Same non-empty guard as the local-repoPath path.
+      if (repoUrlPack !== undefined && repoUrlPack.sourceContext.trim() !== '') {
+        cmd.setWhiteboxSource(repoUrlPack.sourceContext);
+      }
+
       cmd.start();
       broadcastEvent('mission:started', {
         name,
@@ -7595,6 +7994,17 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
         ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
         targets: cmd.targetEnv.getAllTargets().map(t => ({ id: t.id, address: t.address, type: t.type })),
         status: cmd.getStatus(),
+        ...(repoUrlPack !== undefined ? {
+          whitebox: {
+            includedUnits: repoUrlPack.includedUnits,
+            droppedUnits: repoUrlPack.droppedUnits,
+            stats: repoUrlPack.stats,
+            source: 'github',
+            skipSummary: repoUrlPack.skipSummary,
+            runId: start.runId,
+            label: repoUrlPack.label,
+          },
+        } : {}),
       });
     } catch (error: unknown) {
       console.error('[purple-team] Structured mission start failed:', error);
@@ -7625,6 +8035,26 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       res.status(500).json({ error: 'repo source validation failed' });
       return;
     }
+  }
+
+  // Phase 35 repo-URL ingest (legacy branch): beside the repoPath block,
+  // after guardAction approval. runId is minted at request acceptance and
+  // echoed in the response so the UI can join purple-run SSE events to the POST.
+  const repoUrlRunId = `run-${randomUUID()}`;
+  let repoUrlPack: RepoUrlIngestPack | undefined;
+  if (repoUrlInput !== '') {
+    const outcome = await runRepoUrlIngestPhase(repoUrlInput, repoUrlRunId, res);
+    if (!outcome.ok) {
+      res.status(outcome.error.httpStatus).json({
+        error: outcome.error.message,
+        errorCode: outcome.error.code,
+        ...(outcome.error.retryHint !== undefined ? { retryHint: outcome.error.retryHint } : {}),
+        ...(outcome.error.retryAfterSeconds !== undefined ? { retryAfterSeconds: outcome.error.retryAfterSeconds } : {}),
+        runId: repoUrlRunId,
+      });
+      return;
+    }
+    repoUrlPack = outcome.pack;
   }
 
   try {
@@ -7670,13 +8100,36 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     // exists on disk, ingest + security-rank it and feed the packed source into
     // the command before it starts, so operators analyze real source you own
     // rather than probing a black box. Reads LOCAL disk only — no network target.
-    let whitebox: { includedUnits: number; droppedUnits: number; stats: unknown; source: 'local' | 'github' } | undefined;
+    let whitebox: {
+      includedUnits: number;
+      droppedUnits: number;
+      stats: unknown;
+      source: 'local' | 'github';
+      skipSummary?: RepoSkipSummary;
+      runId?: string;
+      label?: string;
+    } | undefined;
     if (repoSource) {
       const wb = ingestRepoToSourceContext(repoSource.repoPath);
       // Only feed a NON-empty source (0 ingestable units → don't overwrite the operators'
       // black-box view with an empty blob; the includedUnits:0 in the response signals it).
       if (wb.sourceContext.trim()) cmd.setWhiteboxSource(wb.sourceContext);
       whitebox = { includedUnits: wb.includedUnits, droppedUnits: wb.droppedUnits, stats: wb.stats, source: repoSource.source };
+    }
+    if (repoUrlPack !== undefined) {
+      // Phase 35 fetched source: same non-empty guard + same setWhiteboxSource
+      // handoff as the local path — operator behavior is bit-identical to a
+      // local run of the same content.
+      if (repoUrlPack.sourceContext.trim() !== '') cmd.setWhiteboxSource(repoUrlPack.sourceContext);
+      whitebox = {
+        includedUnits: repoUrlPack.includedUnits,
+        droppedUnits: repoUrlPack.droppedUnits,
+        stats: repoUrlPack.stats,
+        source: 'github',
+        skipSummary: repoUrlPack.skipSummary,
+        runId: repoUrlRunId,
+        label: repoUrlPack.label,
+      };
     }
 
     // Start the command loop (auto-creates mission, auto-dispatches tasks)
@@ -7692,6 +8145,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
     res.json({
       success: true,
       missionName: name,
+      ...(repoUrlPack !== undefined ? { runId: repoUrlRunId } : {}),
       operators: spawnedOps,
       ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
       targets: cmd.targetEnv.getAllTargets().map(t => ({ id: t.id, address: t.address, type: t.type })),
@@ -7768,10 +8222,30 @@ app.get('/api/mission/:id/report', (req: Request, res: Response) => handleMissio
 
 /**
  * POST /api/mission/stop — Stop the active mission
+ *
+ * Phase 35: an in-flight repo-URL ingest is checked FIRST — during the
+ * synchronous ingest inside POST /api/mission/start no command exists yet,
+ * so the ingest's AbortController is the only cancellable work (this route
+ * 404s in that window otherwise). Optional body `{ runId }` targets one run;
+ * absent runId aborts every in-flight ingest (usually ≤1). After aborting,
+ * the existing stop path runs unchanged for started missions.
  */
-app.post('/api/mission/stop', (_req: Request, res: Response) => {
+app.post('/api/mission/stop', (req: Request, res: Response) => {
+  const body = (req.body ?? {}) as { runId?: unknown };
+  const requestedRunId = typeof body.runId === 'string' && body.runId !== '' ? body.runId : undefined;
+  const cancelledRunIds: string[] = [];
+  for (const [runId, controller] of inFlightRepoIngests) {
+    if (requestedRunId === undefined || runId === requestedRunId) {
+      cancelledRunIds.push(runId);
+      controller.abort();
+    }
+  }
   const cmd = getTempestCommand();
   if (!cmd) {
+    if (cancelledRunIds.length > 0) {
+      res.json({ success: true, cancelledIngest: true, cancelledRunIds });
+      return;
+    }
     res.status(404).json({ error: 'No active mission' });
     return;
   }
@@ -7796,7 +8270,12 @@ app.post('/api/mission/stop', (_req: Request, res: Response) => {
   // Honest cancellation (Phase 26, AC-FH-020): a transport stop halts the
   // tick loop — it is never an acknowledged cancel or resume. No cancel
   // route exists; in-flight work is left interrupted, not acknowledged.
-  res.json({ success: true, message: 'Mission stopped', cancelAcknowledged: false });
+  res.json({
+    success: true,
+    message: 'Mission stopped',
+    cancelAcknowledged: false,
+    ...(cancelledRunIds.length > 0 ? { cancelledIngest: true, cancelledRunIds } : {}),
+  });
 });
 
 /**
@@ -7835,7 +8314,9 @@ app.post('/api/mission/resume', (_req: Request, res: Response) => {
 app.get('/api/mission/status', (_req: Request, res: Response) => {
   const cmd = getTempestCommand();
   if (!cmd) {
-    res.json({ active: false, progress: [], tasks: [] });
+    // Phase 35: mirror the last repo-ingest terminal summary as `whitebox`
+    // — the polling fallback for SSE-less clients (§5.1).
+    res.json({ active: false, progress: [], tasks: [], ...(lastRepoIngestSummary !== null ? { whitebox: lastRepoIngestSummary } : {}) });
     return;
   }
 
@@ -7876,6 +8357,7 @@ app.get('/api/mission/status', (_req: Request, res: Response) => {
       operatorId: f.operatorId,
       discoveredAt: f.discoveredAt,
     })),
+    ...(lastRepoIngestSummary !== null ? { whitebox: lastRepoIngestSummary } : {}),
   });
 });
 

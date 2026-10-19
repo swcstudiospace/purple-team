@@ -1,0 +1,609 @@
+/*
+ * Workbench layout (phase 36 §2): the full-viewport agent panel. The shell
+ * grid (.shell--workbench in styles.css) frames this section; inside there
+ * are exactly three bands — header (auto), thread scroller (flex), composer
+ * (outside the scroller, sticky by construction). The thread column centers
+ * at max-width 80ch; the sidebar takes a fixed 280px and collapses to an
+ * overlay drawer at ≤1024px. Timeline-card grammar stays in agent-panel.css
+ * (ap-*); everything here is namespaced apx-*. Tokens from ui/src/styles.css
+ * are consumed read-only.
+ */
+
+.apx-workbench {
+  --ap-error: #B42318;
+  --ap-ok: #166534;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.apx-workbench :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Header band                                                          */
+/* ------------------------------------------------------------------ */
+
+.apx-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.apx-header-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.apx-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.apx-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.apx-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.apx-header-button {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.apx-header-button:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.apx-keys {
+  position: relative;
+}
+
+.apx-keys summary {
+  list-style: none;
+}
+
+.apx-keys summary::-webkit-details-marker {
+  display: none;
+}
+
+.apx-keys-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 260px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.12);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.apx-keys-body p {
+  margin: 0 0 4px;
+  white-space: nowrap;
+}
+
+.apx-keys-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/* Body band: sidebar + main                                            */
+/* ------------------------------------------------------------------ */
+
+.apx-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+.apx-sidebar {
+  flex: 0 0 280px;
+  width: 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+}
+
+.apx-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.apx-sidebar-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.apx-sidebar-new {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  min-height: 24px;
+  padding: 4px 10px;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  background: var(--brand);
+  color: #FFFFFF;
+  cursor: pointer;
+}
+
+.apx-sidebar-new:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.apx-sidebar-new:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.apx-sidebar-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ap-error);
+}
+
+.apx-sidebar-empty {
+  margin: 0;
+  padding: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.apx-sidebar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.apx-sidebar-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apx-sidebar-link {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.apx-sidebar-link:hover {
+  background: var(--surface-alt);
+}
+
+.apx-sidebar-link[aria-current='true'] {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+.apx-sidebar-link-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apx-sidebar-link-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.apx-sidebar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.apx-sidebar-action {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.apx-sidebar-action:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.apx-sidebar-action--danger:hover {
+  border-color: var(--ap-error);
+  color: var(--ap-error);
+}
+
+/* Narrow viewport: the same markup becomes an overlay drawer (§2.1/§7). */
+.apx-sidebar--drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(320px, 90vw);
+  flex-basis: auto;
+  z-index: 70;
+  box-shadow: 8px 0 24px rgba(26, 26, 26, 0.18);
+}
+
+.apx-sidebar-close {
+  align-self: flex-end;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.apx-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(26, 26, 26, 0.4);
+}
+
+/* ------------------------------------------------------------------ */
+/* Main column: thread + composer + palette                             */
+/* ------------------------------------------------------------------ */
+
+.apx-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* One anchored measure: thread, composer, and palette share the 80ch column. */
+.apx-chat-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  max-width: 80ch;
+  margin: 0 auto;
+  padding: 12px 16px 8px;
+}
+
+.apx-chat-wrap .chat-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.apx-chat-wrap .chat-stream-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+}
+
+/* Command palette popover, anchored above the embedded composer. */
+.apx-palette-popover {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 168px;
+  z-index: 20;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.12);
+}
+
+.apx-palette-popover[hidden] {
+  display: none;
+}
+
+.apx-palette-listbox {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+}
+
+.apx-palette-option {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 4px 10px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.apx-palette-option--active {
+  background: var(--surface-alt);
+  box-shadow: inset 3px 0 0 var(--brand);
+}
+
+.apx-palette-option-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.apx-palette-option-agent {
+  font-size: 12px;
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.apx-palette-option-summary {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.apx-palette-empty {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text-secondary);
+}
+
+.apx-palette-status {
+  min-height: 1.5em;
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.apx-palette-hints {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.apx-palette-hints-title {
+  margin: 0 0 4px;
+}
+
+.apx-palette-hints-title code,
+.apx-palette-hints-list code {
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.apx-palette-hints-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.apx-palette-hints-none {
+  margin: 0;
+}
+
+.apx-palette-hint-req {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.apx-palette-hint-fill {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--brand);
+  font-weight: 600;
+}
+
+/* Timeline drawer: bounded auxiliary surface below the thread. */
+.apx-timeline {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.apx-timeline-count {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ------------------------------------------------------------------ */
+/* Dialogs (rename/delete, §7)                                          */
+/* ------------------------------------------------------------------ */
+
+.apx-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 26, 26, 0.4);
+}
+
+.apx-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(440px, 92vw);
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 12px 32px rgba(26, 26, 26, 0.18);
+}
+
+.apx-dialog-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.apx-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.apx-dialog-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.apx-dialog-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.apx-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.apx-dialog-cancel,
+.apx-dialog-confirm {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 24px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.apx-dialog-cancel {
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text-primary);
+}
+
+.apx-dialog-confirm {
+  border: 1px solid var(--brand);
+  background: var(--brand);
+  color: #FFFFFF;
+}
+
+.apx-dialog-confirm:hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+.apx-dialog-confirm:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.apx-dialog-confirm--danger {
+  border-color: var(--ap-error);
+  background: var(--ap-error);
+}
+
+.apx-dialog-confirm--danger:hover {
+  background: #8F1C13;
+}
+
+/* ------------------------------------------------------------------ */
+/* Motion (§7): one reduced-motion switch for everything new here       */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .apx-workbench *,
+  .apx-workbench *::before,
+  .apx-workbench *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .apx-spinner {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Narrow workbench (≤1024px): drawer sidebar already handled above;     */
+/* tighten the measure so the 80ch column never overflows.              */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1024px) {
+  .apx-chat-wrap {
+    padding: 8px 12px 4px;
+  }
+}

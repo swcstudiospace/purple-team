@@ -39,8 +39,11 @@
 import { config } from '../config/index.js';
 import {
   ingestRepository,
+  ingestFiles,
   createMultiLangIngestConfig,
   packAnalysisUnits,
+  MULTI_LANG_MAX_TOTAL_BYTES,
+  type SourceFileInput,
 } from './code-ingest.js';
 import { DecompositionOrchestrator } from '../orchestration/index.js';
 import type { DecompositionConfig } from '../orchestration/index.js';
@@ -251,6 +254,32 @@ export function ingestRepoToSourceContext(
   } finally {
     source.cleanup();
   }
+}
+
+/**
+ * In-memory twin of `ingestRepoToSourceContext` for FETCHED files (phase 35
+ * repo-URL pipeline): the github-ingest adapter produces `SourceFileInput[]`
+ * (no disk, no temp clone) and this packs them through the exact same
+ * ingest → pack chain, returning the same `RepoSourceContext` contract so the
+ * mission route can treat fetched and local sources identically
+ * (`cmd.setWhiteboxSource` only when non-empty).
+ *
+ * The `maxTotalBytes` sentinel matches `createMultiLangIngestConfig` — the
+ * fetch-side caps (T3MP3ST_REPO_MAX_*) are the first, tighter gate; this is
+ * the same runaway bound the disk path carries.
+ */
+export function ingestFetchedFilesToSourceContext(
+  files: SourceFileInput[],
+  tokenBudget = 24000,
+): RepoSourceContext {
+  const result = ingestFiles(files, { maxTotalBytes: MULTI_LANG_MAX_TOTAL_BYTES });
+  const packed = packAnalysisUnits(result.analysisUnits, tokenBudget);
+  return {
+    sourceContext: packed.text,
+    stats: result.stats,
+    includedUnits: packed.includedUnits.length,
+    droppedUnits: packed.droppedUnits.length,
+  };
 }
 
 /** Options for a full white-box decomposition analysis run. */

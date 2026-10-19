@@ -1,8 +1,29 @@
-import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { filterCommands, parseComposerInput } from '../../../src/ui-commands/parser';
-import { COMMANDS, type AgentId, type ArgSpec, type CommandSpec } from '../../../src/ui-commands/registry';
+/**
+ * AgentPanel — the full-screen workbench host (phase 36 §2/§8).
+ *
+ * Rebuilt from the stacked panel: the tabs, palette grammar, and run-card
+ * timeline survive; the panel-scoped composer is gone (the embedded ChatStream
+ * composer is the only composer — the palette drives it through the shared
+ * draft store). Thread lifecycle moved to the conversation sidebar + zustand
+ * store; persistence rides ChatStream's onThreadSettled seam.
+ *
+ * Layout (workbench.css / styles.css): .shell--workbench gives the section
+ * the full viewport; inside, exactly three bands — header (auto), thread
+ * scroller (flex), composer (outside the scroller, sticky by construction).
+ */
+
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import type { UIMessage } from 'ai';
+import { COMMANDS, type AgentId, type CommandSpec } from '../../../src/ui-commands/registry';
 import ChatStream, { type ChatStreamHandle } from './ChatStream';
+import { ConversationSidebar } from './workbench/ConversationSidebar';
+import { SlashPalette } from './workbench/SlashPalette';
+import { AGENT_LABEL } from './workbench/agent-labels';
+import { readPrefs, savePrefs } from './workbench/prefs';
+import { useConversationsStore } from '../stores/conversations';
+import { useSelectedRepo } from '../stores/github';
 import './agent-panel.css';
+import './workbench/workbench.css';
 
 type TabId = 'red' | 'blue' | 'white' | 'black' | 'unified';
 type EntryStatus = 'running' | 'ok' | 'error' | 'aborted' | 'help';
@@ -39,15 +60,6 @@ const TABS: readonly Tab[] = [
   { id: 'unified', label: 'Unified Purple Stream', agent: null },
 ];
 
-const AGENT_LABEL: Record<AgentId, string> = {
-  red: 'Red',
-  blue: 'Blue',
-  white: 'White',
-  black: 'Black',
-  purple: 'Purple',
-  system: 'System',
-};
-
 const STATUS_LABEL: Record<EntryStatus, string> = {
   running: 'Running',
   ok: 'Done',
@@ -56,7 +68,6 @@ const STATUS_LABEL: Record<EntryStatus, string> = {
   help: 'Help',
 };
 
-const BUSY_NOTE = 'A reply is still in progress. Wait for it to finish or press Stop, then send again.';
 const PREVIEW_CHARS = 480;
 const ECHO_VALUE_CHARS = 60;
 
@@ -161,14 +172,22 @@ function buildRequest(spec: CommandSpec, args: Record<string, string>): BuiltReq
     return { ok: true, method: 'GET', url: qs ? `${spec.route.path}?${qs}` : spec.route.path, body: undefined };
   }
 
-  // hunt: roleInputs selects the structured start branch; operators are the roles.
+  // hunt body builder passes repoUrl (when present from registry arg or wired store default) preferring targetContext+repoUrl for repo runs (over targets); backward for snippets.
   const body = spec.name === 'hunt'
-    ? {
-        objective: values.objective,
-        roleInputs: values.operators,
-        targets: values.targets,
-        ...(typeof values.name === 'string' ? { name: values.name } : {}),
-      }
+    ? (typeof values.repoUrl === 'string' && values.repoUrl.trim() !== ''
+        ? {
+            objective: values.objective,
+            roleInputs: values.operators,
+            targetContext: { kind: 'artifacts' },
+            repoUrl: values.repoUrl.trim(),
+            ...(typeof values.name === 'string' ? { name: values.name } : {}),
+          }
+        : {
+            objective: values.objective,
+            roleInputs: values.operators,
+            targets: values.targets,
+            ...(typeof values.name === 'string' ? { name: values.name } : {}),
+          })
     : values;
   return { ok: true, method: 'POST', url: spec.route.path, body: JSON.stringify(body) };
 }
@@ -187,13 +206,6 @@ function serverErrorMessage(body: ParsedBody, response: Response): string {
     if (typeof message === 'string' && message.trim() !== '') return redactString(message);
   }
   return `Request failed with HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}.`;
-}
-
-function replaceCommandName(text: string, name: string): string {
-  const match = /^(\s*)\/\S*/.exec(text);
-  if (!match) return text;
-  const rest = text.slice(match[0].length);
-  return `${match[1]}/${name}${rest === '' ? ' ' : rest}`;
 }
 
 function ResultBlock({ text }: { text: string }) {
@@ -230,65 +242,75 @@ function HelpList() {
   );
 }
 
-export default function AgentPanel() {
+export interface AgentPanelProps {
+  /** True while the rail is hidden (focus mode) — the header shows the exit button. */
+  focusMode: boolean;
+  onExitFocusMode: () => void;
+}
+
+export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelProps) {
   const baseId = useId();
-  const composerId = `${baseId}-composer`;
-  const listboxId = `${baseId}-listbox`;
-  const hintId = `${baseId}-hint`;
-  const statusId = `${baseId}-status`;
-  const panelId = `${baseId}-panel`;
+  const sidebarId = `${baseId}-sidebar`;
+  const timelineId = `${baseId}-timeline`;
+
+  const activeId = useConversationsStore(state => state.activeId);
+  const load = useConversationsStore(state => state.load);
 
   const [tab, setTab] = useState<TabId>('unified');
-  const [draft, setDraft] = useState('');
-  const [dismissed, setDismissed] = useState(false);
-  const [highlight, setHighlight] = useState(0);
-  const [pendingConfirm, setPendingConfirm] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(() => readPrefs().sidebarOpen);
 
   const nextIdRef = useRef(1);
   const controllersRef = useRef(new Map<number, AbortController>());
-  const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({});
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const chatRef = useRef<ChatStreamHandle | null>(null);
+  const loadedThreadRef = useRef<string | null>(null);
 
   useEffect(() => {
+    void load();
     const controllers = controllersRef.current;
     return () => {
       for (const controller of controllers.values()) controller.abort();
       controllers.clear();
     };
-  }, []);
+  }, [load]);
+
+  // Conversation switch: hydrate the new thread from the server store.
+  useEffect(() => {
+    if (activeId === null || activeId === loadedThreadRef.current) return;
+    loadedThreadRef.current = activeId;
+    void useConversationsStore
+      .getState()
+      .loadMessages(activeId)
+      .then(messages => {
+        if (useConversationsStore.getState().activeId === activeId) chatRef.current?.loadMessages(messages);
+      });
+  }, [activeId]);
 
   useEffect(() => {
     const el = timelineRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [entries, tab]);
+  }, [entries, tab, timelineOpen]);
 
-  const parsed = useMemo(() => parseComposerInput(draft, COMMANDS), [draft]);
-  const open = parsed.kind === 'palette' && !dismissed;
-  const options = useMemo(
-    () => (parsed.kind === 'palette' ? filterCommands(parsed.query, COMMANDS) : []),
-    [parsed],
-  );
-  const activeIndex = open && options.length > 0 ? Math.min(highlight, options.length - 1) : -1;
-  const activeSpec = activeIndex >= 0 ? options[activeIndex] : undefined;
-  const hintSpec: CommandSpec | null = parsed.kind === 'command' ? parsed.spec : (activeSpec ?? null);
-  const argValues: Record<string, string> = parsed.kind === 'command' ? parsed.args : {};
+  /** ChatStream persistence seam — stable identity; the store debounces the PUT. */
+  const handleThreadSettled = useCallback((messages: UIMessage[], threadId: string) => {
+    if (threadId === 'unsynced' || messages.length === 0) return;
+    useConversationsStore.getState().syncMessages(threadId, messages);
+  }, []);
 
-  function updateDraft(next: string): void {
-    setDraft(next);
-    setHighlight(0);
-    setDismissed(false);
-    setPendingConfirm(false);
-    setNote(null);
-  }
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false);
+    savePrefs({ sidebarOpen: false });
+  }, []);
 
-  function completeCommand(spec: CommandSpec): void {
-    updateDraft(`/${spec.name} `);
-    composerRef.current?.focus();
-  }
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(open => {
+      savePrefs({ sidebarOpen: !open });
+      return !open;
+    });
+  }, []);
 
   function appendEntry(entry: TimelineEntry): void {
     setEntries(prev => [...prev, entry]);
@@ -301,10 +323,21 @@ export default function AgentPanel() {
   async function runCommand(spec: CommandSpec, args: Record<string, string>): Promise<void> {
     const id = nextIdRef.current;
     nextIdRef.current += 1;
+    setTimelineOpen(true);
+
+    let finalArgs = args;
+    if (spec.name === 'hunt' && !args.repoUrl) {
+      const { selected } = useSelectedRepo.getState();
+      if (selected) {
+        const repoUrl = `https://github.com/${selected.owner}/${selected.repo}${selected.ref && selected.ref !== 'HEAD' ? `/tree/${selected.ref}` : ''}`;
+        finalArgs = { ...args, repoUrl };
+      }
+    }
+
     const base: TimelineEntry = {
       id,
       agent: spec.agent,
-      echo: echoFor(spec, args),
+      echo: echoFor(spec, finalArgs),
       status: 'running',
       elapsedMs: null,
       httpStatus: null,
@@ -317,134 +350,10 @@ export default function AgentPanel() {
       return;
     }
 
-    const built = buildRequest(spec, args);
+    const built = buildRequest(spec, finalArgs);
     if (!built.ok) {
       appendEntry({ ...base, status: 'error', error: built.error });
       return;
-    }
-
-    const controller = new AbortController();
-    controllersRef.current.set(id, controller);
-    appendEntry(base);
-
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    if (built.body !== undefined) headers['Content-Type'] = 'application/json';
-
-    const started = performance.now();
-    try {
-      const response = await fetch(built.url, {
-        method: built.method,
-        headers,
-        body: built.body,
-        signal: controller.signal,
-      });
-      const elapsedMs = Math.round(performance.now() - started);
-      const text = await response.text();
-      const body = parseJsonBody(text);
-      let resultText: string;
-      if (text.trim() === '') {
-        resultText = '(empty response)';
-      } else if (body.ok) {
-        resultText = JSON.stringify(redactForDisplay(body.value), null, 2) ?? '';
-      } else {
-        resultText = redactString(text);
-      }
-
-      if (response.ok) {
-        patchEntry(id, { status: 'ok', httpStatus: response.status, elapsedMs, resultText });
-      } else {
-        patchEntry(id, {
-          status: 'error',
-          httpStatus: response.status,
-          elapsedMs,
-          error: serverErrorMessage(body, response),
-          resultText,
-        });
-      }
-    } catch (err) {
-      const elapsedMs = Math.round(performance.now() - started);
-      if (controller.signal.aborted) {
-        patchEntry(id, { status: 'aborted', elapsedMs });
-      } else {
-        patchEntry(id, {
-          status: 'error',
-          elapsedMs,
-          error: err instanceof Error ? redactString(err.message) : 'Request failed.',
-        });
-      }
-    } finally {
-      controllersRef.current.delete(id);
-    }
-  }
-
-  function handleEnter(): void {
-    if (parsed.kind === 'palette') {
-      if (activeSpec) completeCommand(activeSpec);
-      return;
-    }
-    if (parsed.kind === 'text') {
-      if (parsed.text === '') return;
-      if (chatRef.current?.send(parsed.text)) {
-        setDraft('');
-        setHighlight(0);
-        setDismissed(false);
-        setPendingConfirm(false);
-        setNote(null);
-      } else {
-        setNote(BUSY_NOTE);
-      }
-      return;
-    }
-    if (parsed.kind === 'unknown') {
-      setNote(`Unknown command "/${parsed.name}". Type / to browse commands.`);
-      return;
-    }
-
-    const { spec, args, missing } = parsed;
-    if (missing.length > 0) {
-      updateDraft(replaceCommandName(draft, spec.name));
-      return;
-    }
-    if (spec.confirm && !pendingConfirm) {
-      setPendingConfirm(true);
-      return;
-    }
-
-    setDraft('');
-    setHighlight(0);
-    setDismissed(false);
-    setPendingConfirm(false);
-    setNote(null);
-    void runCommand(spec, args);
-  }
-
-  function handleComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (open && options.length > 0) {
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault();
-        const step = event.key === 'ArrowDown' ? 1 : -1;
-        setHighlight((activeIndex + step + options.length) % options.length);
-        return;
-      }
-      if (event.key === 'Tab' && !event.shiftKey && activeSpec) {
-        event.preventDefault();
-        completeCommand(activeSpec);
-        return;
-      }
-    }
-    if (event.key === 'Escape') {
-      if (open) {
-        event.preventDefault();
-        setDismissed(true);
-      } else if (pendingConfirm) {
-        event.preventDefault();
-        setPendingConfirm(false);
-      }
-      return;
-    }
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      handleEnter();
     }
   }
 
@@ -463,191 +372,147 @@ export default function AgentPanel() {
 
   const activeTab = TABS.find(item => item.id === tab) ?? TABS[TABS.length - 1];
   const visible = activeTab.agent === null ? entries : entries.filter(entry => entry.agent === activeTab.agent);
-
-  let statusMessage: string | null = null;
-  if (note) {
-    statusMessage = note;
-  } else if (parsed.kind === 'command' && parsed.spec.confirm && pendingConfirm) {
-    statusMessage = `Press Enter again to run /${parsed.spec.name}.`;
-  } else if (parsed.kind === 'command' && parsed.missing.length > 0) {
-    statusMessage = `Missing required arguments: ${parsed.missing.join(', ')}. Add them as key=value, then press Enter.`;
-  } else if (parsed.kind === 'unknown') {
-    statusMessage = `Unknown command "/${parsed.name}". Type / to browse commands.`;
-  } else if (draft.trim() === '') {
-    statusMessage = 'Type / to browse commands. Enter runs a command or sends a message.';
-  }
-
-  const activeOptionId = activeSpec ? `${listboxId}-opt-${activeSpec.name}` : undefined;
+  const threadId = activeId ?? 'unsynced';
 
   return (
-    <section className="agent-panel" aria-labelledby={`${baseId}-title`}>
-      <header className="ap-header">
-        <h2 id={`${baseId}-title`} className="ap-title">Agent console</h2>
-        <p className="ap-subtitle">Slash commands call server routes. Free text goes to the configured default model.</p>
-      </header>
-
-      <div className="ap-tablist" role="tablist" aria-label="Agent lanes">
-        {TABS.map((item, index) => {
-          const selected = item.id === tab;
-          const count = item.agent === null
-            ? entries.length
-            : entries.filter(entry => entry.agent === item.agent).length;
-          return (
-            <button
-              key={item.id}
-              ref={el => {
-                tabRefs.current[item.id] = el;
-              }}
-              type="button"
-              role="tab"
-              id={`${baseId}-tab-${item.id}`}
-              aria-selected={selected}
-              aria-controls={panelId}
-              tabIndex={selected ? 0 : -1}
-              className="ap-tab"
-              onClick={() => setTab(item.id)}
-              onKeyDown={event => handleTabKeyDown(event, index)}
-            >
-              {item.label}
-              <span className="ap-count">{count}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div
-        id={panelId}
-        role="tabpanel"
-        aria-labelledby={`${baseId}-tab-${tab}`}
-        className="ap-timeline"
-        ref={timelineRef}
-      >
-        {visible.length === 0 ? (
-          <p className="ap-empty">
-            {activeTab.agent === null
-              ? 'No commands executed yet. Type / to choose one.'
-              : `No ${activeTab.label} commands yet. Run one below, or see the Unified Purple Stream.`}
-          </p>
-        ) : (
-          <ol className="ap-timeline-list" aria-label={`${activeTab.label} timeline`}>
-            {visible.map(entry => (
-              <li key={entry.id} className={`ap-card ap-card--${entry.status}`}>
-                <div className="ap-card-head">
-                  <span className="ap-agent">{AGENT_LABEL[entry.agent]}</span>
-                  <code className="ap-echo">{entry.echo}</code>
-                </div>
-                <div className="ap-card-meta">
-                  <span className="ap-pill">{STATUS_LABEL[entry.status]}</span>
-                  {entry.httpStatus !== null && <span>HTTP {entry.httpStatus}</span>}
-                  {entry.elapsedMs !== null && <span>{entry.elapsedMs} ms</span>}
-                  {entry.status === 'running' && (
-                    <button
-                      type="button"
-                      className="ap-stop"
-                      onClick={() => controllersRef.current.get(entry.id)?.abort()}
-                    >
-                      Stop
-                    </button>
-                  )}
-                </div>
-                {entry.status === 'running' && (
-                  <p className="ap-running">
-                    <span className="ap-spinner" aria-hidden="true" />
-                    Waiting for response…
-                  </p>
-                )}
-                {entry.status === 'help' && <HelpList />}
-                {entry.error && <p className="ap-error">{entry.error}</p>}
-                {entry.resultText !== null && <ResultBlock text={entry.resultText} />}
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
-      <ChatStream ref={chatRef} />
-
-      <div className="ap-composer">
-        <label htmlFor={composerId} className="ap-label">Command</label>
-        <div className="ap-composer-box">
-          <textarea
-            id={composerId}
-            ref={composerRef}
-            role="combobox"
-            className="ap-textarea"
-            rows={2}
-            value={draft}
-            spellCheck={false}
-            autoComplete="off"
-            placeholder="/ for commands. Enter runs, Shift+Enter adds a line."
-            aria-expanded={open}
-            aria-controls={listboxId}
-            aria-activedescendant={activeOptionId}
-            aria-autocomplete="list"
-            aria-describedby={`${hintId} ${statusId}`}
-            onChange={event => updateDraft(event.target.value)}
-            onKeyDown={handleComposerKeyDown}
-          />
-          <div className="ap-popover" hidden={!open}>
-            <ul id={listboxId} role="listbox" aria-label="Slash commands" className="ap-listbox">
-              {options.map((spec, index) => (
-                <li
-                  key={spec.name}
-                  id={`${listboxId}-opt-${spec.name}`}
-                  role="option"
-                  aria-selected={index === activeIndex}
-                  className={index === activeIndex ? 'ap-option ap-option--active' : 'ap-option'}
-                  onMouseDown={event => event.preventDefault()}
-                  onMouseEnter={() => setHighlight(index)}
-                  onClick={() => completeCommand(spec)}
-                >
-                  <span className="ap-option-name">/{spec.name}</span>
-                  <span className="ap-option-agent">{AGENT_LABEL[spec.agent]}</span>
-                  <span className="ap-option-summary">{spec.summary}</span>
-                </li>
-              ))}
-            </ul>
-            {open && parsed.kind === 'palette' && options.length === 0 && (
-              <p className="ap-popover-empty">No command matches &ldquo;{parsed.query}&rdquo;.</p>
+    <section className="apx-workbench" aria-labelledby={`${baseId}-title`}>
+      <header className="apx-header">
+        <div className="apx-header-row">
+          <h2 id={`${baseId}-title`} className="apx-title">
+            Agent console
+          </h2>
+          <div className="apx-header-actions">
+            {focusMode && (
+              <button type="button" className="apx-header-button" onClick={onExitFocusMode}>
+                Exit focus mode
+              </button>
             )}
+            <button
+              type="button"
+              className="apx-header-button"
+              aria-expanded={sidebarOpen}
+              aria-controls={sidebarId}
+              onClick={toggleSidebar}
+            >
+              {sidebarOpen ? 'Hide conversations' : 'Show conversations'}
+            </button>
+            <button
+              type="button"
+              className="apx-header-button"
+              aria-expanded={timelineOpen}
+              aria-controls={timelineId}
+              onClick={() => setTimelineOpen(open => !open)}
+            >
+              Timeline
+            </button>
+            <details className="apx-keys">
+              <summary className="apx-header-button">Keys</summary>
+              <div className="apx-keys-body">
+                <p>Enter send · Shift+Enter newline · / command palette</p>
+                <p>Esc palette → confirm → exit focus mode · Alt+1..4 sections</p>
+                <p>Home/End jump in the message log</p>
+              </div>
+            </details>
           </div>
         </div>
+        <p className="apx-subtitle">
+          Slash commands call server routes. Free text goes to the configured default model. Conversations persist
+          server-side.
+        </p>
 
-        <div id={statusId} role="status" aria-live="polite" className="ap-status">
-          {statusMessage}
+        <div className="ap-tablist" role="tablist" aria-label="Agent lanes">
+          {TABS.map((item, index) => {
+            const selected = item.id === tab;
+            const count =
+              item.agent === null ? entries.length : entries.filter(entry => entry.agent === item.agent).length;
+            return (
+              <button
+                key={item.id}
+                ref={el => {
+                  tabRefs.current[item.id] = el;
+                }}
+                type="button"
+                role="tab"
+                id={`${baseId}-tab-${item.id}`}
+                aria-selected={selected}
+                aria-controls={`${baseId}-panel`}
+                tabIndex={selected ? 0 : -1}
+                className="ap-tab"
+                onClick={() => setTab(item.id)}
+                onKeyDown={event => handleTabKeyDown(event, index)}
+              >
+                {item.label}
+                <span className="ap-count">{count}</span>
+              </button>
+            );
+          })}
         </div>
+      </header>
 
-        <div id={hintId} className="ap-hints">
-          {hintSpec ? (
-            <>
-              <p className="ap-hints-title">
-                <code>/{hintSpec.name}</code> {hintSpec.summary}
-              </p>
-              {hintSpec.args.length === 0 ? (
-                <p className="ap-hints-none">No arguments.</p>
+      <div className="apx-body">
+        <ConversationSidebar id={sidebarId} open={sidebarOpen} onClose={closeSidebar} />
+
+        <div className="apx-main">
+          <SlashPalette threadId={threadId} onRunCommand={(spec, args) => void runCommand(spec, args)}>
+            <ChatStream
+              ref={chatRef}
+              threadId={threadId}
+              onThreadSettled={handleThreadSettled}
+              showNewChat={false}
+              autoFocusComposer
+            />
+          </SlashPalette>
+
+          {timelineOpen && (
+            <div id={timelineId} className="apx-timeline" ref={timelineRef} aria-label="Command timeline">
+              {visible.length === 0 ? (
+                <p className="ap-empty">
+                  {activeTab.agent === null
+                    ? 'No commands executed yet. Type / to choose one.'
+                    : `No ${activeTab.label} commands yet. Run one below, or see the Unified Purple Stream.`}
+                </p>
               ) : (
-                <ul className="ap-hints-list">
-                  {hintSpec.args.map((arg: ArgSpec) => {
-                    const value = argValues[arg.name];
-                    let fill = '';
-                    if (parsed.kind === 'command') {
-                      if (value !== undefined && value.trim() !== '') fill = ' · set';
-                      else if (arg.required) fill = ' · missing';
-                    }
-                    return (
-                      <li key={arg.name}>
-                        <code>{arg.name}</code>{' '}
-                        <span className="ap-hint-req">{arg.required ? 'required' : 'optional'}</span>
-                        {' — '}
-                        <span>{arg.hint}</span>
-                        {fill && <span className="ap-hint-fill">{fill}</span>}
-                      </li>
-                    );
-                  })}
-                </ul>
+                <ol className="ap-timeline-list" aria-label={`${activeTab.label} timeline`}>
+                  {visible.map(entry => (
+                    <li key={entry.id} className={`ap-card ap-card--${entry.status}`}>
+                      <div className="ap-card-head">
+                        <span className="ap-agent">{AGENT_LABEL[entry.agent]}</span>
+                        <code className="ap-echo">{entry.echo}</code>
+                      </div>
+                      <div className="ap-card-meta">
+                        <span className="ap-pill">{STATUS_LABEL[entry.status]}</span>
+                        {entry.httpStatus !== null && <span>HTTP {entry.httpStatus}</span>}
+                        {entry.elapsedMs !== null && <span>{entry.elapsedMs} ms</span>}
+                        {entry.status === 'running' && (
+                          <button
+                            type="button"
+                            className="ap-stop"
+                            aria-label={`Stop ${entry.echo}`}
+                            onClick={() => controllersRef.current.get(entry.id)?.abort()}
+                          >
+                            Stop
+                          </button>
+                        )}
+                      </div>
+                      {entry.status === 'running' && (
+                        <p className="ap-running">
+                          <span className="ap-spinner" aria-hidden={true} />
+                          Waiting for response…
+                        </p>
+                      )}
+                      {entry.status === 'help' && <HelpList />}
+                      {entry.error !== null && <p className="ap-error">{entry.error}</p>}
+                      {entry.resultText !== null && <ResultBlock text={entry.resultText} />}
+                    </li>
+                  ))}
+                </ol>
               )}
-            </>
-          ) : (
-            <p className="ap-hints-none">Pick a command to see its arguments.</p>
+              <p className="apx-timeline-count" role="status">
+                {visible.length === 0
+                  ? 'Timeline empty.'
+                  : `${visible.length} timeline ${visible.length === 1 ? 'entry' : 'entries'}.`}
+              </p>
+            </div>
           )}
         </div>
       </div>

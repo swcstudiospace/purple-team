@@ -1,0 +1,64 @@
+/*
+ * Inline GenUi rendering in the thread (phase 36 §6.1) — the wrapper around
+ * the sandboxed iframe and the raw-source fallback. Widget-internal styles
+ * (cards, bars, callouts) live in genui.css inside the frame bundle; this
+ * sheet only styles what renders in the app document. Tokens from
+ * ui/src/styles.css are consumed read-only.
+ */
+
+.genui-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.genui-inline-frame {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.genui-inline-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.genui-inline-fallback-note {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.genui-inline-fallback pre {
+  margin: 0;
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.genui-inline-actions {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .genui-inline *,
+  .genui-inline *::before,
+  .genui-inline *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -96,6 +96,7 @@ export const COMMANDS: readonly CommandSpec[] = [
       { name: 'objective', required: true, hint: 'mission objective' },
       { name: 'operators', required: true, hint: 'comma-separated operator roles' },
       { name: 'targets', required: true, hint: 'comma-separated targets' },
+      { name: 'repoUrl', required: false, hint: 'github.com owner/repo[/tree/ref/subpath] URL' },
       { name: 'name', required: false, hint: 'mission name' },
     ],
     route: { method: 'POST', path: '/api/mission/start' },

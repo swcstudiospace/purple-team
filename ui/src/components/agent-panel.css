@@ -1,42 +1,12 @@
-.agent-panel {
-  --ap-error: #B42318;
-  --ap-ok: #166534;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  background: var(--surface);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.5;
-}
+/*
+ * Agent-panel timeline grammar (phase 36 §8): tabs, run cards, result blocks,
+ * and help lists — consumed by the rebuilt workbench host (AgentPanel.tsx).
+ * Shell, header, sidebar, palette, and composer styles live in
+ * ui/src/components/workbench/workbench.css as apx-* rules. The --ap-error /
+ * --ap-ok custom properties are defined on .apx-workbench there; colours
+ * consume the :root tokens from ui/src/styles.css read-only.
+ */
 
-.agent-panel :focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-}
-
-.ap-header {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ap-title {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.ap-subtitle {
-  margin: 0;
-  color: var(--text-secondary);
-}
 
 .ap-tablist {
   display: flex;
@@ -75,15 +45,6 @@
   font-family: var(--font-mono);
   font-size: 12px;
   opacity: 0.85;
-}
-
-.ap-timeline {
-  max-height: 360px;
-  min-height: 120px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
 }
 
 .ap-timeline-list {
@@ -189,23 +150,9 @@
   color: var(--text-secondary);
 }
 
-.ap-spinner {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--brand);
-  animation: ap-pulse 1.2s ease-in-out infinite;
-}
-
-@keyframes ap-pulse {
-  0%,
-  100% {
-    opacity: 0.25;
-  }
-  50% {
+  .ap-spinner {
     opacity: 1;
   }
-}
 
 .ap-error {
   margin: 0;
@@ -213,6 +160,12 @@
   font-weight: 500;
   word-break: break-word;
 }
+
+@keyframes ap-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
 
 .ap-result-wrap {
   display: flex;
@@ -235,6 +188,10 @@
   color: var(--text-primary);
 }
 
+.ap-result-full {
+  max-height: 480px;
+}
+
 .ap-details {
   font-size: 12px;
   color: var(--text-secondary);
@@ -243,10 +200,6 @@
 .ap-details summary {
   cursor: pointer;
   padding: 2px 0;
-}
-
-.ap-result-full {
-  max-height: 480px;
 }
 
 .ap-help-list {
@@ -266,161 +219,4 @@
 
 .ap-help-summary {
   color: var(--text-primary);
-}
-
-.ap-composer {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.ap-label {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.ap-composer-box {
-  position: relative;
-}
-
-.ap-textarea {
-  width: 100%;
-  box-sizing: border-box;
-  resize: vertical;
-  min-height: 56px;
-  padding: 8px 10px;
-  background: var(--bg);
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.5;
-}
-
-.ap-textarea::placeholder {
-  color: var(--text-secondary);
-  opacity: 1;
-}
-
-.ap-popover {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 6px);
-  z-index: 10;
-  max-height: 260px;
-  overflow-y: auto;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.12);
-}
-
-.ap-popover[hidden] {
-  display: none;
-}
-
-.ap-listbox {
-  list-style: none;
-  margin: 0;
-  padding: 4px;
-}
-
-.ap-option {
-  display: grid;
-  grid-template-columns: auto auto 1fr;
-  gap: 4px 10px;
-  align-items: baseline;
-  padding: 6px 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: var(--text-primary);
-}
-
-.ap-option--active {
-  background: var(--surface-alt);
-  box-shadow: inset 3px 0 0 var(--brand);
-}
-
-.ap-option-name {
-  font-family: var(--font-mono);
-  font-weight: 600;
-}
-
-.ap-option-agent {
-  font-size: 12px;
-  color: var(--brand);
-  font-weight: 600;
-}
-
-.ap-option-summary {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.ap-popover-empty {
-  margin: 0;
-  padding: 8px 10px;
-  color: var(--text-secondary);
-}
-
-.ap-status {
-  min-height: 1.5em;
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
-.ap-hints {
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.ap-hints-title {
-  margin: 0 0 4px;
-}
-
-.ap-hints-title code,
-.ap-hints-list code {
-  font-family: var(--font-mono);
-  color: var(--text-primary);
-}
-
-.ap-hints-list {
-  margin: 0;
-  padding-left: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.ap-hints-none {
-  margin: 0;
-}
-
-.ap-hint-req {
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.ap-hint-fill {
-  margin-left: 6px;
-  font-size: 12px;
-  color: var(--brand);
-  font-weight: 600;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .agent-panel *,
-  .agent-panel *::before,
-  .agent-panel *::after {
-    animation: none !important;
-    transition: none !important;
-    scroll-behavior: auto !important;
-  }
-
-  .ap-spinner {
-    opacity: 1;
-  }
 }

@@ -1,0 +1,293 @@
+/* RepoRunConfig — phase 35 run-config form. Mirrors agent-panel.css conventions:
+   component-local vars on the root class, global design tokens everywhere else
+   (--surface/--border/--brand/--text-*/--font-* from ui/src/styles.css). */
+
+.repo-run-config {
+  --rrc-error: #B42318;
+  --rrc-ok: #166534;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.repo-run-config :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.rrc-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rrc-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.rrc-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.rrc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.rrc-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.rrc-input,
+.rrc-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rrc-textarea {
+  resize: vertical;
+  min-height: 56px;
+}
+
+.rrc-input::placeholder,
+.rrc-textarea::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.rrc-input:disabled,
+.rrc-textarea:disabled {
+  color: var(--text-secondary);
+  background: var(--surface-alt);
+  cursor: not-allowed;
+}
+
+.rrc-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rrc-feedback {
+  margin: 0;
+  font-size: 13px;
+}
+
+.rrc-feedback code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+
+.rrc-feedback--ok {
+  color: var(--rrc-ok);
+}
+
+.rrc-feedback--error {
+  color: var(--rrc-error);
+}
+
+.rrc-fault-pill {
+  display: inline-block;
+  margin-right: 4px;
+  padding: 0 6px;
+  border: 1px solid var(--rrc-error);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.rrc-controls-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.rrc-radios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+}
+
+.rrc-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-primary);
+}
+
+.rrc-radio input,
+.rrc-role input {
+  accent-color: var(--brand);
+}
+
+.rrc-scope legend,
+.rrc-roles legend {
+  padding: 0;
+}
+
+.rrc-roles-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.rrc-roles-group-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0 0 4px;
+}
+
+.rrc-roles-group-name {
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.rrc-roles-group-doctrine {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.rrc-role-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 4px 12px;
+}
+
+.rrc-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.rrc-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--rrc-error);
+  background: var(--surface-alt);
+  border-radius: 4px;
+  color: var(--rrc-error);
+}
+
+.rrc-started {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--rrc-ok);
+  background: var(--surface-alt);
+  border-radius: 4px;
+  color: var(--rrc-ok);
+}
+
+.rrc-started code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.rrc-launch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rrc-launch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--brand);
+  color: #FFFFFF;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.rrc-launch:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.rrc-launch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rrc-launch-row .rrc-hint {
+  flex: 1 1 240px;
+}
+
+.rrc-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFFFFF;
+  animation: rrc-spin 0.8s linear infinite;
+}
+
+@keyframes rrc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rrc-caveat {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 640px) {
+  .rrc-controls-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rrc-spinner {
+    animation: none;
+  }
+}

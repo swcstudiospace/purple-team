@@ -1,0 +1,94 @@
+/*
+ * Sandbox frame document styles (phase 36 §6.1). The sandboxed frame has an
+ * opaque origin and cannot inherit the app document's :root, so this sheet
+ * mirrors the token values and the self-hosted font faces from
+ * ui/src/styles.css read-only — no token is redefined in the app itself and
+ * no external URL is introduced (fonts are the same /ui/assets/fonts files).
+ */
+
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/ui/assets/fonts/dm-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url('/ui/assets/fonts/dm-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/ui/assets/fonts/dm-sans-latin-700-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('/ui/assets/fonts/space-mono-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/ui/assets/fonts/space-mono-latin-700-normal.woff2') format('woff2');
+}
+
+:root {
+  --bg: #FFFFFF;
+  --surface: #FAFAFE;
+  --surface-alt: #F4F1FA;
+  --border: #E6E0F2;
+  --brand: #6D28D9;
+  --brand-hover: #5B21B6;
+  --text-primary: #1A1A1A;
+  --text-secondary: #595959;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
+  --font-display: 'Anybody', 'DM Sans', system-ui, sans-serif;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+#root {
+  height: 100%;
+}
+
+/* The genui-panel class carries the widget token block in genui.css; the
+   frame root reuses it and drops only the standalone panel's measure. */
+.genui-frame-root {
+  max-width: none;
+  gap: 0.5rem;
+  padding: 8px;
+}
+
+.genui-frame-root :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .genui-frame-root *,
+  .genui-frame-root *::before,
+  .genui-frame-root *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

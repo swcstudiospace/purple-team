@@ -1,0 +1,630 @@
+/*
+ * Chat core additions (phase 36 §4/§5). Consumes :root tokens from
+ * styles.css read-only; --ap-* values fall back inline so this sheet stays
+ * correct even where agent-panel.css is not loaded.
+ */
+
+/* ------------------------------------------------------------------ */
+/* Utilities                                                           */
+/* ------------------------------------------------------------------ */
+
+/* Visually hidden, screen-reader-only live text. */
+.chat-vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* Scroll anchoring (§4.3)                                             */
+/* ------------------------------------------------------------------ */
+
+.chat-log-wrap {
+  position: relative;
+}
+
+.chat-stream-log:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.chat-jump {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 4px 12px;
+  border: 1px solid var(--brand);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--brand);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(26, 26, 26, 0.18);
+  animation: chat-jump-in 160ms ease-out;
+}
+
+.chat-jump:hover {
+  background: var(--surface-alt);
+}
+
+.chat-jump:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+@keyframes chat-jump-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Markdown message body (§4.1)                                        */
+/* ------------------------------------------------------------------ */
+
+.chat-md-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.chat-md {
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: break-word;
+}
+
+.chat-md > :first-child {
+  margin-top: 0;
+}
+
+.chat-md > :last-child {
+  margin-bottom: 0;
+}
+
+.chat-md p {
+  margin: 0 0 8px;
+}
+
+.chat-md h1,
+.chat-md h2,
+.chat-md h3,
+.chat-md h4,
+.chat-md h5,
+.chat-md h6 {
+  margin: 12px 0 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.chat-md h1 { font-size: 20px; }
+.chat-md h2 { font-size: 17px; }
+.chat-md h3 { font-size: 15px; }
+.chat-md h4,
+.chat-md h5,
+.chat-md h6 { font-size: 14px; }
+
+.chat-md ul,
+.chat-md ol {
+  margin: 0 0 8px;
+  padding-left: 22px;
+}
+
+.chat-md li {
+  margin: 2px 0;
+}
+
+.chat-md li > input[type='checkbox'] {
+  margin-right: 6px;
+}
+
+.chat-md blockquote {
+  margin: 0 0 8px;
+  padding: 4px 12px;
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.chat-md a {
+  color: var(--brand);
+}
+
+.chat-md img {
+  max-width: 100%;
+}
+
+.chat-md hr {
+  margin: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.chat-md table {
+  display: block;
+  max-width: 100%;
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.chat-md th,
+.chat-md td {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  text-align: left;
+}
+
+.chat-md th {
+  background: var(--surface-alt);
+}
+
+/* Plain-text stand-in while the lazy markdown chunk loads. */
+.chat-md-fallback {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-code-inline {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-alt);
+}
+
+/* ------------------------------------------------------------------ */
+/* Code blocks with copy (§4.1)                                        */
+/* ------------------------------------------------------------------ */
+
+.chat-code {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.chat-code-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px 4px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.chat-code-lang {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.chat-code-copy {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-code-copy:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.chat-code-copy:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.chat-code-copy:disabled {
+  cursor: not-allowed;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
+.chat-code-copy--copied {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.chat-code-pre {
+  margin: 0;
+  max-height: 480px;
+  padding: 10px 12px;
+  overflow: auto;
+}
+
+.chat-code-pre code {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: pre;
+}
+
+/* ------------------------------------------------------------------ */
+/* Retry / regenerate (§4.2)                                           */
+/* ------------------------------------------------------------------ */
+
+.chat-stream-retry,
+.chat-regenerate {
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-regenerate {
+  align-self: flex-start;
+}
+
+.chat-stream-retry:hover,
+.chat-regenerate:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.chat-stream-retry:focus-visible,
+.chat-regenerate:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Composer (§4.4)                                                     */
+/* ------------------------------------------------------------------ */
+
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.chat-composer-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.chat-composer-textarea {
+  min-height: 64px;
+  max-height: 260px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  resize: vertical;
+}
+
+.chat-composer-textarea:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.chat-composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chat-composer-send,
+.chat-composer-stop {
+  min-height: 24px;
+  padding: 4px 14px;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-composer-send {
+  background: var(--brand);
+  color: #ffffff;
+}
+
+.chat-composer-send:hover:not(:disabled) {
+  background: var(--brand-hover);
+}
+
+.chat-composer-send:disabled {
+  cursor: not-allowed;
+  border-color: var(--border);
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+}
+
+.chat-composer-stop {
+  background: var(--surface-alt);
+  color: var(--brand);
+}
+
+.chat-composer-stop:hover {
+  background: var(--brand);
+  color: #ffffff;
+}
+
+.chat-composer-send:focus-visible,
+.chat-composer-stop:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Purple Team run cards (§5) — apx-* grammar ported from ap-card       */
+/* ------------------------------------------------------------------ */
+
+.apx-run {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.apx-run--done {
+  border-left-color: var(--ap-ok, #166534);
+}
+
+.apx-run--error {
+  border-left-color: var(--ap-error, #b42318);
+}
+
+.apx-run--cancelled {
+  border-left-color: var(--text-secondary);
+}
+
+.apx-run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.apx-run-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  flex: none;
+}
+
+.apx-run-dot--active {
+  animation: apx-run-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes apx-run-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.apx-run-label {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.apx-run-pill {
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-alt);
+}
+
+.apx-run-pill--ingesting {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.apx-run-pill--done {
+  border-color: var(--ap-ok, #166534);
+  color: var(--ap-ok, #166534);
+}
+
+.apx-run-pill--error {
+  border-color: var(--ap-error, #b42318);
+  color: var(--ap-error, #b42318);
+}
+
+.apx-run-elapsed {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.apx-run-cancel {
+  min-height: 24px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.apx-run-cancel:hover,
+.apx-run-cancel--confirm {
+  border-color: var(--ap-error, #b42318);
+  color: var(--ap-error, #b42318);
+}
+
+.apx-run-cancel--confirm {
+  background: var(--ap-error, #b42318);
+  color: #ffffff;
+}
+
+.apx-run-cancel:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.apx-run-phases {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+.apx-run-phase {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px; /* phases flip pending→active→done without layout shift */
+  font-size: 12.5px;
+}
+
+.apx-run-phase-marker {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+}
+
+.apx-run-phase--done .apx-run-phase-marker {
+  border-color: var(--ap-ok, #166534);
+  background: var(--ap-ok, #166534);
+}
+
+.apx-run-phase--active .apx-run-phase-marker {
+  border-color: var(--brand);
+  animation: apx-run-pulse 1.4s ease-in-out infinite;
+}
+
+.apx-run-phase--error .apx-run-phase-marker {
+  border-color: var(--ap-error, #b42318);
+  background: var(--ap-error, #b42318);
+}
+
+.apx-run-phase-label {
+  color: var(--text-primary);
+}
+
+.apx-run-phase-state {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.apx-run-counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.apx-run-counter-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.apx-run-summary {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.apx-run-error {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ap-error, #b42318);
+  word-break: break-word;
+}
+
+.apx-run-error-code {
+  font-family: var(--font-mono);
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion: kill every new animation/transition (§7)             */
+/* ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-jump,
+  .apx-run-dot--active,
+  .apx-run-phase--active .apx-run-phase-marker {
+    animation: none !important;
+  }
+
+  .chat-composer-send,
+  .chat-composer-stop,
+  .chat-code-copy,
+  .chat-regenerate,
+  .chat-stream-retry,
+  .chat-jump,
+  .apx-run-cancel {
+    transition: none !important;
+  }
+}
