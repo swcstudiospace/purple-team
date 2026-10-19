@@ -158,7 +158,7 @@ function enforceCaps(file: StoreFile): string[] {
   return evicted;
 }
 
-function mutate<T>(operation: (file: StoreFile) => T): Promise<T> {
+function mutate<T>(operation: (file: StoreFile) => T): Promise<{ result: T; evicted: string[] }> {
   return enqueue(() => {
     const file = loadFile();
     const result = operation(file);

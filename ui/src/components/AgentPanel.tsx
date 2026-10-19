@@ -355,6 +355,53 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
       appendEntry({ ...base, status: 'error', error: built.error });
       return;
     }
+
+    appendEntry(base);
+    const start = Date.now();
+    const controller = new AbortController();
+    controllersRef.current.set(id, controller);
+
+    try {
+      const res = await fetch(built.url, {
+        method: built.method,
+        headers:
+          built.method === 'POST'
+            ? { Accept: 'application/json', 'Content-Type': 'application/json' }
+            : { Accept: 'application/json' },
+        body: built.body,
+        signal: controller.signal,
+      });
+      const elapsedMs = Date.now() - start;
+      const httpStatus = res.status;
+      const text = await res.text();
+      const bodyParsed = parseJsonBody(text);
+      if (!res.ok) {
+        patchEntry(id, {
+          status: 'error',
+          httpStatus,
+          elapsedMs,
+          error: serverErrorMessage(bodyParsed, res),
+        });
+        return;
+      }
+      let resultText: string | null = null;
+      if (bodyParsed.ok && bodyParsed.value != null) {
+        resultText = JSON.stringify(bodyParsed.value, null, 2);
+      } else if (text.trim() !== '') {
+        resultText = redactString(text.trim());
+      }
+      patchEntry(id, { status: 'ok', httpStatus, elapsedMs, resultText });
+    } catch (err: unknown) {
+      const elapsedMs = Date.now() - start;
+      if (err instanceof Error && err.name === 'AbortError') {
+        patchEntry(id, { status: 'aborted', elapsedMs });
+      } else {
+        const message = err instanceof Error ? redactString(err.message) : 'Network error';
+        patchEntry(id, { status: 'error', elapsedMs, error: message });
+      }
+    } finally {
+      controllersRef.current.delete(id);
+    }
   }
 
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number): void {

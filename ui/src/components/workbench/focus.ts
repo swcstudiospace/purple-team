@@ -65,11 +65,6 @@ export function useFocusTrap(
         panel!.focus();
         return;
       }
-      if (focusables.length === 0) {
-        event.preventDefault();
-        (panel as HTMLElement).focus();
-        return;
-      }
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
       const active = document.activeElement;

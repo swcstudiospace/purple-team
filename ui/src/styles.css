@@ -296,10 +296,14 @@ textarea:focus-visible {
   padding: 1.5rem 0.5rem;
 }
 
+.shell--workbench > .content > .apx-workbench {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 .shell--workbench > .rail.rail--hidden {
   display: none;
 }
-
 .shell--workbench > .rail.rail--collapsed .brand {
   font-size: 1rem;
   margin-bottom: 1.5rem;
