@@ -8,6 +8,7 @@ import {
   __setOAuthNow,
   clearOAuth,
   completeClaudePkceFlow,
+  findClaudeFlowByState,
   ensureOAuthAccessToken,
   hasOAuth,
   oauthStatus,
@@ -74,6 +75,8 @@ describe('Claude (Pro/Max) OAuth vendor', () => {
     delete process.env.T3MP3ST_CLAUDE_OAUTH_CLIENT_ID;
     delete process.env.T3MP3ST_CLAUDE_OAUTH_AUTHORIZE;
     delete process.env.T3MP3ST_CLAUDE_OAUTH_TOKEN;
+    delete process.env.T3MP3ST_CLAUDE_OAUTH_REDIRECT_URI;
+    delete process.env.T3MP3ST_PORT;
     if (originalAnthropicKey === undefined) delete process.env.ANTHROPIC_API_KEY;
     else process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
     for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
@@ -87,17 +90,22 @@ describe('Claude (Pro/Max) OAuth vendor', () => {
     return path;
   }
 
-  it('builds a Claude PKCE authorize URL against claude.ai with the Claude Code public client', async () => {
+  it('builds a Claude PKCE authorize URL against claude.com with the Claude Code public client', async () => {
     tempStore();
+    process.env.T3MP3ST_PORT = '3456';
     const start = await startClaudePkceFlow();
-    expect(start.authorizeUrl).toContain('https://claude.ai/oauth/authorize');
+    const authorize = new URL(start.authorizeUrl);
+    expect(authorize.host).toBe('claude.com');
+    expect(authorize.pathname).toBe('/cai/oauth/authorize');
     expect(start.authorizeUrl).toContain('code_challenge_method=S256');
     expect(start.authorizeUrl).toContain('client_id=9d1c250a-e61b-44d9-88ed-5944d1962f5e');
-    expect(start.authorizeUrl).toContain(`redirect_uri=${encodeURIComponent('https://platform.claude.com/oauth/code/callback')}`);
-    // code=true makes the hosted callback page render a pasteable code.
-    expect(start.authorizeUrl).toContain('code=true');
-    // Least-privilege scope: inference + the profile read the tier label needs.
-    expect(start.authorizeUrl).toContain('scope=user%3Ainference+user%3Aprofile');
+    expect(start.authorizeUrl).toContain(`redirect_uri=${encodeURIComponent('http://localhost:3456/callback')}`);
+    expect(authorize.searchParams.has('code')).toBe(false);
+    expect(start.authorizeUrl).not.toContain('code=true');
+    // Least-privilege scope: inference + the profile read the tier label needs. Space is %20, never '+'.
+    expect(start.authorizeUrl).toContain('scope=user%3Ainference%20user%3Aprofile');
+    expect(start.authorizeUrl).not.toContain('scope=user%3Ainference+user%3Aprofile');
+    expect(findClaudeFlowByState(start.state)).toBe(start.flowId);
     expect(start.state).toBeTruthy();
     expect(start.flowId).toBeTruthy();
   });
@@ -163,6 +171,33 @@ describe('Claude (Pro/Max) OAuth vendor', () => {
     expect(hasOAuth('claude')).toBe(false);
   });
 
+  it('stores the loopback redirect and sends that same URI on token exchange', async () => {
+    tempStore();
+    process.env.T3MP3ST_PORT = '3456';
+    const start = await startClaudePkceFlow();
+    expect(new URL(start.authorizeUrl).searchParams.get('redirect_uri')).toBe('http://localhost:3456/callback');
+
+    // A later env change must not rewrite the redirect already bound to the flow.
+    process.env.T3MP3ST_CLAUDE_OAUTH_REDIRECT_URI = 'http://127.0.0.1:9999/callback';
+    let exchangedRedirect = '';
+    const f = fakeFetch((url, init) => {
+      if (url === 'https://api.anthropic.com/api/oauth/profile') {
+        return { ok: false, status: 429, body: {} };
+      }
+      exchangedRedirect = JSON.parse(String(init?.body)).redirect_uri;
+      return { ok: true, status: 200, body: { access_token: 'a', expires_in: 3600 } };
+    });
+    await completeClaudePkceFlow(start.flowId, `code#${start.state}`, { fetchImpl: f });
+    expect(exchangedRedirect).toBe('http://localhost:3456/callback');
+
+    process.env.T3MP3ST_CLAUDE_OAUTH_REDIRECT_URI = 'http://127.0.0.1:3456/callback';
+    const loopback = await startClaudePkceFlow();
+    expect(new URL(loopback.authorizeUrl).searchParams.get('redirect_uri')).toBe('http://127.0.0.1:3456/callback');
+
+    process.env.T3MP3ST_CLAUDE_OAUTH_REDIRECT_URI = 'http://evil.example/callback';
+    await expect(startClaudePkceFlow()).rejects.toThrow(/localhost or 127\.0\.0\.1/i);
+  });
+
   it('parses a raw code, code#state, and a full callback URL', () => {
     expect(parseClaudeAuthCode('abc123')).toEqual({ code: 'abc123' });
     expect(parseClaudeAuthCode('abc123#st')).toEqual({ code: 'abc123', state: 'st' });
@@ -172,6 +207,7 @@ describe('Claude (Pro/Max) OAuth vendor', () => {
 
   it('completes the exchange with a JSON body + beta header (no claude-cli UA), persists 0600, and never leaks secrets via status', async () => {
     const path = tempStore();
+    process.env.T3MP3ST_PORT = '3456';
     const start = await startClaudePkceFlow();
     const t0 = 5_000_000;
     __setOAuthNow(() => t0);
@@ -191,7 +227,7 @@ describe('Claude (Pro/Max) OAuth vendor', () => {
       expect(body.code).toBe('authcode-1');
       expect(body.code_verifier).toBeTruthy();
       expect(body.state).toBe(start.state);
-      expect(body.redirect_uri).toBe('https://platform.claude.com/oauth/code/callback');
+      expect(body.redirect_uri).toBe('http://localhost:3456/callback');
       expect(body.scope).toBe('user:inference user:profile');
       return {
         ok: true,

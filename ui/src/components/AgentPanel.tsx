@@ -18,7 +18,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import { COMMANDS, type AgentId, type CommandSpec } from '../../../src/ui-commands/registry';
-import ChatStream, { type ChatStreamHandle } from './ChatStream';
+import ChatStream, { getChatModelChoice, type ChatStreamHandle } from './ChatStream';
 import RepoRunConfig from './RepoRunConfig';
 import { RepoEntry, type RepoEntryTarget } from './workbench/RepoEntry';
 import { ConversationSidebar } from './workbench/ConversationSidebar';
@@ -26,7 +26,8 @@ import { SlashPalette } from './workbench/SlashPalette';
 import { AGENT_LABEL } from './workbench/agent-labels';
 import { readPrefs, savePrefs } from './workbench/prefs';
 import { useConversationsStore } from '../stores/conversations';
-import { useSelectedRepo } from '../stores/github';
+import { useSelectedRepo, type SelectedRepo } from '../stores/github';
+import { useDraft } from './chat/drafts';
 import './agent-panel.css';
 import './workbench/workbench.css';
 
@@ -80,6 +81,44 @@ const JSON_OBJECT_FIELDS: Readonly<Record<string, true>> = {
   params: true,
 };
 const LIST_FIELDS: Readonly<Record<string, true>> = { operators: true, targets: true };
+
+const HATS = [
+  {
+    id: 'red',
+    label: 'Red',
+    doctrine: 'Scope-receipt offensive research through builtin operator defaultTools, not teamToolGrants.',
+    operators: ['scanner', 'recon', 'exploiter'],
+    objective: 'Find exploitable weaknesses',
+  },
+  {
+    id: 'blue',
+    label: 'Blue',
+    doctrine: 'Read-only detection and hardening of supplied artifacts; never touches the target.',
+    operators: ['blue', 'sentinel'],
+    objective: 'Map detection coverage',
+  },
+  {
+    id: 'white',
+    label: 'White',
+    doctrine: 'Adjudication reference over ROE and evidence; never authorization to test.',
+    operators: ['white', 'auditor'],
+    objective: 'Adjudicate evidence and ROE',
+  },
+  {
+    id: 'black',
+    label: 'Black',
+    doctrine: 'Analysis-only tradecraft review of supplied plans; never a live probe.',
+    operators: ['black', 'specter'],
+    objective: 'Harden this codebase',
+  },
+] as const;
+
+function repoSource(selected: SelectedRepo): { repoUrl: string } | { repoPath: string } {
+  const local = selected.repoPath?.trim() ?? '';
+  if (local !== '') return { repoPath: local };
+  const ref = selected.ref !== '' && selected.ref !== 'HEAD' ? `/tree/${selected.ref}` : '';
+  return { repoUrl: `https://github.com/${selected.owner}/${selected.repo}${ref}` };
+}
 
 const SECRET_KEY = /api[-_]?key|secret|passw|authorization|bearer|private[-_]?key|token$/i;
 const SECRET_VALUE = /\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9]{12,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16})\b/g;
@@ -265,6 +304,9 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
   const [threadHasMessages, setThreadHasMessages] = useState(true);
   const [hydratedThread, setHydratedThread] = useState<string | null>(null);
   const [bypassedThreads, setBypassedThreads] = useState<ReadonlySet<string>>(() => new Set());
+  const [hatNotice, setHatNotice] = useState<string | null>(null);
+  const [hatBusy, setHatBusy] = useState<string | null>(null);
+  const [composerObjective] = useDraft(activeId ?? 'unsynced');
 
   const nextIdRef = useRef(1);
   const controllersRef = useRef(new Map<number, AbortController>());
@@ -281,6 +323,13 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
       controllers.clear();
     };
   }, [load]);
+
+  // GitHub page select() leaves threadId null. Claim it for the active
+  // conversation once so the entry gate and chip treat it as this thread's target.
+  useEffect(() => {
+    if (activeId === null) return;
+    useSelectedRepo.getState().claimForThread(activeId);
+  }, [activeId, repoTarget, repoThreadId]);
 
   // Conversation switch: hydrate the new thread from the server store. The
   // hydration result also drives the entry-screen gate (empty + no target).
@@ -469,10 +518,10 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
   }, []);
 
   const threadId = activeId ?? 'unsynced';
-  // The stored target only counts for the conversation it was attached to —
-  // a mission launched in another thread must not suppress this thread's
-  // entry screen, chip, or paste capture.
-  const repoAttachedToThread = repoTarget !== null && repoThreadId === threadId;
+  // A GitHub-page handoff (threadId null) counts for the active conversation
+  // until claimForThread binds it. A target owned by another thread does not.
+  const githubHandoff = repoTarget !== null && repoThreadId === null && activeId !== null;
+  const repoAttachedToThread = (repoTarget !== null && repoThreadId === threadId) || githubHandoff;
   const showRepoEntry =
     entryForced ||
     (conversationsStatus === 'ready' &&
@@ -482,12 +531,60 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
       !repoAttachedToThread &&
       !bypassedThreads.has(threadId));
 
+  const openRepoPicker = useCallback(() => {
+    setEntryStep('select');
+    setEntryForced(true);
+  }, []);
+
+  async function launchHat(hat: (typeof HATS)[number]): Promise<void> {
+    const selected = useSelectedRepo.getState().selected;
+    if (selected === null) {
+      setHatNotice('Attach a repository before running a hat.');
+      return;
+    }
+    const operators = [...hat.operators];
+    const objective = composerObjective.trim() === '' ? hat.objective : composerObjective.trim();
+    const choice = getChatModelChoice();
+    setHatBusy(hat.id);
+    setHatNotice(null);
+    try {
+      const response = await fetch('/api/mission/start', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: `${hat.label} team`,
+          operators,
+          objective,
+          targetContext: { kind: 'artifacts' },
+          ...repoSource(selected),
+          ...(choice === null ? {} : { provider: choice.provider, model: choice.model }),
+        }),
+      });
+      const text = await response.text();
+      let message = response.ok ? `${hat.label} started.` : `Hat run failed (HTTP ${response.status}).`;
+      if (text.trim() !== '') {
+        try {
+          const body = JSON.parse(text) as { error?: unknown; missionName?: unknown };
+          if (!response.ok && typeof body.error === 'string' && body.error !== '') message = redactString(body.error);
+          else if (response.ok && typeof body.missionName === 'string') message = `${hat.label} started: ${body.missionName}.`;
+        } catch {
+          if (!response.ok) message = redactString(text.trim()).slice(0, 240);
+        }
+      }
+      setHatNotice(message);
+    } catch (err: unknown) {
+      setHatNotice(err instanceof Error ? redactString(err.message) : 'Network error');
+    } finally {
+      setHatBusy(null);
+    }
+  }
+
   return (
     <section className="apx-workbench" aria-labelledby={`${baseId}-title`}>
       <header className="apx-header">
         <div className="apx-header-row">
           <h2 id={`${baseId}-title`} className="apx-title">
-            Agent console
+            Chat Panel
           </h2>
           <div className="apx-header-actions">
             {focusMode && (
@@ -514,6 +611,21 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
               Timeline
             </button>
             <details className="apx-keys">
+              <summary className="apx-header-button">How to run</summary>
+              <div className="apx-keys-body">
+                <ol>
+                  <li>Sign in on GitHub or paste a URL or local folder.</li>
+                  <li>Pick a hat or Launch a hunt.</li>
+                  <li>Choose provider and model (ChatGPT and SuperGrok stream; Claude streams after this build).</li>
+                  <li>Watch the run card.</li>
+                  <li>Ask the model in the composer.</li>
+                </ol>
+                <p>
+                  CLI: <code>npx tsx src/cli.ts run</code>
+                </p>
+              </div>
+            </details>
+            <details className="apx-keys">
               <summary className="apx-header-button">Keys</summary>
               <div className="apx-keys-body">
                 <p>Enter send · Shift+Enter newline · / command palette</p>
@@ -530,6 +642,36 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
       </header>
 
       <div className="apx-body">
+        <aside className="apx-sidebar" aria-label="Hats">
+          <div className="apx-sidebar-head">
+            <h3 className="apx-sidebar-title">Hats</h3>
+          </div>
+          {HATS.map(hat => (
+            <section key={hat.id} className="ap-card" aria-labelledby={`${baseId}-hat-${hat.id}`}>
+              <div className="ap-card-head">
+                <h4 id={`${baseId}-hat-${hat.id}`} className="ap-agent">
+                  {hat.label}
+                </h4>
+              </div>
+              <p>{hat.doctrine}</p>
+              <p>Roles: {hat.operators.join(', ')}</p>
+              <button
+                type="button"
+                className="apx-sidebar-new"
+                disabled={hatBusy !== null || repoTarget === null}
+                onClick={() => void launchHat(hat)}
+              >
+                {hatBusy === hat.id ? 'Running…' : 'Run'}
+              </button>
+            </section>
+          ))}
+          {hatNotice !== null && (
+            <p className="ap-error" role="status">
+              {hatNotice}
+            </p>
+          )}
+        </aside>
+
         <ConversationSidebar id={sidebarId} open={sidebarOpen} onClose={closeSidebar} />
 
         <div className="apx-main">
@@ -540,6 +682,7 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
               onThreadSettled={handleThreadSettled}
               showNewChat={false}
               autoFocusComposer
+              onChangeRepo={openRepoPicker}
             />
           </SlashPalette>
 

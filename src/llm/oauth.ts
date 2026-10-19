@@ -97,20 +97,19 @@ const OPENAI_DEFAULT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const OPENAI_SCOPE = 'openid profile email offline_access';
 const OPENAI_ALLOWED_HOSTS = new Set(['auth.openai.com', 'chatgpt.com']);
 
-// Claude Pro/Max — consumer PKCE against the Claude.ai OAuth host, riding the public
-// client id every Claude Code install shares. Anthropic does not document this flow
-// and has moved hosts once already (console.anthropic.com → platform.claude.com), so
-// every value is env-overridable: a host move is a config change, not a code change.
+// Claude Pro/Max — consumer PKCE against the Claude Code public client.
+// Current Claude Code starts at claude.com/cai/oauth/authorize. Hosts have moved
+// before (claude.ai, console.anthropic.com, platform.claude.com), so every value
+// is env-overridable: a host move is a config change, not a code change.
 // console.anthropic.com stays allowed so operators can repoint to the legacy host.
-const CLAUDE_AUTHORIZE_URL = 'https://claude.ai/oauth/authorize';
+const CLAUDE_AUTHORIZE_URL = 'https://claude.com/cai/oauth/authorize';
 const CLAUDE_TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
-const CLAUDE_REDIRECT_URI = 'https://platform.claude.com/oauth/code/callback';
 const CLAUDE_PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile';
 const CLAUDE_DEFAULT_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
 // Least privilege: inference plus the profile read the plan-tier label needs —
 // deliberately NOT the full CLI scope set (user:sessions:claude_code, …).
 const CLAUDE_SCOPE = 'user:inference user:profile';
-const CLAUDE_ALLOWED_HOSTS = new Set(['claude.ai', 'platform.claude.com', 'console.anthropic.com']);
+const CLAUDE_ALLOWED_HOSTS = new Set(['claude.com', 'claude.ai', 'platform.claude.com', 'console.anthropic.com']);
 const CLAUDE_PROFILE_ALLOWED_HOSTS = new Set(['api.anthropic.com']);
 /** Beta flag the Anthropic token endpoint and OAuth-bearing Messages calls require. */
 export const CLAUDE_OAUTH_BETA = 'oauth-2025-04-20';
@@ -145,6 +144,7 @@ interface PendingOpenAi {
 interface PendingClaude {
   verifier: string;
   state: string;
+  redirectUri: string;
   expiresAt: number;
 }
 
@@ -214,6 +214,37 @@ function claudeAuthorizeUrl(): string {
 
 function claudeTokenUrl(): string {
   return (process.env.T3MP3ST_CLAUDE_OAUTH_TOKEN || '').trim() || CLAUDE_TOKEN_URL;
+}
+
+/** Loopback the public client accepts. Env override wins; http loopback is not forced to https. */
+function claudeRedirectUri(): string {
+  const override = (process.env.T3MP3ST_CLAUDE_OAUTH_REDIRECT_URI || '').trim();
+  if (override) return assertClaudeRedirectUri(override);
+  const port = process.env.T3MP3ST_PORT || '3333';
+  return `http://localhost:${port}/callback`;
+}
+
+function assertClaudeRedirectUri(uri: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(uri);
+  } catch {
+    throw new Error('Claude redirect URI is not a valid URL');
+  }
+  const host = parsed.hostname.toLowerCase();
+  // The public client redirects to this app's loopback. Do not force https there.
+  if (parsed.protocol === 'http:' && (host === 'localhost' || host === '127.0.0.1')) {
+    return uri;
+  }
+  if (parsed.protocol === 'https:') return uri;
+  throw new Error('Claude redirect URI must be https, or http on localhost or 127.0.0.1');
+}
+
+/** encodeURIComponent emits %20. URLSearchParams would emit '+' and Anthropic rejects that scope. */
+function setPercentEncodedQuery(url: URL, params: Array<[string, string]>): void {
+  url.search = params
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&');
 }
 
 function claudeProfileUrl(): string {
@@ -532,9 +563,7 @@ export function parseOpenAiAuthCode(raw: string): { code: string; state?: string
   return parsePastedAuthCode(raw);
 }
 
-/** Parses the pasted Claude callback: raw code, code#state, or full callback URL.
- *  Claude's hosted callback page renders the code as copyable text (`code=true`),
- *  so the raw-code branch is the common path; the URL branch covers query delivery. */
+/** Parses a Claude callback: raw code, code#state, or full callback URL. */
 export function parseClaudeAuthCode(raw: string): { code: string; state?: string } {
   return parsePastedAuthCode(raw);
 }
@@ -632,24 +661,36 @@ async function refreshOpenAi(tokens: OAuthTokens, fetchImpl?: FetchLike): Promis
 
 export async function startClaudePkceFlow(): Promise<ClaudePkceStart> {
   const authorize = assertHttpsHost(claudeAuthorizeUrl(), CLAUDE_ALLOWED_HOSTS, 'Claude authorize URL');
+  const redirectUri = claudeRedirectUri();
   const verifier = base64url(randomBytes(32));
   const challenge = base64url(createHash('sha256').update(verifier).digest());
   const state = randomId();
   const flowId = randomId();
-  pendingClaude.set(flowId, { verifier, state, expiresAt: nowFn() + FLOW_TTL_MS });
+  pendingClaude.set(flowId, { verifier, state, redirectUri, expiresAt: nowFn() + FLOW_TTL_MS });
 
-  authorize.searchParams.set('client_id', claudeClientId());
-  authorize.searchParams.set('response_type', 'code');
-  authorize.searchParams.set('redirect_uri', CLAUDE_REDIRECT_URI);
-  authorize.searchParams.set('scope', CLAUDE_SCOPE);
-  authorize.searchParams.set('code_challenge', challenge);
-  authorize.searchParams.set('code_challenge_method', 'S256');
-  authorize.searchParams.set('state', state);
-  // code=true makes the hosted callback page render a copyable authorization code —
-  // the pasted-callback UX. There is no loopback listener to catch (and no device flow).
-  authorize.searchParams.set('code', 'true');
+  // Do not set code=true. Anthropic's authorize page treats that param as an
+  // invalid OAuth request even when response_type and code_challenge are present.
+  setPercentEncodedQuery(authorize, [
+    ['client_id', claudeClientId()],
+    ['response_type', 'code'],
+    ['redirect_uri', redirectUri],
+    ['scope', CLAUDE_SCOPE],
+    ['code_challenge', challenge],
+    ['code_challenge_method', 'S256'],
+    ['state', state],
+  ]);
 
   return { flowId, authorizeUrl: authorize.toString(), state };
+}
+
+/** Pending Claude flow id for a browser callback `state`, if one is still stored. */
+export function findClaudeFlowByState(state: string): string | undefined {
+  const needle = state.trim();
+  if (!needle) return undefined;
+  for (const [flowId, pending] of pendingClaude) {
+    if (pending.state === needle) return flowId;
+  }
+  return undefined;
 }
 
 export async function completeClaudePkceFlow(
@@ -687,7 +728,7 @@ export async function completeClaudePkceFlow(
       grant_type: 'authorization_code',
       client_id: claudeClientId(),
       code: parsed.code,
-      redirect_uri: CLAUDE_REDIRECT_URI,
+      redirect_uri: pending.redirectUri,
       code_verifier: pending.verifier,
       state: pending.state,
       scope: CLAUDE_SCOPE,

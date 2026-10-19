@@ -7,20 +7,21 @@ import AgentPanel from './components/AgentPanel';
 import { escapeGuard } from './components/workbench/focus';
 import { readPrefs, savePrefs, type RailState } from './components/workbench/prefs';
 
-type SectionId = 'overview' | 'github' | 'agent-panel' | 'reports' | 'settings';
+type SectionId = 'overview' | 'github' | 'chat' | 'reports' | 'settings';
 
 const NAV_ITEMS: ReadonlyArray<{ id: SectionId; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'github', label: 'GitHub' },
-  { id: 'agent-panel', label: 'Agent Panel' },
+  { id: 'chat', label: 'Chat Panel' },
   { id: 'reports', label: 'Reports' },
   { id: 'settings', label: 'Settings' },
 ];
 
-// `#generative-ui` deep links land on the merged agent panel (phase 36 §6.2);
+// `#agent-panel` and `#generative-ui` deep links land on the chat panel;
 // the hash is rewritten with replace so history stays clean.
 const LEGACY_SECTION_REDIRECTS: Record<string, SectionId> = {
-  'generative-ui': 'agent-panel',
+  'agent-panel': 'chat',
+  'generative-ui': 'chat',
 };
 
 function sectionFromHash(hash: string): SectionId {
@@ -48,7 +49,7 @@ export default function App() {
   const preFocusRailRef = useRef<RailState>('expanded');
   const firstSectionChange = useRef(true);
 
-  const isWorkbench = active === 'agent-panel';
+  const isWorkbench = active === 'chat';
 
   const applyRailState = useCallback((next: RailState) => {
     if (next !== 'hidden') preFocusRailRef.current = next;
@@ -211,7 +212,7 @@ export default function App() {
 
         {active === 'overview' && <Overview />}
         {active === 'github' && <GitHub />}
-        {active === 'agent-panel' && <AgentPanel focusMode={railHidden} onExitFocusMode={exitFocusMode} />}
+        {active === 'chat' && <AgentPanel focusMode={railHidden} onExitFocusMode={exitFocusMode} />}
         {active === 'reports' && <Reports />}
         {active === 'settings' && <Settings />}
       </main>

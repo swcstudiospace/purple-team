@@ -127,10 +127,10 @@ describe('POST /api/chat handler', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('returns 409 for a provider with no OpenAI-compatible streaming path', async () => {
+  it('returns 409 for a provider with no streaming path', async () => {
     const createModel = vi.fn();
     const handler = createChatHandler({
-      getConfig: () => Promise.resolve(openAiConfig({ provider: 'anthropic' })),
+      getConfig: () => Promise.resolve(openAiConfig({ provider: 'codex' })),
       createModel,
     });
     const res = fakeRes();

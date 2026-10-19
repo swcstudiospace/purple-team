@@ -12,8 +12,9 @@ import type { GitHubResolveResponse } from '../api/client';
  * prefill, hunt default) must only treat it as attached when that id matches
  * their active conversation — otherwise a mission launched in one thread
  * would silently leak its repo into every other thread. `select` stays the
- * GitHub page handoff (no conversation, threadId null): it feeds the page's
- * own surfaces but attaches to no thread.
+ * GitHub page handoff (no conversation, threadId null). The chat panel claims
+ * that handoff once via `claimForThread` so the first conversation inherits it
+ * without a second picker; later threads do not.
  *
  * If the account disconnects while a private repo is selected the selection is
  * kept, but run config must re-resolve before starting a run.
@@ -21,10 +22,11 @@ import type { GitHubResolveResponse } from '../api/client';
 export interface SelectedRepo {
   owner: string;
   repo: string;
-  /** Branch / tag / commit — explicit ref from the URL when present, else defaultBranch. */
   ref: string;
   visibility: 'public' | 'private' | 'internal';
   fullName: string;
+  /** Local folder, when the target is not a GitHub URL. Mutually exclusive with a remote URL at launch. */
+  repoPath?: string;
 }
 
 interface SelectedRepoState {
@@ -37,9 +39,14 @@ interface SelectedRepoState {
   select: (repo: SelectedRepo) => void;
   /** Attach the run target to a conversation (compact summary + optional resolve payload). */
   attach: (repo: SelectedRepo, resolution?: GitHubResolveResponse, threadId?: string) => void;
-  clear: () => void;
-  /** True when a target exists AND belongs to the given conversation. */
+  /**
+   * Bind a GitHub-page selection (threadId null) to one conversation. No-op
+   * when nothing is selected or another thread already owns the target.
+   * Returns true only on the first claim.
+   */
+  claimForThread: (threadId: string) => boolean;
   isAttachedTo: (threadId: string) => boolean;
+  clear: () => void;
   /** A GitHub URL pasted anywhere in the UI, waiting for the repo entry screen. */
   pastePrefill: string | null;
   setPastePrefill: (url: string) => void;
@@ -54,8 +61,14 @@ export const useSelectedRepo = create<SelectedRepoState>()((set, get) => ({
   select: repo => set({ selected: repo, resolution: null, threadId: null }),
   attach: (repo, resolution, threadId) =>
     set({ selected: repo, resolution: resolution ?? null, threadId: threadId ?? null }),
+  claimForThread: threadId => {
+    const state = get();
+    if (state.selected === null || state.threadId !== null || threadId === '') return false;
+    set({ threadId });
+    return true;
+  },
   clear: () => set({ selected: null, resolution: null, threadId: null, pastePrefill: null }),
-  isAttachedTo: threadId => {
+  isAttachedTo: (threadId: string) => {
     const state = get();
     return state.selected !== null && state.threadId === threadId;
   },

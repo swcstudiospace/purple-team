@@ -5,6 +5,7 @@ import {
   connectGitHubPat,
   fetchProviderModels,
   getJson,
+  postJson,
   logoutGitHubDevice,
   logoutVendorOAuth,
   pollGitHubDeviceFlow,
@@ -44,6 +45,31 @@ const UAC_PROVIDERS: ReadonlyArray<{ id: string; label: string; base: string }> 
   { id: 'xai', label: 'xAI Grok · SuperGrok OAuth or API key', base: 'https://api.x.ai/v1' },
   { id: 'anthropic', label: 'Claude · Anthropic Messages API', base: 'https://api.anthropic.com' },
 ];
+
+/** GET /api/llm/options — server default the app actually runs. */
+interface LlmProviderOption {
+  id: string;
+  label: string;
+  streamable: boolean;
+  connected: boolean;
+  models: string[];
+  note?: string;
+}
+
+interface LlmOptionsResponse {
+  active: { provider: string; model: string };
+  providers: LlmProviderOption[];
+}
+
+/** Connected subscriptions, or a provider the server already has a model list for. */
+function selectableLlmProviders(options: LlmOptionsResponse): LlmProviderOption[] {
+  return options.providers.filter(
+    provider =>
+      provider.connected ||
+      provider.models.length > 0 ||
+      provider.id === options.active.provider,
+  );
+}
 
 type Resource<T> =
   | { status: 'loading' }
@@ -723,8 +749,17 @@ function VendorCard({
   } else if (flow.kind === 'awaiting-code') {
     body = (
       <form className="settings-form" onSubmit={submitCode}>
+        {card.id === 'claude' ? (
+          <p className="settings-hint">
+            The browser will return to this machine&apos;s /callback. This page checks until Claude is
+            connected, so you do not have to paste a code. If Anthropic shows an error page, the old
+            code=true URL is no longer sent.
+          </p>
+        ) : null}
         <label className="settings-label" htmlFor={codeInputId}>
-          Authorize in the browser, then paste the callback code
+          {card.id === 'claude'
+            ? 'Paste the callback code only if the browser does not return'
+            : 'Authorize in the browser, then paste the callback code'}
           {card.id === 'claude' ? ' (the code expires in 15 minutes)' : ''}:
         </label>
         <a className="settings-mono" href={flow.authorizeUrl} target="_blank" rel="noreferrer">
@@ -862,6 +897,30 @@ function LlmSection({ oauth }: { oauth: { state: OAuthState; apply: (next: OAuth
 
   // Leaving the section abandons the SuperGrok poll.
   useEffect(() => clearXaiPoll, []);
+
+  // Loopback /callback completes Claude without a paste. Poll until connected.
+  const claudeAwaiting = flows.claude.kind === 'awaiting-code';
+  const applyOAuthRef = useRef(oauth.apply);
+  applyOAuthRef.current = oauth.apply;
+  useEffect(() => {
+    if (!claudeAwaiting) return undefined;
+    let cancelled = false;
+    const poll = window.setInterval(() => {
+      getJson<OAuthStatusResponse>('/api/oauth/status').then(
+        status => {
+          if (cancelled || !status.claude?.connected) return;
+          setFlows(prev => ({ ...prev, claude: { kind: 'idle' } }));
+          setCodeValues(prev => ({ ...prev, claude: '' }));
+          applyOAuthRef.current(status);
+        },
+        () => undefined,
+      );
+    }, MIN_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+    };
+  }, [claudeAwaiting]);
 
   function armXaiPoll(flowId: string, intervalSec: number, expiresAt: number): void {
     clearXaiPoll();
@@ -1013,7 +1072,122 @@ function LlmSection({ oauth }: { oauth: { state: OAuthState; apply: (next: OAuth
 // t3mp3st_state_v1 localStorage document for provider/key/baseUrl/model.
 // -----------------------------------------------------------------------------
 
+function ProviderModelForm({
+  options,
+  providerId,
+  modelId,
+  provider,
+  model,
+  busy,
+  error,
+  note,
+  onProviderChange,
+  onModelChange,
+  onSubmit,
+}: {
+  options: LlmOptionsResponse;
+  providerId: string;
+  modelId: string;
+  provider: string;
+  model: string;
+  busy: boolean;
+  error: string | null;
+  note: string | null;
+  onProviderChange: (id: string) => void;
+  onModelChange: (id: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const choices = selectableLlmProviders(options);
+  const selected = choices.find(entry => entry.id === provider);
+  const models = selected?.models ?? [];
+  const active = options.active;
+
+  return (
+    <form className="settings-form__grid" onSubmit={onSubmit}>
+      <p className="settings-mono">
+        Active: {active.provider || 'none'} · {active.model || 'none'}
+      </p>
+      {choices.length === 0 ? (
+        <p className="settings-hint">No connected or configured providers yet. Sign in above, then retry.</p>
+      ) : (
+        <div className="settings-form__row">
+          <div className="settings-form settings-form--field">
+            <label className="settings-label" htmlFor={providerId}>
+              Provider
+            </label>
+            <select
+              id={providerId}
+              className="settings-select"
+              value={choices.some(entry => entry.id === provider) ? provider : ''}
+              onChange={event => onProviderChange(event.target.value)}
+              disabled={busy}
+            >
+              <option value="">Select a provider</option>
+              {choices.map(entry => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label}
+                  {entry.streamable ? ' · streams' : ' · no stream'}
+                  {entry.connected ? '' : ' · configured'}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="settings-form settings-form--field">
+            <label className="settings-label" htmlFor={modelId}>
+              Model
+            </label>
+            <select
+              id={modelId}
+              className="settings-select"
+              value={models.includes(model) ? model : ''}
+              onChange={event => onModelChange(event.target.value)}
+              disabled={busy || models.length === 0}
+            >
+              <option value="">{models.length === 0 ? 'No models listed' : 'Select a model'}</option>
+              {models.map(id => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+      {selected && (
+        <p className="settings-hint">
+          {selected.streamable
+            ? `${selected.label} streams responses.`
+            : `${selected.label} does not stream.`}
+          {selected.note ? ` ${selected.note}` : ''}
+        </p>
+      )}
+      <div className="settings-form__row">
+        <button
+          type="submit"
+          className="settings-btn settings-btn--primary"
+          disabled={busy || provider === '' || model === '' || !models.includes(model)}
+        >
+          {busy ? 'Saving…' : 'Save'}
+        </button>
+        {note && (
+          <span role="status" className="settings-hint">
+            {note}
+          </span>
+        )}
+      </div>
+      {error && (
+        <p className="settings-field-error" role="alert">
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 function ConfigSection({ oauth }: { oauth: { state: OAuthState } }) {
+  const defaultHeadingId = useId();
+  const defaultProviderId = useId();
+  const defaultModelId = useId();
   const universalId = useId();
   const modelStatusId = useId();
   const dataId = useId();
@@ -1036,6 +1210,78 @@ function ConfigSection({ oauth }: { oauth: { state: OAuthState } }) {
   const [dataNote, setDataNote] = useState<string | null>(null);
   const [llmRunId, setLlmRunId] = useState(0);
   const llm = useResource<LlmStatusResponse>('/api/llm/status', llmRunId);
+  const [llmOptions, setLlmOptions] = useState<Resource<LlmOptionsResponse>>({ status: 'loading' });
+  const [defaultProvider, setDefaultProvider] = useState('');
+  const [defaultModel, setDefaultModel] = useState('');
+  const [defaultBusy, setDefaultBusy] = useState(false);
+  const [defaultError, setDefaultError] = useState<string | null>(null);
+  const [defaultNote, setDefaultNote] = useState<string | null>(null);
+  const [optionsRun, setOptionsRun] = useState(0);
+
+  const subscriptionKey =
+    oauth.state.status === 'ready'
+      ? `${String(oauth.state.data.claude.connected)}:${String(oauth.state.data.openai.connected)}:${String(oauth.state.data.xai.connected)}`
+      : oauth.state.status;
+
+  useEffect(() => {
+    let cancelled = false;
+    setLlmOptions(prev => (prev.status === 'ready' ? prev : { status: 'loading' }));
+    getJson<LlmOptionsResponse>('/api/llm/options').then(
+      data => {
+        if (cancelled) return;
+        setLlmOptions({ status: 'ready', data });
+        const list = selectableLlmProviders(data);
+        setDefaultProvider(prev => {
+          const still = prev !== '' && list.some(entry => entry.id === prev);
+          const nextId = still
+            ? prev
+            : (list.find(entry => entry.id === data.active.provider)?.id ?? list[0]?.id ?? '');
+          const entry = list.find(item => item.id === nextId);
+          const models = entry?.models ?? [];
+          setDefaultModel(prevModel => {
+            if (still && models.includes(prevModel)) return prevModel;
+            if (nextId === data.active.provider && models.includes(data.active.model)) return data.active.model;
+            return models[0] ?? '';
+          });
+          return nextId;
+        });
+      },
+      (err: unknown) => {
+        if (!cancelled) setLlmOptions({ status: 'error', message: errorMessage(err) });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [subscriptionKey, optionsRun]);
+
+  function onDefaultProviderChange(id: string): void {
+    setDefaultProvider(id);
+    setDefaultNote(null);
+    if (llmOptions.status !== 'ready') return;
+    const entry = selectableLlmProviders(llmOptions.data).find(item => item.id === id);
+    const models = entry?.models ?? [];
+    setDefaultModel(prev => (models.includes(prev) ? prev : (models[0] ?? '')));
+  }
+
+  async function saveDefault(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (defaultProvider === '' || defaultModel === '') return;
+    setDefaultBusy(true);
+    setDefaultError(null);
+    try {
+      await postJson('/api/llm/default', { provider: defaultProvider, model: defaultModel });
+      const data = await getJson<LlmOptionsResponse>('/api/llm/options');
+      setLlmOptions({ status: 'ready', data });
+      setDefaultProvider(data.active.provider);
+      setDefaultModel(data.active.model);
+      setDefaultNote(`Saved ${data.active.provider} · ${data.active.model}`);
+    } catch (err) {
+      setDefaultError(errorMessage(err));
+    } finally {
+      setDefaultBusy(false);
+    }
+  }
 
   const providerBase = UAC_PROVIDERS.find(entry => entry.id === provider)?.base ?? '';
 
@@ -1150,6 +1396,47 @@ function ConfigSection({ oauth }: { oauth: { state: OAuthState } }) {
 
   return (
     <>
+      <section className="settings-card" aria-labelledby={defaultHeadingId} aria-busy={llmOptions.status === 'loading'}>
+        <h2 id={defaultHeadingId} className="settings-card__title">
+          Provider and model
+        </h2>
+        <p className="settings-hint">
+          Server default used by the app. Connected providers, including Anthropic when Claude is
+          signed in, can be selected. Streaming is marked on each provider.
+        </p>
+        {llmOptions.status === 'loading' && <CardSkeleton title="Provider and model" />}
+        {llmOptions.status === 'error' && (
+          <>
+            <p className="settings-card__error" role="alert">
+              Could not load providers: {llmOptions.message}
+            </p>
+            <div>
+              <button type="button" className="settings-btn" onClick={() => setOptionsRun(n => n + 1)}>
+                Retry
+              </button>
+            </div>
+          </>
+        )}
+        {llmOptions.status === 'ready' && (
+          <ProviderModelForm
+            options={llmOptions.data}
+            providerId={defaultProviderId}
+            modelId={defaultModelId}
+            provider={defaultProvider}
+            model={defaultModel}
+            busy={defaultBusy}
+            error={defaultError}
+            note={defaultNote}
+            onProviderChange={onDefaultProviderChange}
+            onModelChange={value => {
+              setDefaultModel(value);
+              setDefaultNote(null);
+            }}
+            onSubmit={event => void saveDefault(event)}
+          />
+        )}
+      </section>
+
       <section className="settings-card" aria-labelledby={universalId}>
         <h2 id={universalId} className="settings-card__title">
           Universal API config

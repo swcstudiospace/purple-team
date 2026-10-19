@@ -11,11 +11,13 @@ import {
 import { DefaultChatTransport, type ChatStatus, type UIMessage } from 'ai';
 import { subscribePurpleRuns } from '../lib/events';
 import { AnnounceContext } from './chat/announce';
-import { Composer } from './chat/composer';
+import { Composer, getChatModelChoice, setChatModelChoice, type ChatModelChoice } from './chat/composer';
 import { MessageItem } from './chat/message';
 import { cancelPurpleRunInMessages, upsertPurpleRun } from './chat/run-card';
 import './chat-stream.css';
 import './chat/chat.css';
+
+export { setChatModelChoice, getChatModelChoice, type ChatModelChoice };
 
 /** Imperative handle the workbench uses beside the embedded composer. */
 export interface ChatStreamHandle {
@@ -26,6 +28,7 @@ export interface ChatStreamHandle {
   /** Moves focus to the composer textarea (panel-open focus, phase 36 §7). */
   focusComposer(): void;
 }
+
 
 interface ChatStreamProps {
   ref?: Ref<ChatStreamHandle>;
@@ -42,6 +45,8 @@ interface ChatStreamProps {
   showNewChat?: boolean;
   /** Focus the composer on mount (panel open). Never refocuses on thread switch. */
   autoFocusComposer?: boolean;
+  /** Reopens the repository picker from the composer chip. */
+  onChangeRepo?: () => void;
 }
 
 interface ErrorView {
@@ -51,8 +56,16 @@ interface ErrorView {
 
 const transport = new DefaultChatTransport<UIMessage>({
   api: '/api/chat',
-  // Send only text parts, trimmed under the server's history limits: `{ messages: UIMessage[] }`.
-  prepareSendMessagesRequest: ({ messages }) => ({ body: { messages: toWireMessages(trimHistory(messages)) } }),
+  // Send only text parts, trimmed under the server's history limits, plus the picker choice when set.
+  prepareSendMessagesRequest: ({ messages }) => {
+    const choice = getChatModelChoice();
+    return {
+      body: {
+        messages: toWireMessages(trimHistory(messages)),
+        ...(choice === null ? {} : { provider: choice.provider, model: choice.model }),
+      },
+    };
+  },
 });
 
 /** Per-message ceiling; keeps any single message under the server's trim budget. */
@@ -175,7 +188,7 @@ function lastAssistantText(messages: UIMessage[]): string {
   return text;
 }
 
-function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNewChat = true, autoFocusComposer = false }: ChatStreamProps) {
+function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNewChat = true, autoFocusComposer = false, onChangeRepo }: ChatStreamProps) {
   const baseId = useId();
   const titleId = `${baseId}-title`;
   const statusId = `${baseId}-status`;
@@ -489,7 +502,7 @@ function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNe
           </div>
         )}
 
-        <Composer threadId={threadId} busy={busy} describedById={statusId} onSend={sendText} onStop={() => void stop()} />
+        <Composer threadId={threadId} busy={busy} describedById={statusId} onSend={sendText} onStop={() => void stop()} onChangeRepo={onChangeRepo} />
 
         <div className="chat-vh" role="status" aria-live="polite">
           {liveChunk}

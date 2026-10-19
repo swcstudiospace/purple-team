@@ -51,7 +51,7 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--text-primary) 12%, transparent);
   animation: chat-jump-in 160ms ease-out;
 }
 
@@ -84,6 +84,8 @@
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  color: var(--text-primary);
+  background: transparent;
 }
 
 .chat-md {
@@ -91,6 +93,8 @@
   font-size: 15px;
   line-height: 1.65;
   overflow-wrap: break-word;
+  color: var(--text-primary);
+  background: transparent;
 }
 
 .chat-md > :first-child {
@@ -206,7 +210,8 @@
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #0d0d12;
+  background: var(--surface-alt);
+  color: var(--text-primary);
   overflow: hidden;
 }
 
@@ -217,7 +222,7 @@
   gap: 8px;
   padding: 4px 8px 4px 12px;
   border-bottom: 1px solid var(--border);
-  background: #15151c;
+  background: var(--surface);
 }
 
 .chat-code-lang {
@@ -322,17 +327,17 @@
   padding: 9px 9px 9px 18px;
   border: 1px solid var(--border);
   border-radius: 26px;
-  background: var(--surface);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  background: var(--bg);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text-primary) 10%, transparent);
   transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
 }
 
 /* Focus ring/glow rides the pill itself; the inner textarea stays bare. */
 .chat-composer:focus-within {
-  border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
+  border-color: var(--brand);
   box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--brand) 45%, transparent),
-    0 12px 36px rgba(0, 0, 0, 0.45);
+    0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text-primary) 10%, transparent);
 }
 
 /* The visible label gives way to the placeholder inside the pill; the

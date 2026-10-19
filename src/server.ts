@@ -23,6 +23,7 @@ import {
   clearOAuth,
   completeClaudePkceFlow,
   completeOpenAiPkceFlow,
+  findClaudeFlowByState,
   oauthStatus,
   pollXaiDeviceFlow,
   setOAuthFetch,
@@ -52,10 +53,10 @@ import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
 import { createChatHandler } from './chat/chat-route.js';
 import { createConversationRoutes } from './chat/conversation-routes.js';
 import { createGenUiHandler } from './genui/generate-route.js';
-import { resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
+import { listLlmOptions, resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
 import type { OperatorArchetype, LLMProvider } from './types/index.js';
 import { listOperatorPrompts, setOperatorOverride, resetOperatorOverride, type OperatorOverride } from './operators/index.js';
-import { ingestRepoToSourceContext, ingestFetchedFilesToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError } from './recon/whitebox.js';
+import { ingestRepoToSourceContext, ingestFetchedFilesToSourceContext, runWhiteboxAnalysis, resolveRepoSourceForAnalysis, RepoCloneError, RepoPathError, type ResolvedRepoSource } from './recon/whitebox.js';
 import {
   fetchRepoFiles,
   parseRepoUrlForIngest,
@@ -6600,6 +6601,28 @@ app.get('/api/llm/status', (_req: Request, res: Response) => {
   });
 });
 
+app.get('/api/llm/options', async (_req: Request, res: Response): Promise<void> => {
+  res.json(await listLlmOptions());
+});
+
+app.post('/api/llm/default', (req: Request, res: Response): void => {
+  const provider = typeof req.body?.provider === 'string' ? req.body.provider.trim() : '';
+  const model = typeof req.body?.model === 'string' ? req.body.model.trim() : '';
+  if (!provider || !isKnownLLMProvider(provider)) {
+    res.status(400).json({ error: 'unknown provider' });
+    return;
+  }
+  if (!model) {
+    res.status(400).json({ error: 'model required' });
+    return;
+  }
+  config.setDefaultProvider(provider);
+  config.setDefaultModel(provider, model);
+  void initLLM().then((next) => { llm = next; });
+  const active = selectServerLLMConfig();
+  res.json({ ok: true, provider: active.provider, model: active.model });
+});
+
 // Subscription OAuth (Super Grok Heavy + ChatGPT Plan). Tokens never leave the server.
 app.get('/api/oauth/status', (_req: Request, res: Response) => {
   res.json(oauthStatus());
@@ -6664,7 +6687,7 @@ app.post('/api/oauth/openai/logout', (_req: Request, res: Response) => {
   res.json({ ok: true, oauth: oauthStatus() });
 });
 
-// Claude Pro/Max — PKCE with the pasted-callback code (mirrors the openai trio).
+// Claude Pro/Max — PKCE. The browser returns to GET /callback; paste remains on /complete.
 app.post('/api/oauth/claude/start', async (_req: Request, res: Response): Promise<void> => {
   try {
     res.json(await startClaudePkceFlow());
@@ -6693,6 +6716,46 @@ app.post('/api/oauth/claude/logout', (_req: Request, res: Response) => {
   clearOAuth('claude');
   void initLLM().then((next) => { llm = next; });
   res.json({ ok: true, oauth: oauthStatus() });
+});
+
+function claudeLoopbackCallbackPage(connected: boolean): string {
+  const title = connected ? 'Claude is connected' : 'Claude sign-in failed';
+  const body = connected
+    ? 'Claude is connected. You can close this tab and return to chat.'
+    : 'Claude sign-in did not finish. Close this tab and start again from Settings.';
+  return [
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">',
+    `<title>${title}</title></head>`,
+    '<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;">',
+    `<h1>${title}</h1>`,
+    `<p>${body}</p>`,
+    '<p><a href="/app/#chat">Open chat</a></p>',
+    '</body></html>',
+  ].join('');
+}
+
+// Loopback redirect for the Claude public client. HTML only — never echo tokens or the code.
+app.get('/callback', async (req: Request, res: Response): Promise<void> => {
+  const code = typeof req.query.code === 'string' ? req.query.code : '';
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  const error = typeof req.query.error === 'string' ? req.query.error : '';
+  if (error || !code || !state) {
+    res.status(400).type('html').send(claudeLoopbackCallbackPage(false));
+    return;
+  }
+  const flowId = findClaudeFlowByState(state);
+  if (!flowId) {
+    res.status(400).type('html').send(claudeLoopbackCallbackPage(false));
+    return;
+  }
+  try {
+    await completeClaudePkceFlow(flowId, code);
+    llm = await initLLM();
+    res.status(200).type('html').send(claudeLoopbackCallbackPage(true));
+  } catch {
+    console.error('[purple-team] Claude callback failed');
+    res.status(400).type('html').send(claudeLoopbackCallbackPage(false));
+  }
 });
 
 // =============================================================================
@@ -7973,6 +8036,18 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       }
       repoUrlPack = outcome.pack;
     }
+    let localRepoSource: ResolvedRepoSource | undefined;
+    if (typeof repoPath === 'string' && repoPath.trim() !== '' && repoUrlInput === '') {
+      try {
+        localRepoSource = resolveRepoSourceForAnalysis(repoPath);
+      } catch (e) {
+        if (e instanceof RepoPathError) { res.status(400).json({ error: `repoPath rejected: ${e.message}` }); return; }
+        if (e instanceof RepoCloneError) { res.status(400).json({ error: e.message }); return; }
+        console.error('[purple-team] repo source validation error:', e);
+        res.status(500).json({ error: 'repo source validation failed' });
+        return;
+      }
+    }
 
     try {
       const cmd = createTempestCommandInstance(
@@ -8056,6 +8131,22 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       if (repoUrlPack !== undefined && repoUrlPack.sourceContext.trim() !== '') {
         cmd.setWhiteboxSource(repoUrlPack.sourceContext);
       }
+      let localWhitebox: {
+        includedUnits: number;
+        droppedUnits: number;
+        stats: unknown;
+        source: 'local';
+      } | undefined;
+      if (localRepoSource) {
+        const wb = ingestRepoToSourceContext(localRepoSource.repoPath);
+        if (wb.sourceContext.trim() !== '') cmd.setWhiteboxSource(wb.sourceContext);
+        localWhitebox = {
+          includedUnits: wb.includedUnits,
+          droppedUnits: wb.droppedUnits,
+          stats: wb.stats,
+          source: 'local',
+        };
+      }
 
       cmd.start();
       broadcastEvent('mission:started', {
@@ -8086,7 +8177,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
             runId: start.runId,
             label: repoUrlPack.label,
           },
-        } : {}),
+        } : localWhitebox ? { whitebox: localWhitebox } : {}),
       });
     } catch (error: unknown) {
       console.error('[purple-team] Structured mission start failed:', error);

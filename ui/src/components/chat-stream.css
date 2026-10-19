@@ -1,8 +1,8 @@
 /*
  * ChatStream shell (phase 36 §4) — one calm, centered conversation column on
- * the near-black app surface. Visual grammar: user turns are right-aligned
- * accent-tinted bubbles, assistant turns are plain full-width prose under a
- * small role label, and the composer docks as a floating pill at the bottom
+ * the white app surface. Visual grammar: user turns are right-aligned
+ * light-purple bubbles, assistant turns are dark prose on white under a
+ * small role label, and the composer docks as a white pill at the bottom
  * of the column (chat.css). Consumes :root tokens from styles.css read-only.
  */
 
@@ -115,8 +115,9 @@
   gap: 6px;
   padding: 0;
   border: 0;
-  background: none;
+  background: transparent;
   border-radius: 0;
+  color: var(--text-primary);
 }
 
 /* User turns: right-aligned bubble, at most ~80% of the column. */
@@ -148,15 +149,16 @@
   white-space: nowrap;
 }
 
-/* User bubble surface: brand-violet tint over the elevated step. */
+/* User bubble: light purple tint of brand on white, dark label text. */
 .chat-stream-text {
   display: flex;
   flex-direction: column;
   gap: 4px;
   max-width: 100%;
   padding: 10px 16px;
-  background: color-mix(in srgb, var(--brand) 16%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  background: color-mix(in srgb, var(--brand) 12%, white);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
   border-radius: 18px;
   border-bottom-right-radius: 6px;
   font-size: 15px;

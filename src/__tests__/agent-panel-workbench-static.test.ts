@@ -36,7 +36,7 @@ describe('agent panel workbench shell (phase 36)', () => {
   it('merges generative-ui into the agent panel and redirects the legacy hash', () => {
     expect(app).not.toContain("{ id: 'generative-ui'");
     expect(app).not.toContain("label: 'Generative UI'");
-    expect(app).toContain("'generative-ui': 'agent-panel'");
+    expect(app).toContain("'generative-ui': 'chat'");
     expect(app).toContain('replaceState');
     expect(existsSync(join(process.cwd(), 'ui/src/genui/GenUiPanel.tsx'))).toBe(false);
     existsSync(join(process.cwd(), 'ui/src/genui/library.tsx'));

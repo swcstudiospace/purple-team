@@ -5,6 +5,8 @@
  * Command-line interface for T3MP3ST operations.
  */
 
+import { pathToFileURL } from 'node:url';
+
 import { Command } from 'commander';
 import inquirer from 'inquirer';
 import chalk from 'chalk';
@@ -49,7 +51,7 @@ function showBanner(): void {
   } catch {
     console.log(chalk.cyan(getBanner()));
   }
-  console.log(chalk.gray('  Purple Team: a four-hat educational vulnerability AI (Red, Blue, White, Black)\n'));
+  console.log(chalk.gray('  Chat Panel + CLI share the same hunt.\n'));
 }
 
 function showBox(title: string, content: string, borderColor: string = 'cyan'): void {
@@ -210,6 +212,7 @@ Default: ${chalk.cyan(config.get('defaultProvider'))} / ${chalk.cyan(config.get(
 
   while (running) {
     const choices = [
+      { name: 'Purple Team a target', value: 'purple' },
       { name: '🚀 Start New Operation', value: 'new' },
     ];
 
@@ -241,6 +244,9 @@ Default: ${chalk.cyan(config.get('defaultProvider'))} / ${chalk.cyan(config.get(
 
     try {
       switch (action) {
+        case 'purple':
+          await purpleTeamTarget();
+          break;
         case 'new':
           tempest = await startNewOperation();
           break;
@@ -608,11 +614,152 @@ async function openSettings(): Promise<void> {
   }
 }
 
+
+const HAT_OPERATORS = {
+  Red: ['scanner', 'recon', 'exploiter'],
+  Blue: ['blue', 'sentinel'],
+  White: ['white', 'auditor'],
+  Black: ['black', 'specter'],
+} as const;
+
+type HatName = keyof typeof HAT_OPERATORS;
+
+
+/** Structured mission body. Never includes the role id `red`. */
+export function buildPurpleTeamPayload(input: {
+  objective: string;
+  target: string;
+  hats: readonly HatName[];
+  provider: string;
+  model: string;
+}): {
+  objective: string;
+  operators: string[];
+  targetContext: { kind: 'artifacts' };
+  repoUrl?: string;
+  repoPath?: string;
+  provider: string;
+  model: string;
+} {
+  const operators = input.hats.flatMap(hat => [...HAT_OPERATORS[hat]]);
+  const target = input.target.trim();
+  const github = /^https?:\/\//i.test(target) || /github\.com\//i.test(target) || target.startsWith('github.com/');
+  const repoUrl = github
+    ? (target.startsWith('github.com/') ? `https://${target}` : target)
+    : undefined;
+  return {
+    objective: input.objective.trim(),
+    operators,
+    targetContext: { kind: 'artifacts' },
+    ...(repoUrl !== undefined ? { repoUrl } : { repoPath: target }),
+    provider: input.provider,
+    model: input.model,
+  };
+}
+
+async function purpleTeamTarget(): Promise<void> {
+  const defaultProvider = String(config.get('defaultProvider') ?? '');
+  const defaultModel = String(config.get('defaultModel') ?? '');
+  const answers = await inquirer.prompt([
+    {
+      type: 'input',
+      name: 'objective',
+      message: 'Objective:',
+      validate: (value: string) => value.trim() !== '' || 'Objective is required',
+    },
+    {
+      type: 'input',
+      name: 'target',
+      message: 'Target (GitHub URL or local folder path):',
+      validate: (value: string) => value.trim() !== '' || 'Target is required',
+    },
+    {
+      type: 'checkbox',
+      name: 'hats',
+      message: 'Hats:',
+      choices: (Object.keys(HAT_OPERATORS) as HatName[]).map(hat => ({
+        name: `${hat} (${HAT_OPERATORS[hat].join(', ')})`,
+        value: hat,
+      })),
+      validate: (value: readonly HatName[]) => value.length > 0 || 'Select at least one hat',
+    },
+    {
+      type: 'input',
+      name: 'provider',
+      message: 'Provider:',
+      default: defaultProvider,
+    },
+    {
+      type: 'input',
+      name: 'model',
+      message: 'Model:',
+      default: defaultModel,
+    },
+  ]);
+
+  const payload = buildPurpleTeamPayload(answers);
+  const portRaw = process.env.T3MP3ST_PORT;
+  const portTrimmed = typeof portRaw === 'string' ? portRaw.trim() : '';
+  const port = portTrimmed !== '' ? portTrimmed : '3333';
+  const url = `http://127.0.0.1:${port}/api/mission/start`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    showError('Purple Team server is not running.');
+    console.log(`Start it with: ${chalk.cyan('npm run server')}`);
+    console.log(chalk.gray('Payload that would have been sent:'));
+    console.log(JSON.stringify(payload, null, 2));
+    process.exit(1);
+  }
+
+  const text = await response.text();
+  let body: unknown = text;
+  try {
+    body = text === '' ? null : JSON.parse(text);
+  } catch {
+    body = text;
+  }
+
+  const record = body !== null && typeof body === 'object' ? body : null;
+  const errorField = record !== null && 'error' in record ? record.error : undefined;
+  if (!response.ok || (typeof errorField === 'string' && errorField.trim() !== '')) {
+    const message = typeof errorField === 'string' && errorField.trim() !== ''
+      ? errorField
+      : text || `HTTP ${response.status}`;
+    showError(message);
+    process.exit(1);
+  }
+
+  const runIdField = record !== null && 'runId' in record ? record.runId : undefined;
+  const operatorsField = record !== null && 'operators' in record ? record.operators : undefined;
+  const runId = typeof runIdField === 'string' ? runIdField : '(none)';
+  const spawned = Array.isArray(operatorsField)
+    ? operatorsField.map(op => {
+        if (op !== null && typeof op === 'object' && 'archetype' in op) {
+          const callsign = 'callsign' in op && typeof op.callsign === 'string'
+            ? op.callsign
+            : 'id' in op ? String(op.id) : '';
+          return `${callsign} (${String(op.archetype)})`;
+        }
+        return String(op);
+      })
+    : payload.operators;
+  showSuccess(`Run id: ${runId}`);
+  showInfo(`Operators spawned: ${spawned.join(', ')}`);
+  showInfo(`Watch ${chalk.cyan(`http://127.0.0.1:${port}/app/#chat`)}`);
+}
+
 // =============================================================================
 // CLI COMMANDS
 // =============================================================================
 
-const program = new Command();
+export const program = new Command();
 
 program
   .name('t3mp3st')
@@ -696,6 +843,11 @@ program
   });
 
 program
+  .command('run')
+  .description('Purple Team a target: ingest a repo and spawn hats on the local server')
+  .action(purpleTeamTarget);
+
+program
   .command('models')
   .description('List available models')
   .action(async () => {
@@ -725,4 +877,8 @@ program
   });
 
 // Run CLI
-program.parse();
+const invokedDirectly = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (invokedDirectly) {
+  program.parse();
+}

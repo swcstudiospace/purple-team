@@ -1,5 +1,18 @@
 # Purple Team Changelog
 
+## 2026-10-19 — Chat Panel upgrade: Claude login, hats, providers, CLI
+
+**Fixed**
+- Claude Pro/Max sign-in no longer opens the rejected `claude.ai/oauth/authorize?code=true` URL. Authorize starts at `https://claude.com/cai/oauth/authorize` and returns to `http://localhost:<port>/callback`. Settings polls until the session is connected. Paste remains a fallback.
+- Clicking Red in a hunt no longer sends the role id `red` (the server rejected it). Red, Blue, White, and Black toggle real spawnable roles. Black (`black`, `specter`, `wraith`) is available for codebase hardening.
+- Chat can select a provider and model. Anthropic streams through `/v1/messages` instead of returning 409. Signed-in ChatGPT and SuperGrok stay selectable. Settings can save the server default via `POST /api/llm/default`.
+- A repository chosen on the GitHub tab is the Chat Panel target. You do not pick it twice. Local folders launch with `repoPath`.
+- The CLI `run` command and the first interactive item post the same hunt payload as the UI.
+
+**Changed**
+- The workbench is named Chat Panel (`#chat`; `#agent-panel` still redirects). Hat side panels launch Red, Blue, White, and Black. In-app How to run instructions sit in the chat header.
+- Surfaces are white and purple again (`#FFFFFF` / `#6D28D9`), not the near-black reskin.
+
 ## 2026-10-19 — GitHub login-first redesign: Agent Panel repo entry, Settings, GenUI fixes
 
 **New**
