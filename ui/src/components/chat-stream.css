@@ -1,27 +1,43 @@
+/*
+ * ChatStream shell (phase 36 §4) — one calm, centered conversation column on
+ * the near-black app surface. Visual grammar: user turns are right-aligned
+ * accent-tinted bubbles, assistant turns are plain full-width prose under a
+ * small role label, and the composer docks as a floating pill at the bottom
+ * of the column (chat.css). Consumes :root tokens from styles.css read-only.
+ */
+
 .chat-stream {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  gap: 12px;
+  min-height: 0;
   font-family: var(--font-sans);
   color: var(--text-primary);
+}
+
+/* One shared measure: header, thread, and composer all center at ~760px. */
+.chat-stream-header,
+.chat-stream-log,
+.chat-composer {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
 }
 
 .chat-stream-header {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+  align-items: baseline;
+  gap: 6px 12px;
+  padding: 4px 2px 0;
 }
 
 .chat-stream-title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 600;
+  letter-spacing: 0.02em;
   color: var(--text-primary);
 }
 
@@ -32,19 +48,21 @@
 
 .chat-stream-stop {
   margin-left: auto;
-  padding: 4px 12px;
-  border: 1px solid var(--brand);
-  border-radius: 6px;
-  background: var(--surface-alt);
-  color: var(--brand);
+  min-height: 26px;
+  padding: 3px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
   font: inherit;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
 
 .chat-stream-stop:hover {
-  background: var(--brand);
-  color: #FFFFFF;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 .chat-stream-stop:focus-visible {
@@ -54,7 +72,10 @@
 
 .chat-stream-error {
   margin: 0;
-  color: var(--ap-error);
+  max-width: 760px;
+  margin-inline: auto;
+  color: var(--ap-error, #f85149);
+  font-size: 13px;
   font-weight: 500;
   word-break: break-word;
 }
@@ -65,49 +86,81 @@
 
 .chat-stream-empty {
   margin: 0;
-  padding: 12px;
+  padding: 32px 16px;
   color: var(--text-secondary);
-  background: var(--surface);
-  border: 1px dashed var(--border);
-  border-radius: 8px;
+  font-size: 14px;
+  text-align: center;
 }
 
+/* Thread scroller: generous rhythm between turns; the column's top edge
+   dissolves so streaming content reads as scrolling under the fold. */
 .chat-stream-log {
   list-style: none;
-  margin: 0;
-  padding: 0;
+  padding: 8px 2px 4px;
   max-height: 280px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
 }
 
+/* Assistant turns: plain full-width text under a quiet role label. */
 .chat-stream-msg {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 8px 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--brand);
-  border-radius: 8px;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
 }
 
+/* User turns: right-aligned bubble, at most ~80% of the column. */
 .chat-stream-msg--user {
-  border-left-color: var(--text-secondary);
+  align-self: flex-end;
+  align-items: flex-end;
+  max-width: 80%;
 }
 
 .chat-stream-role {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--brand);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
 
+/* The "You" label stays in the DOM (screen-reader context); the bubble
+   speaks for itself, so it is collapsed to the visually-hidden pattern. */
+.chat-stream-msg--user .chat-stream-role {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* User bubble surface: brand-violet tint over the elevated step. */
 .chat-stream-text {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-width: 100%;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--brand) 16%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  border-radius: 18px;
+  border-bottom-right-radius: 6px;
+  font-size: 15px;
+  line-height: 1.55;
 }
 
 /* Text is rendered as plain text nodes; keep the model's line breaks visible. */

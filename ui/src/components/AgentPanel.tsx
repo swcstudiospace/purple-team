@@ -1,21 +1,26 @@
 /**
  * AgentPanel — the full-screen workbench host (phase 36 §2/§8).
  *
- * Rebuilt from the stacked panel: the tabs, palette grammar, and run-card
- * timeline survive; the panel-scoped composer is gone (the embedded ChatStream
- * composer is the only composer — the palette drives it through the shared
- * draft store). Thread lifecycle moved to the conversation sidebar + zustand
- * store; persistence rides ChatStream's onThreadSettled seam.
+ * Rebuilt from the stacked panel: the palette grammar and run-card timeline
+ * survive; the per-agent tab strip is gone — one unified stream. The
+ * panel-scoped composer is gone too (the embedded ChatStream composer is the
+ * only composer — the palette drives it through the shared draft store).
+ * Thread lifecycle moved to the conversation sidebar + zustand store;
+ * persistence rides ChatStream's onThreadSettled seam. New conversations
+ * start on the repo entry screen (RepoEntry → RepoRunConfig) unless a repo
+ * target is already attached (stores/github.ts).
  *
  * Layout (workbench.css / styles.css): .shell--workbench gives the section
  * the full viewport; inside, exactly three bands — header (auto), thread
  * scroller (flex), composer (outside the scroller, sticky by construction).
  */
 
-import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import { COMMANDS, type AgentId, type CommandSpec } from '../../../src/ui-commands/registry';
 import ChatStream, { type ChatStreamHandle } from './ChatStream';
+import RepoRunConfig from './RepoRunConfig';
+import { RepoEntry, type RepoEntryTarget } from './workbench/RepoEntry';
 import { ConversationSidebar } from './workbench/ConversationSidebar';
 import { SlashPalette } from './workbench/SlashPalette';
 import { AGENT_LABEL } from './workbench/agent-labels';
@@ -25,15 +30,7 @@ import { useSelectedRepo } from '../stores/github';
 import './agent-panel.css';
 import './workbench/workbench.css';
 
-type TabId = 'red' | 'blue' | 'white' | 'black' | 'unified';
 type EntryStatus = 'running' | 'ok' | 'error' | 'aborted' | 'help';
-
-interface Tab {
-  id: TabId;
-  label: string;
-  /** null = every executed command (the Unified Purple Stream). */
-  agent: AgentId | null;
-}
 
 interface TimelineEntry {
   id: number;
@@ -51,14 +48,6 @@ type BuiltRequest =
   | { ok: true; method: 'GET' | 'POST'; url: string; body: string | undefined }
   | { ok: false; error: string };
 type ParsedBody = { ok: true; value: unknown } | { ok: false };
-
-const TABS: readonly Tab[] = [
-  { id: 'red', label: 'Red', agent: 'red' },
-  { id: 'blue', label: 'Blue', agent: 'blue' },
-  { id: 'white', label: 'White', agent: 'white' },
-  { id: 'black', label: 'Black', agent: 'black' },
-  { id: 'unified', label: 'Unified Purple Stream', agent: null },
-];
 
 const STATUS_LABEL: Record<EntryStatus, string> = {
   running: 'Running',
@@ -87,6 +76,8 @@ const JSON_OBJECT_FIELDS: Readonly<Record<string, true>> = {
   observedByFinding: true,
   meta: true,
   verdictsByFinding: true,
+  input: true,
+  params: true,
 };
 const LIST_FIELDS: Readonly<Record<string, true>> = { operators: true, targets: true };
 
@@ -255,18 +246,32 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
 
   const activeId = useConversationsStore(state => state.activeId);
   const load = useConversationsStore(state => state.load);
+  const conversationsStatus = useConversationsStore(state => state.status);
+  const repoTarget = useSelectedRepo(state => state.selected);
+  const repoThreadId = useSelectedRepo(state => state.threadId);
+  const pastePrefill = useSelectedRepo(state => state.pastePrefill);
 
-  const [tab, setTab] = useState<TabId>('unified');
   const [entries, setEntries] = useState<TimelineEntry[]>([]);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(() => readPrefs().sidebarOpen);
 
+  // Repo entry flow: new + target-less conversations start on the entry
+  // screen (select → configure → launch). `entryForced` also covers a GitHub
+  // URL pasted anywhere while a conversation is open; `bypassedThreads` holds
+  // the threads whose entry was skipped with "chat without a repository".
+  const [entryStep, setEntryStep] = useState<'select' | 'configure'>('select');
+  const [entryForced, setEntryForced] = useState(false);
+  const [entryPrefill, setEntryPrefill] = useState<string | null>(null);
+  const [threadHasMessages, setThreadHasMessages] = useState(true);
+  const [hydratedThread, setHydratedThread] = useState<string | null>(null);
+  const [bypassedThreads, setBypassedThreads] = useState<ReadonlySet<string>>(() => new Set());
+
   const nextIdRef = useRef(1);
   const controllersRef = useRef(new Map<number, AbortController>());
-  const tabRefs = useRef<Partial<Record<TabId, HTMLButtonElement | null>>>({});
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const chatRef = useRef<ChatStreamHandle | null>(null);
   const loadedThreadRef = useRef<string | null>(null);
+  const configureFocusRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     void load();
@@ -277,25 +282,51 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
     };
   }, [load]);
 
-  // Conversation switch: hydrate the new thread from the server store.
+  // Conversation switch: hydrate the new thread from the server store. The
+  // hydration result also drives the entry-screen gate (empty + no target).
   useEffect(() => {
     if (activeId === null || activeId === loadedThreadRef.current) return;
     loadedThreadRef.current = activeId;
+    // Navigating to another thread cancels a forced entry flow (paste) while
+    // keeping any prefill for the fresh thread's own entry screen.
+    setEntryForced(false);
+    setEntryStep('select');
     void useConversationsStore
       .getState()
       .loadMessages(activeId)
       .then(messages => {
-        if (useConversationsStore.getState().activeId === activeId) chatRef.current?.loadMessages(messages);
+        if (useConversationsStore.getState().activeId === activeId) {
+          chatRef.current?.loadMessages(messages);
+          setHydratedThread(activeId);
+          setThreadHasMessages(messages.length > 0);
+        }
       });
   }, [activeId]);
+
+  // A GitHub URL pasted anywhere (composer onPaste → useSelectedRepo paste
+  // slice) opens the repo entry screen prefilled; the paste never lands in
+  // the draft.
+  useEffect(() => {
+    if (pastePrefill === null) return;
+    const url = useSelectedRepo.getState().consumePastePrefill();
+    if (url === null) return;
+    setEntryPrefill(url);
+    setEntryStep('select');
+    setEntryForced(true);
+  }, [pastePrefill]);
 
   useEffect(() => {
     const el = timelineRef.current;
     if (el) el.scrollTop = el.scrollHeight;
-  }, [entries, tab, timelineOpen]);
+  }, [entries, timelineOpen]);
+
+  useEffect(() => {
+    if (entryStep === 'configure') configureFocusRef.current?.focus();
+  }, [entryStep]);
 
   /** ChatStream persistence seam — stable identity; the store debounces the PUT. */
   const handleThreadSettled = useCallback((messages: UIMessage[], threadId: string) => {
+    setThreadHasMessages(messages.length > 0);
     if (threadId === 'unsynced' || messages.length === 0) return;
     useConversationsStore.getState().syncMessages(threadId, messages);
   }, []);
@@ -327,8 +358,9 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
 
     let finalArgs = args;
     if (spec.name === 'hunt' && !args.repoUrl) {
-      const { selected } = useSelectedRepo.getState();
-      if (selected) {
+      const thread = useConversationsStore.getState().activeId ?? 'unsynced';
+      const { selected, isAttachedTo } = useSelectedRepo.getState();
+      if (selected && isAttachedTo(thread)) {
         const repoUrl = `https://github.com/${selected.owner}/${selected.repo}${selected.ref && selected.ref !== 'HEAD' ? `/tree/${selected.ref}` : ''}`;
         finalArgs = { ...args, repoUrl };
       }
@@ -404,22 +436,51 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
     }
   }
 
-  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number): void {
-    let next: number | null = null;
-    if (event.key === 'ArrowRight') next = (index + 1) % TABS.length;
-    else if (event.key === 'ArrowLeft') next = (index - 1 + TABS.length) % TABS.length;
-    else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = TABS.length - 1;
-    if (next === null) return;
-    event.preventDefault();
-    const target = TABS[next];
-    setTab(target.id);
-    tabRefs.current[target.id]?.focus();
-  }
+  // --- Repo entry flow ------------------------------------------------------
 
-  const activeTab = TABS.find(item => item.id === tab) ?? TABS[TABS.length - 1];
-  const visible = activeTab.agent === null ? entries : entries.filter(entry => entry.agent === activeTab.agent);
+  const handleEntryTarget = useCallback((target: RepoEntryTarget) => {
+    // The target is conversation-scoped: it is attached to the thread that
+    // is configuring the run, so it survives switches back to that thread
+    // and never leaks into other conversations.
+    const thread = useConversationsStore.getState().activeId ?? 'unsynced';
+    useSelectedRepo.getState().attach(target.selected, target.resolution ?? undefined, thread);
+    setEntryStep('configure');
+    setEntryForced(true);
+  }, []);
+
+  const handleEntryBack = useCallback(() => {
+    useSelectedRepo.getState().clear();
+    setEntryStep('select');
+  }, []);
+
+  const handleRepoRunStarted = useCallback(() => {
+    setEntryForced(false);
+    setEntryStep('select');
+    setEntryPrefill(null);
+    chatRef.current?.focusComposer();
+  }, []);
+
+  const handleEntrySkip = useCallback(() => {
+    const id = useConversationsStore.getState().activeId ?? 'unsynced';
+    setBypassedThreads(previous => new Set(previous).add(id));
+    setEntryForced(false);
+    setEntryPrefill(null);
+    chatRef.current?.focusComposer();
+  }, []);
+
   const threadId = activeId ?? 'unsynced';
+  // The stored target only counts for the conversation it was attached to —
+  // a mission launched in another thread must not suppress this thread's
+  // entry screen, chip, or paste capture.
+  const repoAttachedToThread = repoTarget !== null && repoThreadId === threadId;
+  const showRepoEntry =
+    entryForced ||
+    (conversationsStatus === 'ready' &&
+      activeId !== null &&
+      hydratedThread === activeId &&
+      !threadHasMessages &&
+      !repoAttachedToThread &&
+      !bypassedThreads.has(threadId));
 
   return (
     <section className="apx-workbench" aria-labelledby={`${baseId}-title`}>
@@ -466,34 +527,6 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
           Slash commands call server routes. Free text goes to the configured default model. Conversations persist
           server-side.
         </p>
-
-        <div className="ap-tablist" role="tablist" aria-label="Agent lanes">
-          {TABS.map((item, index) => {
-            const selected = item.id === tab;
-            const count =
-              item.agent === null ? entries.length : entries.filter(entry => entry.agent === item.agent).length;
-            return (
-              <button
-                key={item.id}
-                ref={el => {
-                  tabRefs.current[item.id] = el;
-                }}
-                type="button"
-                role="tab"
-                id={`${baseId}-tab-${item.id}`}
-                aria-selected={selected}
-                aria-controls={`${baseId}-panel`}
-                tabIndex={selected ? 0 : -1}
-                className="ap-tab"
-                onClick={() => setTab(item.id)}
-                onKeyDown={event => handleTabKeyDown(event, index)}
-              >
-                {item.label}
-                <span className="ap-count">{count}</span>
-              </button>
-            );
-          })}
-        </div>
       </header>
 
       <div className="apx-body">
@@ -512,15 +545,11 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
 
           {timelineOpen && (
             <div id={timelineId} className="apx-timeline" ref={timelineRef} aria-label="Command timeline">
-              {visible.length === 0 ? (
-                <p className="ap-empty">
-                  {activeTab.agent === null
-                    ? 'No commands executed yet. Type / to choose one.'
-                    : `No ${activeTab.label} commands yet. Run one below, or see the Unified Purple Stream.`}
-                </p>
+              {entries.length === 0 ? (
+                <p className="ap-empty">No commands executed yet. Type / to choose one.</p>
               ) : (
-                <ol className="ap-timeline-list" aria-label={`${activeTab.label} timeline`}>
-                  {visible.map(entry => (
+                <ol className="ap-timeline-list" aria-label="Unified Purple Stream timeline">
+                  {entries.map(entry => (
                     <li key={entry.id} className={`ap-card ap-card--${entry.status}`}>
                       <div className="ap-card-head">
                         <span className="ap-agent">{AGENT_LABEL[entry.agent]}</span>
@@ -555,10 +584,34 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
                 </ol>
               )}
               <p className="apx-timeline-count" role="status">
-                {visible.length === 0
+                {entries.length === 0
                   ? 'Timeline empty.'
-                  : `${visible.length} timeline ${visible.length === 1 ? 'entry' : 'entries'}.`}
+                  : `${entries.length} timeline ${entries.length === 1 ? 'entry' : 'entries'}.`}
               </p>
+            </div>
+          )}
+
+          {showRepoEntry && entryStep === 'select' && (
+            <RepoEntry prefillUrl={entryPrefill} onTarget={handleEntryTarget} onSkip={handleEntrySkip} />
+          )}
+
+          {showRepoEntry && entryStep === 'configure' && (
+            <div
+              className="apx-entry"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Configure repository run"
+              ref={configureFocusRef}
+              tabIndex={-1}
+            >
+              <div className="apx-entry-card apx-entry-card--wide">
+                <div className="apx-entry-configbar">
+                  <button type="button" className="apx-entry-back" onClick={handleEntryBack}>
+                    ← Change repository
+                  </button>
+                </div>
+                <RepoRunConfig threadId={threadId} onStarted={handleRepoRunStarted} />
+              </div>
             </div>
           )}
         </div>

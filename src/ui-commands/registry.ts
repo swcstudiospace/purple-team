@@ -149,6 +149,48 @@ export const COMMANDS: readonly CommandSpec[] = [
     confirm: true,
   },
   {
+    name: 'tools',
+    aliases: ['catalog'],
+    agent: 'system',
+    summary: 'List registered 4-Hat and shared utility tools, optionally filtered by hat.',
+    args: [
+      { name: 'hat', required: false, hint: 'red | blue | white | black | shared (optional filter)' },
+    ],
+    route: { method: 'GET', path: '/api/teams/tools' },
+  },
+  {
+    name: 'tool',
+    aliases: ['run-tool'],
+    agent: 'purple',
+    summary: 'Run a registered 4-Hat or shared utility tool by id.',
+    args: [
+      { name: 'toolId', required: true, hint: 'tool id from /tools' },
+      { name: 'input', required: false, hint: `${JSON_OBJECT} of tool input` },
+    ],
+    route: { method: 'POST', path: '/api/teams/tools/run' },
+  },
+  {
+    name: 'skills',
+    aliases: ['skillset'],
+    agent: 'system',
+    summary: 'List composable multi-Hat skills, optionally filtered by hat.',
+    args: [
+      { name: 'hat', required: false, hint: 'red | blue | white | black (optional filter)' },
+    ],
+    route: { method: 'GET', path: '/api/teams/skills' },
+  },
+  {
+    name: 'skill',
+    aliases: ['run-skill'],
+    agent: 'purple',
+    summary: 'Run a composable multi-Hat skill pipeline by id.',
+    args: [
+      { name: 'skillId', required: true, hint: 'skill id from /skills' },
+      { name: 'params', required: false, hint: `${JSON_OBJECT} of skill params` },
+    ],
+    route: { method: 'POST', path: '/api/teams/skills/run' },
+  },
+  {
     name: 'help',
     aliases: ['?', 'commands'],
     agent: 'system',

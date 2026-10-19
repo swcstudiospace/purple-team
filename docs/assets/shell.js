@@ -1,8 +1,7 @@
 /* Purple Team shared shell: persistent nav, deep links, api helpers, toasts,
  * query-param state, v2 workspace draft persistence, command palette (Ctrl+K),
- * 4-Hat switcher shortcuts (Alt+1..4), platform capability fallbacks, and
- * mobile bottom navigation. Loaded by every /ui page. No colors here — all
- * paint comes from tokens.css via class names. */
+ * platform capability fallbacks, and mobile bottom navigation. Loaded by every
+ * /ui page. No colors here — all paint comes from tokens.css via class names. */
 (function () {
   'use strict';
 
@@ -12,7 +11,6 @@
     { id: 'overview', file: 'overview.html', label: 'Overview', icon: 'O' },
     { id: 'mission', file: 'mission.html', label: 'Mission', icon: 'M' },
     { id: 'operators', file: 'operators.html', label: 'Operatives', icon: 'P' },
-    { id: 'hats', file: 'hats.html', label: 'Four Hats', icon: '4' },
     { id: 'evidence', file: 'evidence.html', label: 'Evidence', icon: 'E' },
     { id: 'defend', file: 'defend.html', label: 'Defend', icon: 'D' },
     { group: 'Toolkit' },
@@ -26,30 +24,6 @@
     { id: 'about', file: 'about.html', label: 'About', icon: '?' }
   ];
 
-  var HAT_PALETTE_ITEMS = [
-    { id: 'hat-red', label: '[RED] Red Hat — Adversarial Validation', href: 'hats.html?hat=red', badge: 'red' },
-    { id: 'hat-blue', label: '[BLUE] Blue Hat — Orchestration & Defense', href: 'hats.html?hat=blue', badge: 'blue' },
-    { id: 'hat-black', label: '[BLACK] Black Hat — Stress, Risk & Policy', href: 'hats.html?hat=black', badge: 'black' },
-    { id: 'hat-white', label: '[WHITE] White Hat — Evidence & Gap Analysis', href: 'hats.html?hat=white', badge: 'white' },
-    { id: 'tool-blue-workflow-sequencer', label: 'Tool: Blue Workflow Sequencer', href: 'hats.html?hat=blue&tool=blue-workflow-sequencer', badge: 'blue' },
-    { id: 'tool-blue-decision-ledger', label: 'Tool: Blue Decision Ledger', href: 'hats.html?hat=blue&tool=blue-decision-ledger', badge: 'blue' },
-    { id: 'tool-blue-execution-monitor', label: 'Tool: Blue Execution Monitor', href: 'hats.html?hat=blue&tool=blue-execution-monitor', badge: 'blue' },
-    { id: 'tool-white-data-inspector', label: 'Tool: White Data & Telemetry Inspector', href: 'hats.html?hat=white&tool=white-data-inspector', badge: 'white' },
-    { id: 'tool-white-evidence-collector', label: 'Tool: White Fact & Evidence Collector', href: 'hats.html?hat=white&tool=white-evidence-collector', badge: 'white' },
-    { id: 'tool-white-gap-analyzer', label: 'Tool: White Gap & Assumption Analyzer', href: 'hats.html?hat=white&tool=white-gap-analyzer', badge: 'white' },
-    { id: 'tool-black-risk-analyzer', label: 'Tool: Black Risk & Failure-Mode Analyzer', href: 'hats.html?hat=black&tool=black-risk-analyzer', badge: 'black' },
-    { id: 'tool-black-policy-validator', label: 'Tool: Black Constraint & Policy Validator', href: 'hats.html?hat=black&tool=black-policy-validator', badge: 'black' },
-    { id: 'tool-black-stress-prober', label: 'Tool: Black Edge-Case & Stress Prober', href: 'hats.html?hat=black&tool=black-stress-prober', badge: 'black' },
-    { id: 'tool-shared-context-transform', label: 'Tool: Cross-Hat Context Transformer (Send to Hat)', href: 'hats.html?hat=shared&tool=shared-context-transform', badge: 'purple' },
-    { id: 'tool-shared-artifact-diff', label: 'Tool: Cross-Hat Artifact Diff', href: 'hats.html?hat=shared&tool=shared-artifact-diff', badge: 'purple' },
-    { id: 'tool-shared-snapshot-manager', label: 'Tool: Versioned Snapshot Manager', href: 'hats.html?hat=shared&tool=shared-snapshot-manager', badge: 'purple' },
-    { id: 'tool-shared-batch-runner', label: 'Tool: Cross-Hat Batch Runner', href: 'hats.html?hat=shared&tool=shared-batch-runner', badge: 'purple' },
-    { id: 'skill-blue-incident-sequencer', label: 'Skill: Blue Incident Triage & Sequencer', href: 'hats.html?mode=skills&skill=skill-blue-incident-sequencer', badge: 'blue' },
-    { id: 'skill-white-roe-gap-verification', label: 'Skill: White ROE & Telemetry Gap Verification', href: 'hats.html?mode=skills&skill=skill-white-roe-gap-verification', badge: 'white' },
-    { id: 'skill-black-predeploy-stress-audit', label: 'Skill: Black Pre-Deployment Policy & Stress Audit', href: 'hats.html?mode=skills&skill=skill-black-predeploy-stress-audit', badge: 'black' },
-    { id: 'skill-purple-four-hat-synthesis', label: 'Skill: Purple Four-Hat Closed-Loop Synthesis', href: 'hats.html?mode=skills&skill=skill-purple-four-hat-synthesis', badge: 'purple' }
-  ];
-
   /* Legacy single-page ids (bookmarks, keyboard shortcuts, in-app links) map
    * onto the compartmentalized pages. See docs/IA.md for the full mapping. */
   var LEGACY_MAP = {
@@ -57,7 +31,6 @@
     'live-scan': 'mission.html',
     receipts: 'mission.html',
     operators: 'operators.html',
-    hats: 'hats.html',
     evidence: 'evidence.html',
     arsenal: 'arsenal.html',
     terminal: 'terminal.html',
@@ -76,7 +49,6 @@
   function defaultWorkspaceState() {
     return {
       version: 2,
-      activeHat: 'blue',
       toolDrafts: {},
       pinnedOutputs: [],
       forwardedContext: null,
@@ -91,7 +63,6 @@
   function hydrateWorkspaceState(raw) {
     var base = defaultWorkspaceState();
     if (!raw || typeof raw !== 'object') return base;
-    base.activeHat = validHat(raw.activeHat || raw.currentHat || raw.hat);
     var drafts = raw.toolDrafts || raw.drafts;
     if (drafts && typeof drafts === 'object' && !Array.isArray(drafts)) {
       base.toolDrafts = Object.assign({}, drafts);
@@ -127,11 +98,6 @@
         window.localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(hydrated));
       } catch (e) { /* storage unavailable */ }
       return hydrated;
-    },
-    setActiveHat: function (hat) {
-      var st = workspace.get();
-      st.activeHat = validHat(hat);
-      return workspace.save(st);
     },
     saveDraft: function (toolId, draft) {
       if (!toolId) return workspace.get();
@@ -172,7 +138,6 @@
         payload: ctx ? ctx.payload : null,
         forwardedAt: new Date().toISOString()
       };
-      st.activeHat = st.forwardedContext.toHat;
       return workspace.save(st);
     },
     clearForwardedContext: function () {
@@ -253,7 +218,6 @@
     nav.setAttribute('data-mobile-bottom-nav', '');
     var items = [
       { file: 'overview.html', label: 'Overview', icon: 'O' },
-      { file: 'hats.html', label: 'Four Hats', icon: '4' },
       { file: 'operators.html', label: 'Operatives', icon: 'P' },
       { file: 'defend.html', label: 'Defend', icon: 'D' }
     ];
@@ -279,12 +243,11 @@
         list.push({
           id: 'page-' + p.id,
           label: 'Page: ' + p.label,
-          href: p.file,
-          badge: 'shared'
+          href: p.file
         });
       }
     });
-    return list.concat(HAT_PALETTE_ITEMS);
+    return list;
   }
 
   var palettePreviousFocus = null;
@@ -308,9 +271,9 @@
     backdrop.setAttribute('data-cmd-palette-backdrop', '');
     backdrop.innerHTML = '<div class="cmd-palette" role="dialog" aria-modal="true" aria-label="Command Palette">'
       + '<div class="card__row"><strong class="card__title">Command Palette</strong>'
-      + '<span class="badge badge--neutral mono">Esc to close · Alt+1..4 Switch Hat</span></div>'
-      + '<label class="sr-only" for="cmdPaletteInput">Search pages, Hats, tools, and skills</label>'
-      + '<input id="cmdPaletteInput" class="form-input" type="search" placeholder="Jump to Hat, tool, skill, or page..." autocomplete="off">'
+      + '<span class="badge badge--neutral mono">Esc to close</span></div>'
+      + '<label class="sr-only" for="cmdPaletteInput">Search pages</label>'
+      + '<input id="cmdPaletteInput" class="form-input" type="search" placeholder="Jump to page..." autocomplete="off">'
       + '<ul class="cmd-palette__list" role="listbox" id="cmdPaletteList"></ul>'
       + '</div>';
     document.body.appendChild(backdrop);
@@ -330,7 +293,7 @@
       if (activeIdx >= filtered.length) activeIdx = 0;
       if (!listEl) return;
       if (!filtered.length) {
-        listEl.innerHTML = '<li class="text-secondary">No matching Hat, tool, skill, or page.</li>';
+        listEl.innerHTML = '<li class="text-secondary">No matching page.</li>';
         if (focusedInList && input) input.focus();
         return;
       }
@@ -339,7 +302,6 @@
         return '<li role="option" aria-selected="' + sel + '">'
           + '<button type="button" class="cmd-palette__item" aria-selected="' + sel + '" data-palette-idx="' + idx + '">'
           + '<span>' + escHtml(item.label) + '</span>'
-          + '<span class="hat-badge hat-badge--' + escHtml(item.badge) + '">' + escHtml(item.badge) + '</span>'
           + '</button></li>';
       }).join('');
       listEl.querySelectorAll('[data-palette-idx]').forEach(function (btn) {
@@ -411,20 +373,6 @@
         ev.preventDefault();
         openCommandPalette();
         return;
-      }
-      if (ev.altKey && !ev.ctrlKey && !ev.metaKey) {
-        var hatMap = { '1': 'red', '2': 'blue', '3': 'black', '4': 'white' };
-        var targetHat = hatMap[ev.key];
-        if (targetHat) {
-          ev.preventDefault();
-          workspace.setActiveHat(targetHat);
-          announce('Switched active Hat to ' + targetHat.toUpperCase());
-          if (typeof window.__onShellHatSwitch === 'function') {
-            window.__onShellHatSwitch(targetHat);
-          } else {
-            window.location.href = 'hats.html?hat=' + targetHat;
-          }
-        }
       }
     });
   }
@@ -593,7 +541,6 @@
 
   window.Shell = {
     PAGES: PAGES,
-    HAT_PALETTE_ITEMS: HAT_PALETTE_ITEMS,
     workspace: workspace,
     announce: announce,
     openCommandPalette: openCommandPalette,

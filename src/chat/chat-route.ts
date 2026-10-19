@@ -131,6 +131,10 @@ export function createChatHandler(deps: ChatRouteDeps) {
       const result = streamText({
         model: createModel(cfg),
         messages: modelMessages,
+        // Cap the completion budget: without it the provider prices the model's
+        // full output ceiling (e.g. 64k) against the account balance up front,
+        // so any credit-limited key 402s on every send.
+        maxOutputTokens: 8192,
       });
       // Pipes chunks to the Express response as they arrive; nothing is buffered.
       // onError keeps provider error text (which may echo the key) out of the stream.

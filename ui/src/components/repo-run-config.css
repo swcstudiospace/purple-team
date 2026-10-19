@@ -157,6 +157,21 @@
   padding: 0;
 }
 
+/* Branch picker: the ref input keeps free-text semantics; fetched branch
+   names arrive through the native datalist (list= attr), so the only chrome
+   is the mono default-branch name inside the hint. */
+.rrc-field--branch {
+  min-width: 0;
+}
+
+.rrc-hint code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--surface-alt);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+
 .rrc-roles-groups {
   display: flex;
   flex-direction: column;

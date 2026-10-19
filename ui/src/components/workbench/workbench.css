@@ -349,12 +349,15 @@
   max-height: none;
 }
 
-/* Command palette popover, anchored above the embedded composer. */
+/* Command palette popover, anchored above the embedded composer. The static
+   offset is the pre-measurement fallback tuned to the bottom-pill composer
+   (~52px pill + status/hints rows + 8px gap); SlashPalette's layout effect
+   replaces it with a measured value. */
 .apx-palette-popover {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 168px;
+  bottom: 100px;
   z-index: 20;
   max-height: 260px;
   overflow-y: auto;

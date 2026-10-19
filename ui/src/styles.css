@@ -49,16 +49,18 @@
   src: url('/ui/assets/fonts/anybody-latin-700-normal.woff2') format('woff2');
 }
 
-/* White and Purple tokens (values from docs/assets/tokens.css). */
+/* White and Purple tokens — Grok-style dark retune: near-black surfaces
+ * (#0a0a0b family), elevated panels one step lighter, subtle borders, and a
+ * brand violet tuned to keep text ≥4.5:1 on every surface. */
 :root {
-  --bg: #FFFFFF;
-  --surface: #FAFAFE;
-  --surface-alt: #F4F1FA;
-  --border: #E6E0F2;
-  --brand: #6D28D9;
-  --brand-hover: #5B21B6;
-  --text-primary: #1A1A1A;
-  --text-secondary: #595959;
+  --bg: #0a0a0b;
+  --surface: #111114;
+  --surface-alt: #1a1a20;
+  --border: #26262e;
+  --brand: #9061f9;
+  --brand-hover: #a583fb;
+  --text-primary: #ededf2;
+  --text-secondary: #9c9ca7;
 
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, monospace;
@@ -80,6 +82,7 @@ body {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
+  color-scheme: dark;
 }
 
 a:focus-visible,

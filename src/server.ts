@@ -68,17 +68,21 @@ import { redactCredential } from './evidence/index.js';
 import {
   GitHubOAuthError,
   completeGitHubFlow,
+  connectGitHubPat,
   consumeGitHubFlowState,
   disconnectGitHub,
   ensureGitHubAccessToken,
   forceGitHubTokenRefresh,
   githubCallbackPage,
   githubStatus,
+  pollGitHubDeviceFlow,
   setGitHubFetch,
+  startGitHubDeviceFlow,
   startGitHubPkceFlow,
 } from './github/oauth.js';
 import {
   GitHubApiError,
+  listGitHubBranches,
   listGitHubRepos,
   parseGitHubRepoUrl,
   resolveGitHubRepo,
@@ -6838,6 +6842,84 @@ app.get('/api/github/resolve', async (req: Request, res: Response): Promise<void
   }
 });
 
+// Zero-config device flow: the default client id ships in-code (the gh CLI's
+// public OAuth App), so 'Sign in with GitHub' works without any env setup.
+// GET starts the flow, POST polls it — the device_code stays server-side and
+// the SPA only ever sees {userCode, verificationUri} + the poll outcomes.
+app.get('/api/oauth/github/device', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await startGitHubDeviceFlow());
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+app.post('/api/oauth/github/device', async (req: Request, res: Response): Promise<void> => {
+  const flowId = typeof req.body?.flowId === 'string' ? req.body.flowId : '';
+  if (!flowId) {
+    res.status(400).json({ error: 'flowId required' });
+    return;
+  }
+  try {
+    res.json(await pollGitHubDeviceFlow(flowId));
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+// PAT paste fallback for operators who cannot use the device flow. The token
+// is validated once against GET /user, then persists server-side like any
+// other connection — it is never echoed back.
+app.post('/api/oauth/github/token', async (req: Request, res: Response): Promise<void> => {
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  if (!token) {
+    res.status(400).json({ error: 'token required' });
+    return;
+  }
+  try {
+    const github = await connectGitHubPat(token);
+    res.json({ ok: true, github });
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
+// Branch listing for the repo picker: tokened when connected, anonymous for
+// public repos (mirrors /api/github/resolve). defaultBranch rides along from
+// the (60 s cached) resolve; a 404 resolve just omits it, other resolve
+// failures pass through to sendGitHubError.
+app.get('/api/github/branches', async (req: Request, res: Response): Promise<void> => {
+  const owner = typeof req.query.owner === 'string' ? req.query.owner.trim() : '';
+  const repo = typeof req.query.repo === 'string' ? req.query.repo.trim() : '';
+  if (!owner || !repo) {
+    res.status(400).json({ error: 'owner and repo required', code: 'invalid-url' });
+    return;
+  }
+  try {
+    const token = await ensureGitHubAccessToken();
+    const page = Math.max(1, Math.floor(Number(req.query.page)) || 1);
+    const perPage = Math.min(100, Math.max(1, Math.floor(Number(req.query.perPage)) || 30));
+    const result = await listGitHubBranches({
+      owner,
+      repo,
+      token,
+      page,
+      perPage,
+      onAuthFailure: () => forceGitHubTokenRefresh(),
+    });
+    const body: Record<string, unknown> = { ...result };
+    try {
+      const resolution = await resolveGitHubRepo({ owner, repo, token, onAuthFailure: () => forceGitHubTokenRefresh() });
+      body.defaultBranch = resolution.defaultBranch;
+    } catch (e) {
+      if (!(e instanceof GitHubApiError) || e.httpStatus !== 404) throw e;
+    }
+    res.json(body);
+  } catch (e) {
+    sendGitHubError(res, e);
+  }
+});
+
 // =============================================================================
 // DARK PURPLE TEAMS (SPE-9601) — spawnable team archetypes + purple synthesis.
 // Dependency direction: server → teams, never reverse. The teams modules stay pure
@@ -9800,6 +9882,12 @@ app.use('/app', (req: Request, res: Response, next: NextFunction) => {
     res.redirect('/ui/');
     return;
   }
+  // The GenUI sandbox frame (sandbox="allow-scripts" → opaque origin) fetches
+  // its module bundle as an anonymous CORS request with `Origin: null`;
+  // anonymous CORS matches `Access-Control-Allow-Origin: *` per the fetch
+  // spec, so the credential-free public build assets opt in to keep the
+  // sandbox frame bootable without weakening its isolation.
+  res.set('Access-Control-Allow-Origin', '*');
   serveAppDist(req, res, next);
 });
 

@@ -5,14 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
       Phase 36 §6.1 sandbox posture. The frame runs with sandbox="allow-scripts"
-      (opaque origin), so scripts can never read the app's storage or DOM; this
-      CSP is the hard network cut — connect-src 'none' — plus no popups, forms,
-      or top navigation by policy. Everything loads from this origin; no
-      external URL is reachable.
+      (opaque origin), so scripts can never read the app's storage or DOM.
+      NOTE: an opaque origin NEVER matches the 'self' source expression, so
+      'self' here would block the frame's own bundle (verified: genui-ready
+      never fired and the parent fell back to raw source). The network cut is
+      default-src 'none' (covers connect-src); script/style/font loads are
+      unconstrained because the opaque sandbox already denies same-origin
+      access and only this document's own assets are referenced.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'none'; img-src data:"
+      content="default-src 'none'; script-src *; style-src * 'unsafe-inline'; img-src data:; font-src *; connect-src 'none'"
     />
     <title>Generated UI sandbox</title>
   </head>

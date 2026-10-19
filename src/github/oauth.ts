@@ -21,6 +21,7 @@ import { createHash, randomBytes } from 'crypto';
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
+import { classifyGitHubFailure, GitHubApiError } from './api.js';
 
 // =============================================================================
 // Types
@@ -75,8 +76,10 @@ export type GitHubOAuthErrorCode =
   | 'bad-code'
   | 'exchange-failed'
   | 'token-expired'
-  | 'refresh-failed';
-
+  | 'refresh-failed'
+  | 'flow-expired'
+  | 'access-denied'
+  | 'unknown-flow';
 export class GitHubOAuthError extends Error {
   readonly code: GitHubOAuthErrorCode;
   readonly httpStatus: number;
@@ -89,10 +92,19 @@ export class GitHubOAuthError extends Error {
   }
 }
 
+interface GitHubOAuthFetchResponse {
+  ok: boolean;
+  status: number;
+  json: () => Promise<unknown>;
+  text: () => Promise<string>;
+  /** Optional so the token-endpoint mocks stay two-field simple; PAT reads x-oauth-scopes. */
+  headers?: { get(name: string): string | null };
+}
+
 type FetchLike = (
   url: string,
   init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
-) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown>; text: () => Promise<string> }>;
+) => Promise<GitHubOAuthFetchResponse>;
 
 // =============================================================================
 // Constants + env
@@ -112,8 +124,23 @@ const GITHUB_USER_AGENT = 't3mp3st-github-client';
 const REFRESH_SKEW_MS = 120_000;
 const FLOW_TTL_MS = 15 * 60 * 1000;
 
+// Zero-config device flow: defaults to the gh CLI's public OAuth App so
+// 'Sign in with GitHub' works with no env setup at all; T3MP3ST_GITHUB_
+// DEVICE_CLIENT_ID swaps in a first-party client when one is registered.
+const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const GITHUB_DEVICE_CLIENT_ID_DEFAULT = '178c6fc778ccc68e1d6a';
+const GITHUB_DEVICE_INTERVAL_DEFAULT_S = 5;
+const GITHUB_DEVICE_EXPIRES_DEFAULT_S = 900;
+
 interface PendingFlow {
   verifier: string;
+  expiresAt: number;
+}
+
+interface PendingDeviceFlow {
+  deviceCode: string;
+  /** Polling interval in seconds; slow_down bumps it by 5 in place. */
+  interval: number;
   expiresAt: number;
 }
 
@@ -123,6 +150,7 @@ interface GitHubStoreFile {
 }
 
 const pendingFlows = new Map<string, PendingFlow>();
+const pendingDeviceFlows = new Map<string, PendingDeviceFlow>();
 // GitHub refresh tokens rotate on EVERY use — single-flight is mandatory or a
 // concurrent loser burns the rotation into an invalid_grant lockout.
 let refreshFlight: Promise<string | undefined> | null = null;
@@ -144,6 +172,7 @@ export function __setGitHubNow(fn: (() => number) | undefined): void {
 export function __resetGitHubState(): void {
   storeCache = null;
   pendingFlows.clear();
+  pendingDeviceFlows.clear();
   refreshFlight = null;
 }
 
@@ -159,6 +188,10 @@ export function isGitHubOAuthConfigured(): boolean {
 
 function githubClientId(): string {
   return (process.env.T3MP3ST_GITHUB_OAUTH_CLIENT_ID || '').trim();
+}
+
+function githubDeviceClientId(): string {
+  return (process.env.T3MP3ST_GITHUB_DEVICE_CLIENT_ID || '').trim() || GITHUB_DEVICE_CLIENT_ID_DEFAULT;
 }
 
 function githubClientSecret(): string {
@@ -245,7 +278,7 @@ async function doFetch(
   url: string,
   init: Parameters<FetchLike>[1],
   fetchImpl?: FetchLike,
-): Promise<{ ok: boolean; status: number; json: () => Promise<unknown>; text: () => Promise<string> }> {
+): Promise<GitHubOAuthFetchResponse> {
   const fn = fetchImpl ?? injectedFetch ?? (globalThis.fetch as unknown as FetchLike | undefined);
   if (!fn) throw new Error('no fetch implementation available for GitHub OAuth');
   return fn(url, init);
@@ -434,6 +467,175 @@ async function fetchProfileAtConnect(accessToken: string, fetchImpl?: FetchLike)
   } catch {
     return undefined;
   }
+}
+
+// =============================================================================
+// Device flow + PAT paste (zero-config connect — no env credentials needed)
+// =============================================================================
+
+export interface GitHubDeviceFlowStart {
+  flowId: string;
+  userCode: string;
+  verificationUri: string;
+  expiresIn: number;
+  interval: number;
+}
+
+export type GitHubDevicePollResult =
+  | { status: 'pending'; interval: number }
+  | { status: 'connected'; github: GitHubStatus };
+
+/**
+ * Zero-config sign-in: POST github.com/login/device/code with the default
+ * (gh CLI) client id and the same least-privilege scope as the PKCE flow.
+ * The device_code never leaves the server — clients get the user_code pair
+ * and poll by flowId.
+ */
+export async function startGitHubDeviceFlow(opts: { fetchImpl?: FetchLike } = {}): Promise<GitHubDeviceFlowStart> {
+  const url = assertHttpsHost(GITHUB_DEVICE_CODE_URL, GITHUB_ALLOWED_HOSTS, 'GitHub device code URL');
+  const res = await doFetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+      'User-Agent': GITHUB_USER_AGENT,
+    },
+    body: formBody({ client_id: githubDeviceClientId(), scope: GITHUB_SCOPE }),
+  }, opts.fetchImpl);
+
+  const body = await readJson(res);
+  if (!res.ok) {
+    throw new GitHubOAuthError('exchange-failed', `GitHub device code request failed: ${errorDetail(body, res.status)}`, 502);
+  }
+  const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
+  const deviceCode = typeof rec.device_code === 'string' ? rec.device_code : '';
+  const userCode = typeof rec.user_code === 'string' ? rec.user_code : '';
+  const verificationUri = typeof rec.verification_uri === 'string' ? rec.verification_uri : '';
+  if (!deviceCode || !userCode || !verificationUri) {
+    throw new GitHubOAuthError('exchange-failed', 'GitHub device code response missing device_code/user_code/verification_uri', 502);
+  }
+  const rawExpiresIn = Number(rec.expires_in);
+  const rawInterval = Number(rec.interval);
+  const expiresIn = Number.isFinite(rawExpiresIn) && rawExpiresIn > 0 ? rawExpiresIn : GITHUB_DEVICE_EXPIRES_DEFAULT_S;
+  const interval = Number.isFinite(rawInterval) && rawInterval > 0 ? rawInterval : GITHUB_DEVICE_INTERVAL_DEFAULT_S;
+  const flowId = base64url(randomBytes(16));
+  pendingDeviceFlows.set(flowId, { deviceCode, interval, expiresAt: nowFn() + expiresIn * 1000 });
+  return { flowId, userCode, verificationUri, expiresIn, interval };
+}
+
+/**
+ * Poll an in-flight device flow. The flow is only consumed on a terminal
+ * answer (token, expiry, denial) — pending answers leave it replayable, and
+ * slow_down bumps the stored interval by 5 s per the OAuth device spec. On
+ * access_token the token persists through the same store/projection path as
+ * the PKCE flow (no refresh token: this grant never issues one).
+ */
+export async function pollGitHubDeviceFlow(
+  flowId: string,
+  opts: { fetchImpl?: FetchLike } = {},
+): Promise<GitHubDevicePollResult> {
+  const pending = pendingDeviceFlows.get(flowId);
+  if (!pending) {
+    throw new GitHubOAuthError('unknown-flow', 'unknown or expired GitHub device flow — start again', 404);
+  }
+  if (nowFn() > pending.expiresAt) {
+    pendingDeviceFlows.delete(flowId);
+    throw new GitHubOAuthError('flow-expired', 'GitHub device code expired — start again', 410);
+  }
+
+  const tokenUrl = assertHttpsHost(GITHUB_TOKEN_URL, GITHUB_ALLOWED_HOSTS, 'GitHub token URL');
+  const res = await doFetch(tokenUrl.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Accept: 'application/json',
+      'User-Agent': GITHUB_USER_AGENT,
+    },
+    body: formBody({
+      client_id: githubDeviceClientId(),
+      device_code: pending.deviceCode,
+      grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+    }),
+  }, opts.fetchImpl);
+
+  const body = await readJson(res);
+  const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
+  const error = typeof rec.error === 'string' ? rec.error : '';
+  const access = typeof rec.access_token === 'string' ? rec.access_token : '';
+
+  if (res.ok && access) {
+    pendingDeviceFlows.delete(flowId);
+    const tokens: GitHubTokens = {
+      accessToken: access,
+      tokenType: 'bearer',
+      scopes: ['repo', 'read:user'],
+      obtainedAt: nowFn(),
+    };
+    const profile = await fetchProfileAtConnect(access, opts.fetchImpl);
+    saveStore({ tokens, profile });
+    return { status: 'connected', github: githubStatus() };
+  }
+  if (error === 'authorization_pending') {
+    return { status: 'pending', interval: pending.interval };
+  }
+  if (error === 'slow_down') {
+    pending.interval += 5;
+    return { status: 'pending', interval: pending.interval };
+  }
+  if (error === 'expired_token') {
+    pendingDeviceFlows.delete(flowId);
+    throw new GitHubOAuthError('flow-expired', 'GitHub device code expired — start again', 410);
+  }
+  if (error === 'access_denied') {
+    pendingDeviceFlows.delete(flowId);
+    throw new GitHubOAuthError('access-denied', 'GitHub authorization was denied — start again', 403);
+  }
+  throw new GitHubOAuthError('exchange-failed', `GitHub device token request failed: ${errorDetail(body, res.status)}`, 502);
+}
+
+/**
+ * PAT paste fallback: ONE GET /user both validates the token and captures
+ * {login, avatarUrl}. Granted scopes ride the x-oauth-scopes response header
+ * (comma-separated); a missing header falls back to the requested set.
+ */
+export async function connectGitHubPat(token: string, opts: { fetchImpl?: FetchLike } = {}): Promise<GitHubStatus> {
+  const url = assertHttpsHost(`${GITHUB_API_ORIGIN}/user`, GITHUB_API_ALLOWED_HOSTS, 'GitHub user URL');
+  const res = await doFetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${token}`,
+      'User-Agent': GITHUB_USER_AGENT,
+    },
+  }, opts.fetchImpl);
+
+  if (!res.ok) {
+    if (res.status === 401) {
+      throw new GitHubApiError('invalid-token', 'GitHub rejected that token — check it and try again', 401);
+    }
+    const bodyText = await res.text().catch(() => '');
+    throw classifyGitHubFailure(res.status, res.headers ?? { get: () => null }, bodyText, 'token');
+  }
+  const body = (await readJson(res)) as Record<string, unknown>;
+  const scopesRaw = res.headers?.get('x-oauth-scopes') ?? '';
+  const granted = scopesRaw.split(',').map((s) => s.trim()).filter(Boolean);
+  const login = typeof body.login === 'string' && body.login ? body.login : '';
+  const profile: GitHubProfile | undefined = login
+    ? {
+      login,
+      avatarUrl: typeof body.avatar_url === 'string' && body.avatar_url ? body.avatar_url : undefined,
+    }
+    : undefined;
+  saveStore({
+    tokens: {
+      accessToken: token,
+      tokenType: 'bearer',
+      scopes: granted.length ? granted : ['repo', 'read:user'],
+      obtainedAt: nowFn(),
+    },
+    profile,
+  });
+  return githubStatus();
 }
 
 // =============================================================================

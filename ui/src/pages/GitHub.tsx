@@ -120,12 +120,12 @@ function deriveAccountView(
   if (status.status === 'error') return 'network-error';
   if (authBroken) return 'token-expired';
   const data = status.data;
-  if (!data.configured) return 'not-configured';
-  // A pending/denied flow only wins while the account is still signed out;
-  // once the callback or paste path lands, `connected` takes over.
-  if (flow.kind === 'pending' && !data.connected) return 'consent-pending';
-  if (flow.kind === 'denied' && !data.connected) return 'consent-denied';
+  // A connected account (web flow OR zero-config device login) outranks the
+  // web-flow env gate: never show the developer setup card while signed in.
   if (data.connected) return 'connected';
+  if (flow.kind === 'pending') return 'consent-pending';
+  if (flow.kind === 'denied') return 'consent-denied';
+  if (!data.configured) return 'not-configured';
   return 'signed-out';
 }
 

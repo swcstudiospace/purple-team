@@ -1,51 +1,14 @@
 /*
- * Agent-panel timeline grammar (phase 36 §8): tabs, run cards, result blocks,
- * and help lists — consumed by the rebuilt workbench host (AgentPanel.tsx).
- * Shell, header, sidebar, palette, and composer styles live in
- * ui/src/components/workbench/workbench.css as apx-* rules. The --ap-error /
- * --ap-ok custom properties are defined on .apx-workbench there; colours
- * consume the :root tokens from ui/src/styles.css read-only.
+ * Agent-panel grammar: run cards, result blocks, help lists, and the repo
+ * entry screen + attached-repo chip — consumed by the workbench host
+ * (AgentPanel.tsx) and its entry/configure surfaces. The per-agent tab strip
+ * is gone (one unified stream). Shell, header, sidebar, palette, and composer
+ * styles live in ui/src/components/workbench/workbench.css as apx-* rules.
+ * The --ap-error / --ap-ok custom properties are defined on .apx-workbench
+ * there; colours consume the :root tokens from ui/src/styles.css read-only.
  */
 
 
-.ap-tablist {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 8px;
-}
-
-.ap-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-alt);
-  color: var(--text-secondary);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.ap-tab[aria-selected='true'] {
-  background: var(--brand);
-  border-color: var(--brand);
-  color: #FFFFFF;
-}
-
-.ap-tab:hover:not([aria-selected='true']) {
-  color: var(--text-primary);
-  border-color: var(--brand);
-}
-
-.ap-count {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  opacity: 0.85;
-}
 
 .ap-timeline-list {
   list-style: none;
@@ -227,4 +190,439 @@
 
 .ap-help-summary {
   color: var(--text-primary);
+}
+
+/* ------------------------------------------------------------------ */
+/* Repo entry screen (AgentPanel start state) + attached-repo chip     */
+/* ------------------------------------------------------------------ */
+
+.apx-entry {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  overflow-y: auto;
+  padding: 32px 16px;
+  background: var(--bg);
+}
+
+.apx-entry-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  max-width: 640px;
+  margin: auto;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.apx-entry-card--wide {
+  max-width: 760px;
+}
+
+.apx-entry-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.apx-entry-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+
+.apx-entry-subtitle {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.apx-entry-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.apx-entry-mode {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.apx-entry-mode[aria-pressed='true'] {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #FFFFFF;
+}
+
+.apx-entry-mode:hover:not([aria-pressed='true']) {
+  color: var(--text-primary);
+  border-color: var(--brand);
+}
+
+.apx-entry-list,
+.apx-entry-paste {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.apx-entry-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.apx-entry-search,
+.apx-entry-input {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 8px 10px;
+  background: var(--bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.apx-entry-search::placeholder,
+.apx-entry-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.apx-entry-visibility {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.apx-entry-visibility button {
+  padding: 6px 12px;
+  border: 0;
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.apx-entry-visibility button + button {
+  border-left: 1px solid var(--border);
+}
+
+.apx-entry-visibility button[aria-pressed='true'] {
+  background: var(--brand);
+  color: #FFFFFF;
+}
+
+.apx-repo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.apx-repo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.apx-repo-item:hover {
+  border-color: var(--brand);
+}
+
+.apx-repo-item-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.apx-repo-item-fullname {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.apx-repo-item-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.apx-badge {
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.apx-badge--private {
+  border-color: var(--ap-error);
+  color: var(--ap-error);
+}
+
+.apx-badge--public {
+  border-color: var(--ap-ok);
+  color: var(--ap-ok);
+}
+
+.apx-repo-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.apx-repo-preview-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.apx-repo-preview-title code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.apx-repo-preview-meta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.apx-entry-label {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.apx-entry-paste-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.apx-entry-note,
+.apx-entry-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.apx-entry-note .ap-spinner {
+  display: inline-block;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.apx-entry-hint a {
+  color: var(--brand);
+}
+
+.apx-entry-error {
+  margin: 0;
+  color: var(--ap-error);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.apx-entry-error-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.apx-entry-primary,
+.apx-entry-secondary,
+.apx-entry-more,
+.apx-entry-back,
+.apx-entry-skip {
+  font: inherit;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.apx-entry-primary {
+  align-self: flex-start;
+  padding: 8px 16px;
+  background: var(--brand);
+  color: #FFFFFF;
+  border: 1px solid var(--brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.apx-entry-primary:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.apx-entry-connect {
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.apx-entry-secondary {
+  padding: 8px 14px;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.apx-entry-secondary:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.apx-entry-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.apx-entry-more {
+  align-self: stretch;
+  padding: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border);
+}
+
+.apx-entry-more:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--brand);
+}
+
+.apx-entry-more:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.apx-entry-configbar {
+  display: flex;
+}
+
+.apx-entry-back,
+.apx-entry-skip {
+  align-self: flex-start;
+  padding: 4px 8px;
+  background: transparent;
+  border: 0;
+  color: var(--text-secondary);
+}
+
+.apx-entry-back:hover,
+.apx-entry-skip:hover {
+  color: var(--brand);
+}
+
+.apx-entry-footer {
+  display: flex;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+/* Attached-repo chip inside the bottom-pill composer (chat/composer.tsx):
+   a leading segment of the pill, bottom-aligned with the textarea. */
+.apx-workbench .chat-composer-repo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  max-width: 40%;
+  margin-bottom: 4px;
+  padding: 2px 4px 2px 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
+.apx-workbench .chat-composer-repo-name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.apx-workbench .chat-composer-repo-badge {
+  padding: 0 8px;
+  border: 1px solid var(--ap-error);
+  border-radius: 999px;
+  color: var(--ap-error);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.apx-workbench .chat-composer-repo-detach {
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.apx-workbench .chat-composer-repo-detach:hover {
+  color: var(--ap-error);
+}
+
+@media (max-width: 640px) {
+  .apx-entry {
+    padding: 16px 8px;
+  }
+
+  .apx-entry-card {
+    padding: 14px;
+  }
+
+  .apx-entry-paste-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .apx-entry-paste-row .apx-entry-secondary {
+    width: 100%;
+  }
 }

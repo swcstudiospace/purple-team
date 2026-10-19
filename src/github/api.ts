@@ -24,6 +24,7 @@ import { createHash } from 'crypto';
 
 export type GitHubApiErrorCode =
   | 'invalid-url'
+  | 'invalid-token'
   | 'token-expired'
   | 'rate-limited'
   | 'repo-not-found'
@@ -76,11 +77,12 @@ export function setGitHubApiFetch(fn: GitHubFetchLike | undefined): void {
   injectedFetch = fn;
 }
 
-/** Test helper — drop the injected fetch and both 60 s caches. */
+/** Test helper — drop the injected fetch and the 60 s caches. */
 export function __resetGitHubApiState(): void {
   injectedFetch = undefined;
   repoPageCache.clear();
   resolveCache.clear();
+  branchCache.clear();
 }
 
 function assertApiUrl(url: string): URL {
@@ -199,6 +201,7 @@ export function classifyGitHubFailure(
 const CACHE_TTL_MS = 60_000;
 const REPOS_CACHE_MAX = 10;
 const RESOLVE_CACHE_MAX = 50;
+const BRANCHES_CACHE_MAX = 50;
 
 interface CacheEntry<T> {
   at: number;
@@ -207,6 +210,8 @@ interface CacheEntry<T> {
 
 const repoPageCache = new Map<string, CacheEntry<GitHubRepoPage>>();
 const resolveCache = new Map<string, CacheEntry<GitHubRepoResolution>>();
+
+const branchCache = new Map<string, CacheEntry<GitHubBranchPage>>();
 
 function cacheGet<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
   const hit = cache.get(key);
@@ -420,6 +425,76 @@ export async function resolveGitHubRepo(params: {
   if (s.pushedAt) value.pushedAt = s.pushedAt;
   cachePut(resolveCache, cacheKey, value, RESOLVE_CACHE_MAX);
   return { ...value };
+}
+
+// =============================================================================
+// GET /repos/{owner}/{repo}/branches — branch listing (tokened | anonymous)
+// =============================================================================
+
+export interface GitHubBranchSummary {
+  name: string;
+  commitSha: string;
+  protected: boolean;
+}
+
+export interface GitHubBranchPage {
+  branches: GitHubBranchSummary[];
+  page: number;
+  perPage: number;
+  hasNext: boolean;
+}
+
+function branchOf(rec: RepoRecord): GitHubBranchSummary {
+  const commit = rec.commit as Record<string, unknown> | undefined;
+  return {
+    name: typeof rec.name === 'string' ? rec.name : '',
+    commitSha: commit && typeof commit.sha === 'string' ? commit.sha : '',
+    protected: rec.protected === true,
+  };
+}
+
+/** Repo-picker branch listing — mirrors resolveGitHubRepo's tokened-or-anonymous access. */
+export async function listGitHubBranches(params: {
+  owner: string;
+  repo: string;
+  token?: string;
+  page?: number;
+  perPage?: number;
+  fetchImpl?: GitHubFetchLike;
+  onAuthFailure?: () => Promise<string | undefined>;
+}): Promise<GitHubBranchPage> {
+  const page = Number.isFinite(params.page) && (params.page as number) >= 1 ? Math.floor(params.page as number) : 1;
+  const rawPerPage = Number.isFinite(params.perPage) ? Math.floor(params.perPage as number) : 30;
+  const perPage = Math.min(100, Math.max(1, rawPerPage));
+
+  const cacheKey = `branches:${params.token ? tokenFingerprint(params.token) : 'anon'}:${params.owner}/${params.repo}:${perPage}:${page}`;
+  const cached = cacheGet(branchCache, cacheKey);
+  if (cached) return { ...cached, branches: cached.branches.map((b) => ({ ...b })) };
+
+  const query = new URLSearchParams({ per_page: String(perPage), page: String(page) });
+  const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}/branches?${query.toString()}`;
+
+  let result: ApiCallResult;
+  try {
+    result = await ghApiGet(path, params.token, params.fetchImpl);
+  } catch (e) {
+    const fresh = await refreshedTokenAfterAuthFailure(e, params.token, params.onAuthFailure);
+    if (!fresh) throw e;
+    result = await ghApiGet(path, fresh, params.fetchImpl);
+  }
+
+  if (!Array.isArray(result.body)) {
+    throw new GitHubApiError('network-error', 'GitHub /branches returned a non-array body', 502);
+  }
+  const branches = (result.body as unknown[])
+    .filter((raw): raw is RepoRecord => Boolean(raw) && typeof raw === 'object')
+    .map(branchOf)
+    .filter((b) => b.name);
+  // Pagination signal is the Link header: rel="next" present ⇒ another page.
+  const link = result.headers.get('link') || '';
+  const value: GitHubBranchPage = { branches, page, perPage, hasNext: /rel="next"/.test(link) };
+  cachePut(branchCache, cacheKey, value, BRANCHES_CACHE_MAX);
+  return { ...value, branches: branches.map((b) => ({ ...b })) };
 }
 
 /**

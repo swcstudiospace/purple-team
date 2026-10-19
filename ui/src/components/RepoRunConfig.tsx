@@ -27,6 +27,12 @@ export interface RepoRunStarted {
 
 export interface RepoRunConfigProps {
   onStarted?: (result: RepoRunStarted) => void;
+  /**
+   * Owning conversation id: when provided, the store target only prefills
+   * when it is attached to THIS conversation (a target launched in another
+   * thread must not leak in). Undefined = unscoped (non-workbench mounts).
+   */
+  threadId?: string;
 }
 
 /** The 17 spawnable roles (src/teams/contracts.ts), grouped by discipline with doctrine copy from src/teams/hat-registry.ts. */
@@ -50,6 +56,11 @@ const OPERATOR_GROUPS: ReadonlyArray<{ group: string; doctrine: string; roles: r
 
 const DEFAULT_ROLES: readonly string[] = ['scanner', 'auditor'];
 
+/** One branch row from GET /api/github/branches (fed to the ref datalist). */
+interface BranchSummary {
+  name: string;
+}
+
 const SECRET_VALUE = /\b(?:sk-[A-Za-z0-9_-]{12,}|gh[pousr]_[A-Za-z0-9]{12,}|xox[abprs]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16})\b/g;
 
 /** Prefer the server's plain `error: string` body field (AgentPanel serverErrorMessage precedent). */
@@ -72,7 +83,7 @@ function composeUrl(base: ParsedRepoTarget, ref: string, subpath: string, wholeR
   return `https://github.com/${base.owner}/${base.repo}/tree/${refSegment}${effectiveSubpath === '' ? '' : `/${effectiveSubpath}`}`;
 }
 
-export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
+export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProps) {
   const urlId = useId();
   const refId = useId();
   const scopeId = useId();
@@ -80,6 +91,7 @@ export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
   const objectiveId = useId();
   const nameId = useId();
   const rolesId = useId();
+  const branchListId = useId();
 
   const [repoUrl, setRepoUrl] = useState('');
   const [refText, setRefText] = useState('');
@@ -91,18 +103,20 @@ export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState<RepoRunStarted | null>(null);
-  const { selected } = useSelectedRepo();
+  const [branches, setBranches] = useState<readonly BranchSummary[]>([]);
+  const [branchDefault, setBranchDefault] = useState<string | null>(null);
+  const { selected, threadId: ownerThreadId } = useSelectedRepo();
 
-  // Link to GitHub: prefill URL from selected store for connected success state (graceful empty if none).
+  // Link to GitHub: prefill URL from the selected store target, but only when
+  // it belongs to this conversation (or no conversation scope was given).
+  const targetInScope = selected !== null && (threadId === undefined || ownerThreadId === threadId);
   const didPrefill = useRef(false);
   useEffect(() => {
-    if (selected && !didPrefill.current && repoUrl.trim() === '') {
-      const refPart = selected.ref && selected.ref !== 'HEAD' ? `/tree/${selected.ref}` : '';
-      const u = `https://github.com/${selected.owner}/${selected.repo}${refPart}`;
-      setRepoUrl(u);
-      didPrefill.current = true;
-    }
-  }, [selected]);
+    if (selected === null || !targetInScope || didPrefill.current || repoUrl.trim() !== '') return;
+    const refPart = selected.ref && selected.ref !== 'HEAD' ? `/tree/${selected.ref}` : '';
+    setRepoUrl(`https://github.com/${selected.owner}/${selected.repo}${refPart}`);
+    didPrefill.current = true;
+  }, [selected, targetInScope]);
 
   const parsed = useMemo(() => parseRepoTarget(repoUrl), [repoUrl]);
 
@@ -115,6 +129,47 @@ export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
   useEffect(() => () => abortRef.current?.abort(), []);
 
   const controlsAvailable = lastGoodRef.current !== null;
+
+  // Branch picker: datalist suggestions for the ref input, fetched per
+  // owner/repo from GET /api/github/branches. Best-effort — a failure (route
+  // missing, auth gap) leaves the free-text ref control fully usable.
+  const branchOwnerRepo = parsed.ok ? `${parsed.value.owner}/${parsed.value.repo}` : null;
+  useEffect(() => {
+    if (branchOwnerRepo === null) {
+      setBranches([]);
+      setBranchDefault(null);
+      return;
+    }
+    const controller = new AbortController();
+    let cancelled = false;
+    const [owner, repo] = branchOwnerRepo.split('/');
+    fetch(`/api/github/branches?owner=${encodeURIComponent(owner)}&repo=${encodeURIComponent(repo)}`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    })
+      .then(response => (response.ok ? response.json() : null))
+      .then((body: unknown) => {
+        if (cancelled || body === null || typeof body !== 'object') return;
+        if (!('branches' in body) || !Array.isArray(body.branches)) return;
+        const list: BranchSummary[] = [];
+        for (const branch of body.branches) {
+          if (branch !== null && typeof branch === 'object' && 'name' in branch && typeof branch.name === 'string') {
+            list.push({ name: branch.name });
+          }
+        }
+        setBranches(list);
+        if ('defaultBranch' in body && typeof body.defaultBranch === 'string' && body.defaultBranch !== '') {
+          setBranchDefault(body.defaultBranch);
+        }
+      })
+      .catch(() => {
+        // Optional suggestions only; never block the form.
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [branchOwnerRepo]);
 
   // Reject snippets (non github URL code pastes). Purple accepts URLs, rejects snippets, inline error.
   // Inlined to follow no-tiny-fn. Security: parse already validates no creds, https github etc.
@@ -237,7 +292,7 @@ export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
         </p>
       </header>
 
-      {selected && (
+      {targetInScope && selected !== null && (
         <p className="rrc-hint" role="status">Linked from GitHub (success state): {selected.fullName}. Fallback: public URLs work anonymously.</p>
       )}
 
@@ -267,7 +322,7 @@ export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
       </div>
 
       <div className="rrc-controls-row">
-        <div className="rrc-field">
+        <div className="rrc-field rrc-field--branch">
           <label className="rrc-label" htmlFor={refId}>Branch / tag / commit</label>
           <input
             id={refId}
@@ -278,9 +333,27 @@ export default function RepoRunConfig({ onStarted }: RepoRunConfigProps) {
             spellCheck={false}
             autoComplete="off"
             placeholder="default branch (auto)"
+            list={branchListId}
             onChange={event => handleRefChange(event.target.value)}
           />
-          <p className="rrc-hint">Leave empty to run the repository&apos;s default branch (resolved automatically).</p>
+          <datalist id={branchListId}>
+            {branches.map(branch => (
+              <option key={branch.name} value={branch.name} />
+            ))}
+          </datalist>
+          <p className="rrc-hint">
+            Leave empty to run the repository&apos;s default branch
+            {branchDefault !== null ? (
+              <>
+                {' '}
+                (<code>{branchDefault}</code>)
+              </>
+            ) : (
+              ''
+            )}{' '}
+            (resolved automatically). Free-text branch, tag, or commit
+            {branches.length > 0 ? `, or pick from the ${branches.length} fetched branches` : ''}.
+          </p>
         </div>
 
         <fieldset className="rrc-field rrc-scope">

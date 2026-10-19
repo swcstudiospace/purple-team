@@ -408,3 +408,148 @@ export function putConversationMessages(
   );
 }
 
+// ---------------------------------------------------------------------------
+// Settings page. Shapes from the GitHub device-flow route contracts in
+// src/server.ts and the vendor/model routes docs/settings.html drives.
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/oauth/github — account status projection. Same "no token fields
+ * ever leave the server" rule as GitHubStatus; `refreshTokenExpiresAt` rides
+ * along for PAT grants (GitHub PATs have no refresh token).
+ */
+export interface GitHubDeviceStatus {
+  connected: boolean;
+  login?: string;
+  avatarUrl?: string;
+  scopes?: string[];
+  /** ms epoch of the short-lived access token (the server refreshes on demand). */
+  expiresAt?: number;
+  /** ms epoch when the grant itself lapses — PAT connections die here. */
+  refreshTokenExpiresAt?: number;
+  mode?: 'connected' | 'anonymous';
+}
+
+/** GET /api/oauth/github/device — starts an RFC 8628 device-code flow. */
+export interface GitHubDeviceStart {
+  flowId: string;
+  userCode: string;
+  verificationUri: string;
+  /** Seconds until the user code expires. */
+  expiresIn: number;
+  /** Recommended poll interval, seconds. */
+  interval: number;
+}
+
+/** POST /api/oauth/github/device {flowId} — the user has not approved yet. */
+export interface GitHubDevicePollPending {
+  status: 'pending';
+  interval: number;
+}
+
+/** POST /api/oauth/github/device {flowId} — the user approved the code. */
+export interface GitHubDevicePollConnected {
+  status: 'connected';
+  github: GitHubDeviceStatus;
+}
+
+export type GitHubDevicePoll = GitHubDevicePollPending | GitHubDevicePollConnected;
+
+/** POST /api/oauth/github/token {token} | POST /api/oauth/github/logout */
+export interface GitHubDeviceActionResult {
+  ok: boolean;
+  github: GitHubDeviceStatus;
+}
+
+/** POST /api/oauth/xai/start — SuperGrok device-code start (XaiDeviceStart). */
+export interface XaiDeviceStart {
+  flowId: string;
+  userCode: string;
+  verificationUri: string;
+  verificationUriComplete?: string;
+  expiresIn: number;
+  interval: number;
+}
+
+/** POST /api/oauth/xai/poll {flowId} — pollXaiDeviceFlow spread beside oauthStatus(). */
+export interface XaiDevicePoll {
+  status: 'pending' | 'slow_down' | 'authorized' | 'denied' | 'expired';
+  interval?: number;
+  error?: string;
+  oauth: OAuthStatusResponse;
+}
+
+/** POST /api/oauth/{openai,claude}/start — PKCE start (browser + pasted code). */
+export interface VendorPkceStart {
+  flowId: string;
+  authorizeUrl: string;
+  state: string;
+}
+
+/** POST /api/oauth/{xai,openai,claude}/complete | /logout — carries a fresh status map. */
+export interface VendorOAuthResult {
+  ok: boolean;
+  oauth: OAuthStatusResponse;
+}
+
+/** POST /api/models — provider model listing for the universal API config. */
+export interface ModelsResponse {
+  provider: string;
+  source: 'live' | 'stale' | 'unavailable';
+  models: Array<{ id: string }>;
+  /** Epoch ms of the live/stale fetch; null when unavailable. */
+  fetchedAt: number | null;
+  note?: string;
+}
+
+export function startGitHubDeviceFlow(): Promise<GitHubDeviceStart> {
+  return getJson<GitHubDeviceStart>('/api/oauth/github/device');
+}
+
+export function pollGitHubDeviceFlow(flowId: string): Promise<GitHubDevicePoll> {
+  return postJson<GitHubDevicePoll>('/api/oauth/github/device', { flowId });
+}
+
+/** Paste fallback for environments where the device flow is impractical. */
+export function connectGitHubPat(token: string): Promise<GitHubDeviceActionResult> {
+  return postJson<GitHubDeviceActionResult>('/api/oauth/github/token', { token });
+}
+
+export function logoutGitHubDevice(): Promise<GitHubDeviceActionResult> {
+  return postJson<GitHubDeviceActionResult>('/api/oauth/github/logout', {});
+}
+
+export function startXaiOAuth(): Promise<XaiDeviceStart> {
+  return postJson<XaiDeviceStart>('/api/oauth/xai/start', {});
+}
+
+export function pollXaiOAuth(flowId: string): Promise<XaiDevicePoll> {
+  return postJson<XaiDevicePoll>('/api/oauth/xai/poll', { flowId });
+}
+
+export function startPkceOAuth(vendor: 'openai' | 'claude'): Promise<VendorPkceStart> {
+  return postJson<VendorPkceStart>(`/api/oauth/${vendor}/start`, {});
+}
+
+/** `code` is the pasted callback code (`code#state` or the whole URL also work). */
+export function completePkceOAuth(
+  vendor: 'openai' | 'claude',
+  flowId: string,
+  code: string,
+): Promise<VendorOAuthResult> {
+  return postJson<VendorOAuthResult>(`/api/oauth/${vendor}/complete`, { flowId, code });
+}
+
+export function logoutVendorOAuth(vendor: OAuthVendor): Promise<VendorOAuthResult> {
+  return postJson<VendorOAuthResult>(`/api/oauth/${vendor}/logout`, {});
+}
+
+/** Explicit user action, so the request bypasses the server's model-list TTL cache. */
+export function fetchProviderModels(params: {
+  provider: string;
+  apiKey?: string;
+  baseUrl?: string;
+}): Promise<ModelsResponse> {
+  return postJson<ModelsResponse>('/api/models', { ...params, refresh: true });
+}
+

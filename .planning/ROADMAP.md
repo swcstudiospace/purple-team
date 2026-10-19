@@ -18,8 +18,8 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 🚀 **v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel (Phases 34-36)** — started 2026-10-19 (`SPE-15995`, `SPE-15994`, `SPE-15992`, `SPE-15993`)
 
 - [x] Phase 34: Claude Subscription OAuth (PKCE) — in-app Pro Max 20x login via Anthropic's public PKCE client, provider wiring, session tier UI (`SPE-15995`) — completed 2026-10-19 (manual live-login E2E pending, R1)
-- [ ] Phase 35: GitHub Integration & Repository-URL Purple Team — account connection (private repos in scope), repo ingest pipeline, URL input replacing code snippets (`SPE-15994`, `SPE-15992`)
-- [ ] Phase 36: Full-screen Agent Panel & Generative UI Merge — viewport chat with conversation sidebar/history, inline run progress, sandboxed GenUi (`SPE-15993`)
+- [x] Phase 35: GitHub Integration & Repository-URL Purple Team — account connection (private repos in scope), repo ingest pipeline, URL input replacing code snippets (`SPE-15994`, `SPE-15992`) — code shipped in 2c2feb5; verified + extended 2026-10-19 (zero-config device login, PAT connect, branch listing, repo-first Agent Panel entry; live E2E incl. real device-flow login and private/org repo listing)
+- [x] Phase 36: Full-screen Agent Panel & Generative UI Merge — viewport chat with conversation sidebar/history, inline run progress, sandboxed GenUi (`SPE-15993`) — code shipped in 2c2feb5; verified + repaired 2026-10-19 (GenUI sandbox boot fixed: opaque-origin CSP + anonymous CORS; single unified stream after 4-hat tab removal; Grok-style reskin)
 
 <details>
 <summary>✅ v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization (Phases 30-33) — completed 2026-10-15</summary>

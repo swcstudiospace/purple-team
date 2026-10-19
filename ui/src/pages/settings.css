@@ -1,0 +1,576 @@
+/* Settings section — mirrors the github-card pattern (github.css) with
+   settings-* class names. Colors come from the SPA token vocabulary
+   (styles.css :root, values from docs/assets/tokens.css). The SPA :root does
+   not mirror --danger/--warn/--ok, so they fall back to the canonical values
+   the same way github.css does (var(--danger, #B91C1C)). */
+
+.settings {
+  display: grid;
+  gap: 24px;
+  max-width: 860px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.settings-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.settings-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.settings-card__empty {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.settings-card__error {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--danger, #b91c1c);
+  border-radius: 8px;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.settings-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Loading skeleton */
+.settings-skeleton {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-skeleton__line {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--border);
+  animation: settings-pulse 1.4s ease-in-out infinite;
+}
+
+.settings-skeleton__line--short {
+  width: 45%;
+}
+
+@keyframes settings-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Badges (overview-badge pattern) */
+.settings-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.settings-badge--on {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--bg);
+}
+
+.settings-badge--off {
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+}
+
+.settings-badge--warn {
+  border-color: var(--warn, #92400e);
+  background: var(--tint-warn, #fdf6ec);
+  color: var(--warn, #92400e);
+}
+
+/* Scope / status chips */
+.settings-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.settings-chip--neutral {
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.settings-chip--ok {
+  border-color: var(--ok, #166534);
+  color: var(--ok, #166534);
+  background: var(--tint-ok, #f0f7f1);
+}
+
+.settings-chip--warn {
+  border-color: var(--warn, #92400e);
+  color: var(--warn, #92400e);
+  background: var(--tint-warn, #fdf6ec);
+}
+
+.settings-chip--error {
+  border-color: var(--danger, #b91c1c);
+  color: var(--danger, #b91c1c);
+  background: var(--tint-danger, #fdf2f2);
+}
+
+/* Account row (GitHub hero, connected state) */
+.settings-account {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-account__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  object-fit: cover;
+  flex: none;
+}
+
+.settings-account__avatar--placeholder {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-secondary);
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.settings-account__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-account__handle {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.settings-account__meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.settings-account__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* Definition rows (overview-field pattern) */
+.settings-fields {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.settings-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-field dt {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.settings-field dd {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.settings-mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* Buttons (red ONLY for danger per docs/assets/tokens.css) */
+.settings-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.settings-btn:hover:not(:disabled) {
+  background: var(--surface-alt);
+}
+
+.settings-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.settings-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.settings-btn--primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--bg);
+}
+
+.settings-btn--primary:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.settings-btn--danger {
+  border-color: var(--danger, #b91c1c);
+  color: var(--danger, #b91c1c);
+}
+
+.settings-btn--danger:hover:not(:disabled) {
+  background: var(--danger-surface, #fdf2f2);
+}
+
+.settings-btn--sm {
+  padding: 4px 12px;
+  font-size: 13px;
+}
+
+/* Forms */
+.settings-form {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-form__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-form__grid {
+  display: grid;
+  gap: 12px;
+}
+
+/* Labeled field wrapper: grows inside a __row, stacks label over control. */
+.settings-form--field {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.settings-input,
+.settings-select {
+  min-height: 38px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14px;
+}
+
+.settings-input {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
+.settings-input:focus-visible,
+.settings-select:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.settings-label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.settings-field-error {
+  margin: 0;
+  color: var(--danger, #b91c1c);
+  font-size: 13px;
+}
+
+.settings-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.settings-scope-warning {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+/* Device-code panel (hero, pending state) */
+.settings-device {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.settings-device__code-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-device__code {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  overflow-wrap: anywhere;
+}
+
+.settings-countdown {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Collapsible advanced panels */
+.settings-collapsible {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-collapsible__toggle {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.settings-collapsible__toggle::before {
+  content: '▸';
+  margin-right: 4px;
+}
+
+.settings-collapsible__toggle[aria-expanded='true']::before {
+  content: '▾';
+  margin-right: 4px;
+}
+
+.settings-collapsible__toggle:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.settings-collapsible__panel {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+  font-size: 13px;
+}
+
+.settings-setup__redirect {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-setup__url {
+  flex: 1 1 240px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* Provider cards (subscription sign-in) */
+.settings-provider-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.settings-provider-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.settings-provider-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.settings-provider-card__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.settings-provider-card__desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.settings-provider-card__body {
+  display: grid;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 13px;
+}
+
+.settings-provider-card__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-provider-card__code {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  overflow-wrap: anywhere;
+}
+
+/* Key rows (API key input + show toggle) */
+.settings-key-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-key-row .settings-input {
+  flex: 1 1 180px;
+}
+
+.settings-key-row .settings-select {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+/* Granted-scope chips under the connected GitHub account */
+.settings-scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.settings-model-hint {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-btn {
+    transition: none;
+  }
+
+  .settings-skeleton__line {
+    animation: none;
+  }
+}

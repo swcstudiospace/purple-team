@@ -1,5 +1,23 @@
 # Purple Team Changelog
 
+## 2026-10-19 — GitHub login-first redesign: Agent Panel repo entry, Settings, GenUI fixes
+
+**New**
+- Zero-config **Sign in with GitHub** (device flow, `GET/POST /api/oauth/github/device`) in the new React **Settings** section (`#settings`): big user-code panel with countdown and polling, "paste a personal access token" and "custom OAuth app" as collapsible advanced paths. No env vars or OAuth App registration needed; the client id defaults to the public gh CLI app and is overridable via `T3MP3ST_GITHUB_DEVICE_CLIENT_ID`. PAT connect: `POST /api/oauth/github/token`. Branch listing: `GET /api/github/branches`.
+- The Agent Panel now **starts with "Select a repository"**: pick from the connected account (private/public visibility filter, search, pagination — personal and organisation repos) or paste a repository URL that resolves to a preview (owner/repo, visibility, default branch). The previously dead `RepoRunConfig` is mounted as the configure step (branch/tag/commit picker fed by the live branch list, subpath scope, operators, objective) and launches the repo-URL Purple Team run. Pasting a GitHub URL into the chat composer attaches it as the run target instead of sending text. The repo target is conversation-scoped: new chats start at the entry screen, and the launching thread keeps its chip.
+- Tools and skills from the retired Four Hats page are reachable in the Agent Panel slash palette (`/tools`, `/tool`, `/skills`, `/skill`).
+
+**Fixed**
+- `POST /api/chat` no longer 402s on credit-limited accounts: the stream now caps `maxOutputTokens` (8192) instead of letting the provider price the model's full 64k output ceiling against the balance.
+- Generative UI actually renders now. The sandboxed frame (`sandbox="allow-scripts"`, opaque origin) never booted: its own CSP used `script-src 'self'`, which an opaque origin can never match, and its module bundle needs anonymous CORS for `Origin: null`. The frame CSP keeps the network cut (`default-src 'none'; connect-src 'none'`) without self-blocking, and `/app` static assets send `Access-Control-Allow-Origin: *`. Verified live: fenced `openui` programs render inline with auto-height.
+- The GitHub page showed the "register an OAuth App" setup card even while an account was connected via device login; a connected account now outranks the web-flow env gate.
+
+**Removed**
+- The static Four Hats page is gone (`docs/hats.html`, its shell nav/palette entries, hat CSS variables, manifest shortcut). Backend hat filter semantics on `/api/teams/tools|skills` and the six specialist hats are unchanged.
+- The React shell no longer links out to static `/ui/hats.html` or `/ui/settings.html`; Settings is a first-class SPA section.
+
+Verified on this tree: root and UI typecheck clean, `ui:build` green; targeted vitest (github device flow, four-hat rewrite, tauri scaffold, oauth-ui-static, agent-panel workbench, chat route) green; live browser E2E on :3399 — real device-flow login completed (`@SomeRandmGuyy`), private+public org repos listed in the picker, anonymous resolve → configure → mission ingest on expressjs/express, GenUI iframe rendered at auto-height, chat round-trip replied after the token-cap fix.
+
 ## 2026-10-19 — Purple Team platform: dashboard, Agent Panel, providers, packaging
 
 **New**

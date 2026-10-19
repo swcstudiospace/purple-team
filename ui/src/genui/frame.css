@@ -43,14 +43,14 @@
 }
 
 :root {
-  --bg: #FFFFFF;
-  --surface: #FAFAFE;
-  --surface-alt: #F4F1FA;
-  --border: #E6E0F2;
-  --brand: #6D28D9;
-  --brand-hover: #5B21B6;
-  --text-primary: #1A1A1A;
-  --text-secondary: #595959;
+  --bg: #0a0a0b;
+  --surface: #111114;
+  --surface-alt: #1a1a20;
+  --border: #26262e;
+  --brand: #9061f9;
+  --brand-hover: #a583fb;
+  --text-primary: #ededf2;
+  --text-secondary: #9c9ca7;
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'Space Mono', ui-monospace, monospace;
   --font-display: 'Anybody', 'DM Sans', system-ui, sans-serif;

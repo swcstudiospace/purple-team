@@ -2,7 +2,7 @@
   "name": "Purple Team — 4-Hat Vulnerability AI",
   "short_name": "Purple Team",
   "description": "Educational 4-Hat Vulnerability AI with Red, Blue, Black, and White Hat tools, composable skills, and Tauri desktop/mobile support.",
-  "start_url": "./hats.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
@@ -10,11 +10,6 @@
   "theme_color": "#B91C1C",
   "categories": ["security", "developer", "education"],
   "shortcuts": [
-    {
-      "name": "Four Hats Workspace",
-      "short_name": "Four Hats",
-      "url": "./hats.html"
-    },
     {
       "name": "Operatives & Synthesis",
       "short_name": "Operatives",

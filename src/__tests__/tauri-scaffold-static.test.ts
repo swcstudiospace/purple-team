@@ -129,7 +129,7 @@ describe('build.rs', () => {
 });
 
 // Bundle wiring pins (09-02): frontendDist is ../docs, so the bundle ships
-// exactly the FINAL docs/ asset set from docs/IA.md — twelve content pages plus
+// exactly the FINAL docs/ asset set from docs/IA.md — eleven content pages plus
 // the index landing (same document as overview.html), the shell script, and
 // the token stylesheet. Any rename/move/add must update this list AND the
 // conf; the test fails loudly on drift either way.
@@ -150,7 +150,6 @@ describe('bundled frontendDist asset set', () => {
     'operators.html',
     'evidence.html',
     'defend.html',
-    'hats.html',
     'arsenal.html',
     'terminal.html',
     'range.html',

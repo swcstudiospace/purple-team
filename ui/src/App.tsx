@@ -2,17 +2,19 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Mous
 import Overview from './pages/Overview';
 import GitHub from './pages/GitHub';
 import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 import AgentPanel from './components/AgentPanel';
 import { escapeGuard } from './components/workbench/focus';
 import { readPrefs, savePrefs, type RailState } from './components/workbench/prefs';
 
-type SectionId = 'overview' | 'github' | 'agent-panel' | 'reports';
+type SectionId = 'overview' | 'github' | 'agent-panel' | 'reports' | 'settings';
 
 const NAV_ITEMS: ReadonlyArray<{ id: SectionId; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'github', label: 'GitHub' },
   { id: 'agent-panel', label: 'Agent Panel' },
   { id: 'reports', label: 'Reports' },
+  { id: 'settings', label: 'Settings' },
 ];
 
 // `#generative-ui` deep links land on the merged agent panel (phase 36 §6.2);
@@ -20,13 +22,6 @@ const NAV_ITEMS: ReadonlyArray<{ id: SectionId; label: string }> = [
 const LEGACY_SECTION_REDIRECTS: Record<string, SectionId> = {
   'generative-ui': 'agent-panel',
 };
-
-// Four Hats and Settings are still served by the static pages under /ui until
-// they are migrated; linking to them keeps one source of truth per screen.
-const STATIC_LINKS: ReadonlyArray<{ href: string; label: string }> = [
-  { href: '/ui/hats.html', label: 'Four Hats (static)' },
-  { href: '/ui/settings.html', label: 'Settings (static)' },
-];
 
 function sectionFromHash(hash: string): SectionId {
   const id = hash.replace(/^#/, '');
@@ -98,7 +93,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isWorkbench, railState, exitFocusMode]);
 
-  // Alt+1..4 jump between rail sections; ignored while composing (§2.2).
+  // Alt+1..5 jump between rail sections; ignored while composing (§2.2).
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
       if (!event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
@@ -166,21 +161,6 @@ export default function App() {
           </a>
         </li>
       ))}
-      {STATIC_LINKS.map((link, index) => (
-        <li key={link.href}>
-          <a
-            ref={el => {
-              linkRefs.current[NAV_ITEMS.length + index] = el;
-            }}
-            href={link.href}
-            className="rail-link"
-            aria-label={collapsed ? link.label : undefined}
-            title={collapsed ? link.label : undefined}
-          >
-            {collapsed ? <span className="rail-icon" aria-hidden="true">{link.label.charAt(0)}</span> : link.label}
-          </a>
-        </li>
-      ))}
     </ul>
   );
 
@@ -233,6 +213,7 @@ export default function App() {
         {active === 'github' && <GitHub />}
         {active === 'agent-panel' && <AgentPanel focusMode={railHidden} onExitFocusMode={exitFocusMode} />}
         {active === 'reports' && <Reports />}
+        {active === 'settings' && <Settings />}
       </main>
     </div>
   );

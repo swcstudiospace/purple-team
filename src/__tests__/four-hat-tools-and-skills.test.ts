@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   MAX_TOOL_PAYLOAD_BYTES,
@@ -24,14 +24,16 @@ import {
   runArtifactDiffTool,
   runSnapshotManagerTool,
   runBatchRunnerTool,
+  type HatDomain,
   HAT_TOOL_REGISTRY,
-  SKILL_CATALOG,
+  type ToolHatScope,
   listRegisteredHatTools,
   getRegisteredHatTool,
   executeRegisteredHatTool,
   listComposableSkills,
   getComposableSkill,
   runComposableSkill,
+  SKILL_CATALOG,
   buildSpecialistWorkflowTools,
 } from '../teams/index.js';
 import { runBlueCoverageStage } from '../teams/blue/workflow.js';
@@ -776,58 +778,11 @@ describe('Wave 2: Extra Tools, Registry & Composable Skills', () => {
   });
 });
 
-describe('Wave 3: Upgraded UI Shell, Hat Theming & Desktop/Mobile Optimization Static Pins', () => {
+describe('Four-Hat backend contract: team API routes, skills tags & guardrail scopes', () => {
   const root = process.cwd();
-  const tokensCss = readFileSync(join(root, 'docs/assets/tokens.css'), 'utf8');
-  const shellJs = readFileSync(join(root, 'docs/assets/shell.js'), 'utf8');
-  const hatsHtml = readFileSync(join(root, 'docs/hats.html'), 'utf8');
   const serverTs = readFileSync(join(root, 'src/server.ts'), 'utf8');
 
-  it('defines 4-Hat custom properties, desktop split-pane, and mobile bottom-nav in tokens.css', () => {
-    for (const token of [
-      '--hat-red-accent:',
-      '--hat-blue-accent:',
-      '--hat-black-accent:',
-      '--hat-white-accent:',
-      '--hat-purple-accent:',
-      '.hat-badge--red',
-      '.hat-badge--blue',
-      '.hat-badge--black',
-      '.hat-badge--white',
-      '.workspace-split',
-      '.mobile-bottom-nav',
-      'env(safe-area-inset-bottom',
-    ]) {
-      expect(tokensCss).toContain(token);
-    }
-  });
-
-  it('wires Command Palette, v2 workspace persistence, and capability fallbacks in shell.js', () => {
-    for (const marker of [
-      't3mp3st_workspace_v2',
-      'openCommandPalette',
-      'copyText',
-      'exportArtifact',
-      'shareArtifact',
-      'mobile-bottom-nav',
-    ]) {
-      expect(shellJs).toContain(marker);
-    }
-  });
-
-  it('wires interactive 4-Hat tool/skill runner and Send-to-Hat handoff in docs/hats.html and server.ts', () => {
-    for (const marker of [
-      'hatWorkspace',
-      'toolCatalogList',
-      'toolInputEditor',
-      'sendToHatBtn',
-      '/api/teams/tools',
-      '/api/teams/skills',
-      'manifest.webmanifest',
-    ]) {
-      expect(hatsHtml).toContain(marker);
-    }
-    expect(existsSync(join(root, 'docs/manifest.webmanifest'))).toBe(true);
+  it('serves hat tools and composable skills over /api/teams routes', () => {
     expect(serverTs).toContain("app.get('/api/teams/tools'");
     expect(serverTs).toContain("app.post('/api/teams/tools/run'");
     expect(serverTs).toContain("app.get('/api/teams/skills'");
@@ -846,5 +801,21 @@ describe('Wave 3: Upgraded UI Shell, Hat Theming & Desktop/Mobile Optimization S
     const resolveBlock = serverTs.slice(resolveStart, resolveEnd);
     expect(resolveBlock).toContain('uniqueStrings(ledgerFinding.evidenceIds)');
     expect(resolveBlock).not.toContain('Math.min(evidenceRefs.length, MAX_STAGE_LIST_ITEMS)');
+  });
+
+  it('keeps the four-hats doctrine tag on the composable skills catalog', () => {
+    const synthesis = getComposableSkill('skill-purple-four-hat-synthesis');
+    expect(synthesis?.tags).toContain('four-hats');
+    expect(SKILL_CATALOG.filter((skill) => skill.tags.includes('four-hats'))).toHaveLength(1);
+  });
+
+  it('keeps guardrails HatDomain/ToolHatScope aligned with the hat query-param filter', () => {
+    const hatDomains: HatDomain[] = ['red', 'blue', 'black', 'white'];
+    const toolScopes: ToolHatScope[] = [...hatDomains, 'shared'];
+    expect(hatDomains).toHaveLength(4);
+    expect(toolScopes).toHaveLength(5);
+    for (const scope of toolScopes) {
+      expect(listRegisteredHatTools(scope).length).toBeGreaterThan(0);
+    }
   });
 });
