@@ -9265,17 +9265,28 @@ app.get('/api/agents/local/status', async (req: Request, res: Response): Promise
 // STATIC FILE SERVING
 // =============================================================================
 
-// Bare root → land on the React dashboard when its build exists (npm run ui:build),
-// else the static UI. Registered right beside the /ui mount so it only matches the
-// exact '/' path and never shadows the /api/* routes above.
-app.get('/', (_req: Request, res: Response) => res.redirect(existsSync('ui/dist/index.html') ? '/app/' : '/ui/'));
+// Built React UI (`npm run ui:build` writes ui/dist). The build is optional and can
+// appear or vanish while the server runs, so every check below happens per request.
+const APP_DIST = 'ui/dist';
+const appDistReady = (): boolean => existsSync(`${APP_DIST}/index.html`);
+
+// Bare root → land on the React dashboard when its build exists, else the static UI.
+// Registered right beside the /ui mount so it only matches the exact '/' path and
+// never shadows the /api/* routes above.
+app.get('/', (_req: Request, res: Response) => res.redirect(appDistReady() ? '/app/' : '/ui/'));
 
 app.use('/ui', express.static('docs'));
 
-// Built React UI (`npm run ui:build` writes ui/dist). Mounted only when the bundle
-// exists, so the server still starts without a build.
-const APP_DIST = 'ui/dist';
-if (existsSync(APP_DIST)) app.use('/app', express.static(APP_DIST));
+// /app is always a served route (the static nav and the root redirect point at it).
+// Until the build exists it falls back to the static UI instead of a 404.
+const serveAppDist = express.static(APP_DIST);
+app.use('/app', (req: Request, res: Response, next: NextFunction) => {
+  if (!appDistReady()) {
+    res.redirect('/ui/');
+    return;
+  }
+  serveAppDist(req, res, next);
+});
 
 // =============================================================================
 // ERROR HANDLING
