@@ -23,8 +23,10 @@ import { config } from '../config/index.js';
 import { localAgentChat } from '../agent/local-agents.js';
 import { fetchBypassingProxy } from '../net/proxy.js';
 import {
+  CLAUDE_OAUTH_BETA,
   ensureOAuthAccessToken,
   oauthVendorForProvider,
+  peekOAuthAccessToken,
   peekOAuthIdToken,
 } from './oauth.js';
 
@@ -459,6 +461,12 @@ class AnthropicAdapter implements LLMProviderAdapter {
 
   validateConfig(): { valid: boolean; error?: string } {
     if (!this.config.apiKey) {
+      if (this.config.authType === 'oauth') {
+        return {
+          valid: false,
+          error: 'Claude sign-in required. Sign in from Settings → Subscription sign-in.',
+        };
+      }
       return {
         valid: false,
         error: 'Anthropic API key is required. Get one at https://console.anthropic.com/.',
@@ -526,8 +534,16 @@ class AnthropicAdapter implements LLMProviderAdapter {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
-      'x-api-key': this.config.apiKey ?? '',
     };
+    if (this.config.authType === 'oauth') {
+      // Claude Pro/Max subscription OAuth: Bearer + the oauth beta flag; x-api-key must
+      // be dropped (OAuth sent as an API key is rejected). If other beta flags are ever
+      // needed, append to the comma-separated list rather than replacing it.
+      headers.Authorization = `Bearer ${this.config.apiKey ?? ''}`;
+      headers['anthropic-beta'] = CLAUDE_OAUTH_BETA;
+    } else {
+      headers['x-api-key'] = this.config.apiKey ?? '';
+    }
 
     const response = await fetch(url, {
       method: 'POST',
@@ -1887,8 +1903,13 @@ export class LLMBackbone extends EventEmitter<LLMEvents> {
 
     const oauthVendor = this.config.authType === 'oauth' ? oauthVendorForProvider(this.config.provider) : undefined;
     if (oauthVendor) {
+      // Explicit-token precedence: a caller-provided OAuth apiKey that DIFFERS from
+      // the stored access token wins (tests, /api/llm/chat body apiKey, pinned hops).
+      // The store may only replace a token that is absent or still equals the stored
+      // one (refresh-in-place) — capture the pre-refresh stored token for that check.
+      const stored = peekOAuthAccessToken(oauthVendor);
       const fresh = await ensureOAuthAccessToken(oauthVendor);
-      if (fresh) this.config.apiKey = fresh;
+      if (fresh && (!this.config.apiKey || this.config.apiKey === stored)) this.config.apiKey = fresh;
     }
 
     // The model ladder: primary first, then each configured fallback hop. A hop is
@@ -1910,8 +1931,11 @@ export class LLMBackbone extends EventEmitter<LLMEvents> {
       const hasNext = rung < ladder.length - 1;
       const hopOAuth = hop.authType === 'oauth' ? oauthVendorForProvider(hop.provider) : undefined;
       if (hopOAuth) {
+        // Same explicit-token precedence as the primary rung above: a hop that pins
+        // its own OAuth token keeps it; only an absent or store-equal token rotates.
+        const storedHop = peekOAuthAccessToken(hopOAuth);
         const freshHop = await ensureOAuthAccessToken(hopOAuth);
-        if (freshHop) hop.apiKey = freshHop;
+        if (freshHop && (!hop.apiKey || hop.apiKey === storedHop)) hop.apiKey = freshHop;
       }
       const adapter = onFallback ? this.createAdapter({ ...this.config, ...hop }) : this.adapter;
       const msgs = reframeNext ? reframeWithAuthorizedContext(messages) : messages;

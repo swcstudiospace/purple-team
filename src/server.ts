@@ -21,10 +21,12 @@ import { config, LLM_PROVIDER_IDS } from './config/index.js';
 import { resolveProviderModels } from './config/provider-models.js';
 import {
   clearOAuth,
+  completeClaudePkceFlow,
   completeOpenAiPkceFlow,
   oauthStatus,
   pollXaiDeviceFlow,
   setOAuthFetch,
+  startClaudePkceFlow,
   startOpenAiPkceFlow,
   startXaiDeviceFlow,
 } from './llm/oauth.js';
@@ -6623,6 +6625,37 @@ app.post('/api/oauth/openai/complete', async (req: Request, res: Response): Prom
 
 app.post('/api/oauth/openai/logout', (_req: Request, res: Response) => {
   clearOAuth('openai');
+  void initLLM().then((next) => { llm = next; });
+  res.json({ ok: true, oauth: oauthStatus() });
+});
+
+// Claude Pro/Max — PKCE with the pasted-callback code (mirrors the openai trio).
+app.post('/api/oauth/claude/start', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    res.json(await startClaudePkceFlow());
+  } catch (e) {
+    res.status(502).json({ error: (e as Error).message });
+  }
+});
+
+app.post('/api/oauth/claude/complete', async (req: Request, res: Response): Promise<void> => {
+  const flowId = typeof req.body?.flowId === 'string' ? req.body.flowId : '';
+  const code = typeof req.body?.code === 'string' ? req.body.code : '';
+  if (!flowId || !code) {
+    res.status(400).json({ error: 'flowId and code required' });
+    return;
+  }
+  try {
+    await completeClaudePkceFlow(flowId, code);
+    llm = await initLLM();
+    res.json({ ok: true, oauth: oauthStatus() });
+  } catch (e) {
+    res.status(400).json({ error: (e as Error).message });
+  }
+});
+
+app.post('/api/oauth/claude/logout', (_req: Request, res: Response) => {
+  clearOAuth('claude');
   void initLLM().then((next) => { llm = next; });
   res.json({ ok: true, oauth: oauthStatus() });
 });

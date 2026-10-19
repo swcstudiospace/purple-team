@@ -61,3 +61,36 @@ describe('openai vendor OAuth routes (ChatGPT Plan)', () => {
     expect(routes).toContain('oauth: oauthStatus()');
   });
 });
+
+describe('claude vendor OAuth routes (Claude Pro/Max)', () => {
+  it('registers start / complete / logout mirroring the openai PKCE trio', () => {
+    expect(server).toContain("app.post('/api/oauth/claude/start'");
+    expect(server).toContain("app.post('/api/oauth/claude/complete'");
+    expect(server).toContain("app.post('/api/oauth/claude/logout'");
+    expect(server).toContain('startClaudePkceFlow');
+    expect(server).toContain('completeClaudePkceFlow');
+    expect(server).toContain("clearOAuth('claude')");
+  });
+
+  it('complete validates flowId + code before exchanging', () => {
+    const route = block(
+      server,
+      "app.post('/api/oauth/claude/complete'",
+      "app.post('/api/oauth/claude/logout'",
+    );
+
+    expect(route).toMatch(/flowId and code required/);
+    expect(route).toContain('completeClaudePkceFlow(flowId, code)');
+    expect(route).toContain('llm = await initLLM()');
+  });
+
+  it('never returns a claude token in a route body', () => {
+    const routes = block(
+      server,
+      "app.get('/api/oauth/status'",
+      "// POST /api/models",
+    );
+    expect(routes).not.toMatch(/res\.json\(\s*\{[^}]*accessToken/);
+    expect(routes).not.toMatch(/console\.(log|error|warn)\([^)]*[Aa]ccessToken/);
+  });
+});

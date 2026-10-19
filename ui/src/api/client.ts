@@ -54,7 +54,7 @@ async function readErrorMessage(res: Response): Promise<string> {
 // helpers they call. Only fields the UI reads are listed.
 // ---------------------------------------------------------------------------
 
-export type OAuthVendor = 'xai' | 'openai';
+export type OAuthVendor = 'xai' | 'openai' | 'claude';
 export type FindingSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
 export type FindingStatus = 'open' | 'validated' | 'false_positive' | 'fix_ready' | 'retest_queued' | 'resolved';
 export type LocalAgentId = 'claude' | 'codex' | 'hermes' | 'opencode' | 'omp' | 'cursor';
@@ -89,6 +89,10 @@ export interface OAuthStatus {
   /** Epoch milliseconds. Absent when not connected. */
   expiresAt?: number;
   label: string;
+  /** Short plan tier (claude only, e.g. "Max 20x"). Absent when unknown. */
+  tier?: string;
+  /** True when the refresh token expired and a fresh sign-in is required (claude only). */
+  needsReauth?: boolean;
 }
 
 export type OAuthStatusResponse = Record<OAuthVendor, OAuthStatus>;

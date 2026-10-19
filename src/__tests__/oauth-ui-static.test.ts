@@ -11,7 +11,7 @@ const operators = readFileSync(join(docsDir, 'operators.html'), 'utf8');
 const pages = readdirSync(docsDir).filter((f) => f.endsWith('.html'));
 const allHtml = pages.map((f) => readFileSync(join(docsDir, f), 'utf8')).join('\n');
 
-describe('settings sign-in surface (all five providers)', () => {
+describe('settings sign-in surface (subscription + local providers)', () => {
   it('labels ChatGPT Plan, Claude Code, Super Grok Heavy, Cursor, and OpenRouter', () => {
     for (const label of ['ChatGPT Plan', 'Claude Code', 'Super Grok Heavy', 'Cursor', 'OpenRouter']) {
       expect(settings, `settings.html missing provider label "${label}"`).toContain(label);
@@ -44,6 +44,34 @@ describe('settings sign-in surface (all five providers)', () => {
     expect(landing).toContain('Claude Code');
     expect(landing).toContain('startXaiOAuth');
     expect(landing).toContain("auth: 'oauth'");
+  });
+});
+
+describe('Claude Pro/Max sign-in surface (phase 34)', () => {
+  it('labels the Claude subscription card and wires the claude OAuth routes in settings.html', () => {
+    expect(settings).toContain('Claude Pro/Max');
+    expect(settings).toContain('startClaudeOAuth');
+    expect(settings).toContain('/api/oauth/claude/start');
+    expect(settings).toContain('/api/oauth/claude/complete');
+    expect(settings).toContain('/api/oauth/claude/logout');
+  });
+
+  it('keeps the one-time oauth-migration notice and the local CLI fallback card', () => {
+    expect(settings).toContain('Claude now signs in directly with your Anthropic account');
+    expect(settings).toContain('pt.claude-oauth-notice');
+    // The local Claude Code CLI card stays as the ToS-clean fallback path.
+    expect(settings).toContain('Claude Code (local CLI)');
+  });
+
+  it('shows the Claude badge on the landing subscriptions row', () => {
+    expect(landing).toContain('Claude Pro/Max');
+  });
+
+  it('documents the claude OAuth routes in the API reference', () => {
+    const apiRef = readFileSync(join(docsDir, 'API_REFERENCE.md'), 'utf8');
+    for (const route of ['/api/oauth/claude/start', '/api/oauth/claude/complete', '/api/oauth/claude/logout']) {
+      expect(apiRef, `API_REFERENCE.md missing ${route}`).toContain(route);
+    }
   });
 });
 

@@ -220,12 +220,15 @@ export default function Overview() {
             <ul className="overview-list">
               {Object.entries<OAuthStatus>(d).map(([vendor, status]) => (
                 <li key={vendor} className="overview-list__item">
-                  <span>{status.label}</span>
+                  <span>
+                    {status.label}
+                    {status.tier && <span className="overview-mono"> {status.tier}</span>}
+                  </span>
                   <span className="overview-list__meta">
-                    <Badge tone={status.connected ? 'on' : 'off'}>
-                      {status.connected ? 'Connected' : 'Not connected'}
+                    <Badge tone={status.connected && !status.needsReauth ? 'on' : 'off'}>
+                      {status.needsReauth ? 'Re-auth needed' : status.connected ? 'Connected' : 'Not connected'}
                     </Badge>
-                    {status.connected && status.expiresAt !== undefined && (
+                    {status.connected && !status.needsReauth && status.expiresAt !== undefined && (
                       <span className="overview-mono">Expires {formatTime(status.expiresAt)}</span>
                     )}
                   </span>

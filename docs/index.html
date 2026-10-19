@@ -35,16 +35,19 @@
 
 <section class="card" aria-labelledby="keylessTitle">
 <h2 class="card__title" id="keylessTitle">Run keyless</h2>
-<p class="text-secondary" id="keylessCalloutText">Sign in with <strong>Super Grok Heavy</strong>, or connect the local <strong>Claude Code</strong> CLI / Codex / Hermes. No API key required.</p>
+<p class="text-secondary" id="keylessCalloutText">Sign in with <strong>Super Grok Heavy</strong>, <strong>ChatGPT Plan</strong>, or <strong>Claude Pro/Max</strong> — or connect the local <strong>Claude Code</strong> CLI / Codex / Hermes. No API key required.</p>
 <div class="card__row">
 <span class="badge badge--neutral" id="oauthXaiStatus">offline</span>
 <span class="text-secondary">Super Grok Heavy</span>
 <span class="badge badge--neutral" id="oauthOpenaiStatus">offline</span>
 <span class="text-secondary">ChatGPT Plan</span>
+<span class="badge badge--neutral" id="oauthClaudeStatus">offline</span>
+<span class="text-secondary">Claude Pro/Max</span>
 <a class="btn btn--sm" href="settings.html">Set up in Settings</a>
 </div>
 <div class="provider-card__body" id="oauthXaiBody" hidden></div>
 <div class="provider-card__body" id="oauthOpenaiBody" hidden></div>
+<div class="provider-card__body" id="oauthClaudeBody" hidden></div>
 </section>
 
 <section class="card" aria-labelledby="huntTitle">
@@ -383,19 +386,28 @@ async function oauthLiveModel(provider) {
 function paintOAuthStatus(oauth) {
   var x = oauth && oauth.xai;
   var o = oauth && oauth.openai;
+  var c = oauth && oauth.claude;
   var xs = document.getElementById('oauthXaiStatus');
   var os = document.getElementById('oauthOpenaiStatus');
+  var cs = document.getElementById('oauthClaudeStatus');
   if (xs) { xs.textContent = x && x.connected ? 'connected' : 'offline'; xs.className = 'badge ' + (x && x.connected ? 'badge--ok' : 'badge--neutral'); }
   if (os) { os.textContent = o && o.connected ? 'connected' : 'offline'; os.className = 'badge ' + (o && o.connected ? 'badge--ok' : 'badge--neutral'); }
+  if (cs) {
+    if (c && c.needsReauth) { cs.textContent = 'expired — sign in again'; cs.className = 'badge badge--warn'; }
+    else { cs.textContent = c && c.connected ? 'connected' : 'offline'; cs.className = 'badge ' + (c && c.connected ? 'badge--ok' : 'badge--neutral'); }
+  }
   var xb = document.getElementById('oauthXaiBody');
   var ob = document.getElementById('oauthOpenaiBody');
+  var cb = document.getElementById('oauthClaudeBody');
   if (xb && x && x.connected) xb.textContent = 'Signed in. Super Grok Heavy models are available in Model Selection.';
   if (ob && o && o.connected) ob.textContent = 'Signed in. ChatGPT Plan models run on your subscription.';
+  if (cb && c && c.connected) cb.textContent = 'Signed in' + (c.tier ? ' · ' + c.tier : '') + '. Claude Pro/Max models run on your subscription.';
   var callout = document.getElementById('keylessCalloutText');
   if (callout) {
     var names = [];
     if (x && x.connected) names.push('Super Grok Heavy');
     if (o && o.connected) names.push('ChatGPT Plan');
+    if (c && c.connected) names.push(c.tier ? 'Claude ' + c.tier : 'Claude Pro/Max');
     if (names.length) callout.textContent = 'Keyless backends signed in: ' + names.join(', ') + '. Missions can run without an API key.';
   }
 }

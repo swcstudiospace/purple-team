@@ -237,12 +237,17 @@ Repository paths are contained by resolver logic before analysis. Keep that cont
 Plan sign-ins use OAuth on the server; tokens never leave the server. Check
 session state with `GET /api/oauth/status` (per-provider `connected` flags)
 or `GET /api/llm/status` (includes an `oauth` summary).
+Claude Pro/Max sign-in additionally reports a `tier` label (e.g. `Max 20x`) and a
+`needsReauth` flag once its rotating refresh token is spent.
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/oauth/openai/start` | Start ChatGPT Plan PKCE flow; returns `{ flowId, authorizeUrl, state }` |
 | `POST` | `/api/oauth/openai/complete` | Complete ChatGPT Plan sign-in; body `{ flowId, code }`, returns `{ ok: true, oauth }` |
 | `POST` | `/api/oauth/openai/logout` | Clear the ChatGPT Plan session |
+| `POST` | `/api/oauth/claude/start` | Start Claude Pro/Max PKCE flow; returns `{ flowId, authorizeUrl, state }` — open `authorizeUrl`, then paste the callback code |
+| `POST` | `/api/oauth/claude/complete` | Complete Claude sign-in; body `{ flowId, code }`, returns `{ ok: true, oauth }` |
+| `POST` | `/api/oauth/claude/logout` | Clear the Claude Pro/Max session |
 | `POST` | `/api/oauth/xai/start` | Start Grok plan device flow; returns `{ flowId, userCode, verificationUri, expiresIn, interval }` |
 | `POST` | `/api/oauth/xai/poll` | Poll Grok plan authorization; body `{ flowId }` |
 | `POST` | `/api/oauth/xai/logout` | Clear the Grok plan session |

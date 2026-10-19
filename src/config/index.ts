@@ -512,7 +512,7 @@ class ConfigManager {
 
     if (this.hasApiKey('openrouter')) providers.push('openrouter');
     if (this.hasApiKey('venice')) providers.push('venice');
-    if (this.hasApiKey('anthropic')) providers.push('anthropic');
+    if (this.hasApiKey('anthropic') || hasOAuth('claude')) providers.push('anthropic');
     if (this.hasApiKey('openai')) providers.push('openai');
     if (this.hasApiKey('xai') || hasOAuth('xai')) providers.push('xai');
     if (this.hasLiteLLMProxy()) providers.push('litellm');
@@ -570,7 +570,9 @@ class ConfigManager {
         actualModel = model || this.config.get('venice').defaultModel;
         break;
       case 'anthropic':
-        apiKey = this.getApiKey('anthropic');
+        // Claude Pro/Max subscription OAuth wins over ANTHROPIC_API_KEY so subscription
+        // usage is not silently billed as metered API credits (same rationale as xai).
+        apiKey = peekOAuthAccessToken('claude') || this.getApiKey('anthropic');
         baseUrl = this.config.get('anthropic').baseUrl;
         actualModel = model || this.config.get('anthropic').defaultModel;
         break;
@@ -674,7 +676,8 @@ class ConfigManager {
     }
 
     const oauthHydrated = (actualProvider === 'xai' && hasOAuth('xai'))
-      || (actualProvider === 'chatgpt' && hasOAuth('openai'));
+      || (actualProvider === 'chatgpt' && hasOAuth('openai'))
+      || (actualProvider === 'anthropic' && hasOAuth('claude'));
 
     return {
       provider: actualProvider,
@@ -715,12 +718,13 @@ class ConfigManager {
     const chain: FallbackEntry[] = [];
     const add = (p: 'openrouter' | 'venice' | 'anthropic' | 'openai' | 'xai' | 'gemini' | 'litellm' | 'deepseek' | 'zai' | 'huggingface' | 'nanogpt' | 'novita') => {
       if (p === primary) return;
-      const oauth = p === 'xai' && hasOAuth(p);
+      const oauthVendor = p === 'xai' ? 'xai' : p === 'anthropic' ? 'claude' : undefined;
+      const oauth = oauthVendor ? hasOAuth(oauthVendor) : false;
       if (p === 'litellm' ? !this.hasLiteLLMProxy() : !(this.hasApiKey(p) || oauth)) return;
       chain.push({
         provider: p,
         model: this.config.get(p).defaultModel,
-        apiKey: oauth ? peekOAuthAccessToken(p) : this.getApiKey(p),
+        apiKey: oauth && oauthVendor ? peekOAuthAccessToken(oauthVendor) : this.getApiKey(p),
         authType: oauth ? 'oauth' : 'api-key',
         baseUrl: this.config.get(p).baseUrl,
       });

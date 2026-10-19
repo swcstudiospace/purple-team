@@ -1,14 +1,18 @@
 /**
- * Subscription OAuth for SuperGrok / Super Grok Heavy (xAI device-code) and
- * ChatGPT Plan (OpenAI PKCE). Tokens live in a 0600 file under ~/.t3mp3st —
- * never in Conf export, never in API responses, never in logs.
+ * Subscription OAuth for SuperGrok / Super Grok Heavy (xAI device-code),
+ * ChatGPT Plan (OpenAI PKCE), and Claude Pro/Max (Anthropic consumer PKCE).
+ * Tokens live in a 0600 file under ~/.t3mp3st — never in Conf export, never in
+ * API responses, never in logs.
  *
  * Inference uses the access token as a Bearer against the provider's public API
- * (api.x.ai / chatgpt.com Codex backend). This is the same public-client flow the
- * official Grok CLI and Codex CLI use; T3MP3ST does not mint API keys.
+ * (api.x.ai / chatgpt.com Codex backend / api.anthropic.com Messages). These are
+ * the same public-client flows the official Grok CLI, Codex CLI, and Claude Code
+ * install use; T3MP3ST does not mint API keys and never spoofs a CLI identity.
  *
- * Claude Pro/Max is deliberately not handled here. Claude subscriptions run only
- * through the user's own locally installed `claude` CLI (src/agent/local-agents.ts).
+ * The Claude leg is community-sourced and contractually contested (Anthropic bars
+ * third-party use of Pro/Max OAuth tokens): every endpoint/client constant is
+ * env-overridable, provider refusals surface verbatim-sanitized, and the local
+ * `claude` CLI connector (src/agent/local-agents.ts) remains a separate path.
  */
 
 import { createHash, randomBytes } from 'crypto';
@@ -16,7 +20,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'f
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 
-export type OAuthVendor = 'xai' | 'openai';
+export type OAuthVendor = 'xai' | 'openai' | 'claude';
 
 export interface OAuthTokens {
   accessToken: string;
@@ -28,12 +32,19 @@ export interface OAuthTokens {
   expiresAt: number;
   tokenType?: string;
   obtainedAt: number;
+  /** Granted scope string, when the provider echoes one. The Claude refresh grant
+   *  replays exactly what was granted instead of re-requesting the default. */
+  scope?: string;
 }
 
 export interface OAuthStatus {
   connected: boolean;
   expiresAt?: number;
   label: string;
+  /** Claude only: short plan-tier label (e.g. "Max 20x") derived from the OAuth profile. */
+  tier?: string;
+  /** Claude only: the stored refresh token is spent/revoked — sign in again. */
+  needsReauth?: boolean;
 }
 
 export interface XaiDeviceStart {
@@ -46,6 +57,12 @@ export interface XaiDeviceStart {
 }
 
 export interface OpenAiPkceStart {
+  flowId: string;
+  authorizeUrl: string;
+  state: string;
+}
+
+export interface ClaudePkceStart {
   flowId: string;
   authorizeUrl: string;
   state: string;
@@ -80,6 +97,24 @@ const OPENAI_DEFAULT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const OPENAI_SCOPE = 'openid profile email offline_access';
 const OPENAI_ALLOWED_HOSTS = new Set(['auth.openai.com', 'chatgpt.com']);
 
+// Claude Pro/Max — consumer PKCE against the Claude.ai OAuth host, riding the public
+// client id every Claude Code install shares. Anthropic does not document this flow
+// and has moved hosts once already (console.anthropic.com → platform.claude.com), so
+// every value is env-overridable: a host move is a config change, not a code change.
+// console.anthropic.com stays allowed so operators can repoint to the legacy host.
+const CLAUDE_AUTHORIZE_URL = 'https://claude.ai/oauth/authorize';
+const CLAUDE_TOKEN_URL = 'https://platform.claude.com/v1/oauth/token';
+const CLAUDE_REDIRECT_URI = 'https://platform.claude.com/oauth/code/callback';
+const CLAUDE_PROFILE_URL = 'https://api.anthropic.com/api/oauth/profile';
+const CLAUDE_DEFAULT_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+// Least privilege: inference plus the profile read the plan-tier label needs —
+// deliberately NOT the full CLI scope set (user:sessions:claude_code, …).
+const CLAUDE_SCOPE = 'user:inference user:profile';
+const CLAUDE_ALLOWED_HOSTS = new Set(['claude.ai', 'platform.claude.com', 'console.anthropic.com']);
+const CLAUDE_PROFILE_ALLOWED_HOSTS = new Set(['api.anthropic.com']);
+/** Beta flag the Anthropic token endpoint and OAuth-bearing Messages calls require. */
+export const CLAUDE_OAUTH_BETA = 'oauth-2025-04-20';
+
 const DEFAULT_INTERVAL_SEC = 5;
 const MIN_INTERVAL_MS = 1000;
 const SLOW_DOWN_BUMP_MS = 5000;
@@ -89,6 +124,10 @@ const FLOW_TTL_MS = 15 * 60 * 1000;
 interface StoreFile {
   xai?: OAuthTokens;
   openai?: OAuthTokens;
+  claude?: OAuthTokens;
+  /** Derived Claude plan-tier label + check time. Only the derived label is
+   *  persisted — the profile's account/email payload is deliberately dropped. */
+  claudeTier?: { tier: string; checkedAt: number };
 }
 
 interface PendingXai {
@@ -103,8 +142,22 @@ interface PendingOpenAi {
   expiresAt: number;
 }
 
+interface PendingClaude {
+  verifier: string;
+  state: string;
+  expiresAt: number;
+}
+
 const pendingXai = new Map<string, PendingXai>();
 const pendingOpenAi = new Map<string, PendingOpenAi>();
+const pendingClaude = new Map<string, PendingClaude>();
+// Claude refresh tokens are single-use and rotate: at most one refresh round-trip in
+// flight so concurrent callers share it instead of burning rotations into an
+// invalid_grant lockout. xai/openai keep their existing per-call behavior.
+let claudeRefreshFlight: Promise<string | undefined> | null = null;
+// Set when a Claude refresh fails with invalid_grant-class errors — the "sign in
+// again" UI state. Cleared on sign-in and logout.
+let claudeNeedsReauth = false;
 
 let storeCache: StoreFile | null = null;
 let injectedFetch: FetchLike | undefined;
@@ -124,6 +177,9 @@ export function __resetOAuthState(): void {
   storeCache = null;
   pendingXai.clear();
   pendingOpenAi.clear();
+  pendingClaude.clear();
+  claudeRefreshFlight = null;
+  claudeNeedsReauth = false;
 }
 
 export function oauthStorePath(): string {
@@ -146,6 +202,22 @@ function openaiAuthorizeUrl(): string {
 
 function openaiTokenUrl(): string {
   return (process.env.T3MP3ST_OPENAI_OAUTH_TOKEN || '').trim() || OPENAI_TOKEN_URL;
+}
+
+function claudeClientId(): string {
+  return (process.env.T3MP3ST_CLAUDE_OAUTH_CLIENT_ID || '').trim() || CLAUDE_DEFAULT_CLIENT_ID;
+}
+
+function claudeAuthorizeUrl(): string {
+  return (process.env.T3MP3ST_CLAUDE_OAUTH_AUTHORIZE || '').trim() || CLAUDE_AUTHORIZE_URL;
+}
+
+function claudeTokenUrl(): string {
+  return (process.env.T3MP3ST_CLAUDE_OAUTH_TOKEN || '').trim() || CLAUDE_TOKEN_URL;
+}
+
+function claudeProfileUrl(): string {
+  return (process.env.T3MP3ST_CLAUDE_OAUTH_PROFILE || '').trim() || CLAUDE_PROFILE_URL;
 }
 
 function assertHttpsHost(url: string, allowed: Set<string>, label: string): URL {
@@ -220,6 +292,7 @@ export function hasOAuth(vendor: OAuthVendor): boolean {
 export function oauthStatus(): Record<OAuthVendor, OAuthStatus> {
   const xai = tokensOf('xai');
   const openai = tokensOf('openai');
+  const claude = tokensOf('claude');
   return {
     xai: {
       connected: Boolean(xai),
@@ -231,12 +304,23 @@ export function oauthStatus(): Record<OAuthVendor, OAuthStatus> {
       expiresAt: openai?.expiresAt,
       label: 'ChatGPT Plan',
     },
+    claude: {
+      connected: Boolean(claude),
+      expiresAt: claude?.expiresAt,
+      label: 'Claude Pro/Max',
+      tier: claude ? loadStore().claudeTier?.tier : undefined,
+      needsReauth: claude && claudeNeedsReauth ? true : undefined,
+    },
   };
 }
 
 export function clearOAuth(vendor: OAuthVendor): void {
   const store = { ...loadStore() };
   delete store[vendor];
+  if (vendor === 'claude') {
+    delete store.claudeTier;
+    claudeNeedsReauth = false;
+  }
   saveStore(store);
 }
 
@@ -263,6 +347,7 @@ function parseTokenResponse(body: unknown, fallbackRefresh?: string): OAuthToken
     expiresAt: nowFn() + ttlSec * 1000,
     tokenType: typeof rec.token_type === 'string' ? rec.token_type : 'Bearer',
     obtainedAt: nowFn(),
+    scope: typeof rec.scope === 'string' && rec.scope ? rec.scope : undefined,
   };
 }
 
@@ -426,8 +511,7 @@ async function refreshXai(tokens: OAuthTokens, fetchImpl?: FetchLike): Promise<O
 // OpenAI — PKCE (ChatGPT Plan, Codex backend public client)
 // =============================================================================
 
-/** Parses the pasted ChatGPT callback: raw code, code#state, or full callback URL. */
-export function parseOpenAiAuthCode(raw: string): { code: string; state?: string } {
+function parsePastedAuthCode(raw: string): { code: string; state?: string } {
   const trimmed = (raw || '').trim();
   if (!trimmed) return { code: '' };
   try {
@@ -441,6 +525,18 @@ export function parseOpenAiAuthCode(raw: string): { code: string; state?: string
   const hash = trimmed.split('#');
   if (hash.length >= 2) return { code: hash[0], state: hash.slice(1).join('#') };
   return { code: trimmed };
+}
+
+/** Parses the pasted ChatGPT callback: raw code, code#state, or full callback URL. */
+export function parseOpenAiAuthCode(raw: string): { code: string; state?: string } {
+  return parsePastedAuthCode(raw);
+}
+
+/** Parses the pasted Claude callback: raw code, code#state, or full callback URL.
+ *  Claude's hosted callback page renders the code as copyable text (`code=true`),
+ *  so the raw-code branch is the common path; the URL branch covers query delivery. */
+export function parseClaudeAuthCode(raw: string): { code: string; state?: string } {
+  return parsePastedAuthCode(raw);
 }
 
 export async function startOpenAiPkceFlow(): Promise<OpenAiPkceStart> {
@@ -531,23 +627,184 @@ async function refreshOpenAi(tokens: OAuthTokens, fetchImpl?: FetchLike): Promis
 }
 
 // =============================================================================
+// Claude — PKCE (Claude Pro/Max subscription, Claude Code public client)
+// =============================================================================
+
+export async function startClaudePkceFlow(): Promise<ClaudePkceStart> {
+  const authorize = assertHttpsHost(claudeAuthorizeUrl(), CLAUDE_ALLOWED_HOSTS, 'Claude authorize URL');
+  const verifier = base64url(randomBytes(32));
+  const challenge = base64url(createHash('sha256').update(verifier).digest());
+  const state = randomId();
+  const flowId = randomId();
+  pendingClaude.set(flowId, { verifier, state, expiresAt: nowFn() + FLOW_TTL_MS });
+
+  authorize.searchParams.set('client_id', claudeClientId());
+  authorize.searchParams.set('response_type', 'code');
+  authorize.searchParams.set('redirect_uri', CLAUDE_REDIRECT_URI);
+  authorize.searchParams.set('scope', CLAUDE_SCOPE);
+  authorize.searchParams.set('code_challenge', challenge);
+  authorize.searchParams.set('code_challenge_method', 'S256');
+  authorize.searchParams.set('state', state);
+  // code=true makes the hosted callback page render a copyable authorization code —
+  // the pasted-callback UX. There is no loopback listener to catch (and no device flow).
+  authorize.searchParams.set('code', 'true');
+
+  return { flowId, authorizeUrl: authorize.toString(), state };
+}
+
+export async function completeClaudePkceFlow(
+  flowId: string,
+  rawCode: string,
+  opts: { fetchImpl?: FetchLike } = {},
+): Promise<void> {
+  const pending = pendingClaude.get(flowId);
+  if (!pending) throw new Error('unknown or expired Claude login — start again');
+  if (nowFn() > pending.expiresAt) {
+    pendingClaude.delete(flowId);
+    throw new Error('Claude login timed out — start again');
+  }
+
+  const parsed = parseClaudeAuthCode(rawCode);
+  if (!parsed.code) throw new Error('paste the authorization code from the Claude callback page');
+  if (parsed.state && parsed.state !== pending.state) {
+    pendingClaude.delete(flowId);
+    throw new Error('Claude login state mismatch — start again');
+  }
+
+  const tokenUrl = assertHttpsHost(claudeTokenUrl(), CLAUDE_ALLOWED_HOSTS, 'Claude token URL');
+  // JSON body + the oauth beta header + scope are all load-bearing: form-encoded
+  // bodies, a missing scope, or a missing beta header each earn the token endpoint's
+  // blanket 429. No claude-cli User-Agent is sent — spoofing gets 404 and is barred
+  // regardless (policy: never impersonate Claude Code).
+  const res = await doFetch(tokenUrl.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'anthropic-beta': CLAUDE_OAUTH_BETA,
+    },
+    body: JSON.stringify({
+      grant_type: 'authorization_code',
+      client_id: claudeClientId(),
+      code: parsed.code,
+      redirect_uri: CLAUDE_REDIRECT_URI,
+      code_verifier: pending.verifier,
+      state: pending.state,
+      scope: CLAUDE_SCOPE,
+    }),
+  }, opts.fetchImpl);
+
+  const body = await readJson(res);
+  pendingClaude.delete(flowId);
+  if (!res.ok) {
+    const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
+    const detail = typeof rec.error_description === 'string' ? rec.error_description
+      : typeof rec.error === 'string' ? rec.error
+      : `HTTP ${res.status}`;
+    throw new Error(`Claude token exchange failed: ${detail}`);
+  }
+  claudeNeedsReauth = false;
+  persistTokens('claude', parseTokenResponse(body));
+  // Plan tier (Max 20x / Pro / …) — best-effort, once per sign-in: only the derived
+  // label is persisted, never the profile's account/email payload. Failure degrades
+  // to label-only status.
+  try {
+    await refreshClaudeTier(opts.fetchImpl);
+  } catch {
+    /* tier is optional signal, never a sign-in failure */
+  }
+}
+
+async function refreshClaude(tokens: OAuthTokens, fetchImpl?: FetchLike): Promise<OAuthTokens> {
+  if (!tokens.refreshToken) throw new Error('Claude session has no refresh token — sign in again');
+  const tokenUrl = assertHttpsHost(claudeTokenUrl(), CLAUDE_ALLOWED_HOSTS, 'Claude token URL');
+  const res = await doFetch(tokenUrl.toString(), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'anthropic-beta': CLAUDE_OAUTH_BETA,
+    },
+    body: JSON.stringify({
+      grant_type: 'refresh_token',
+      client_id: claudeClientId(),
+      refresh_token: tokens.refreshToken,
+      scope: tokens.scope ?? CLAUDE_SCOPE,
+    }),
+  }, fetchImpl);
+  const body = await readJson(res);
+  if (!res.ok) {
+    const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
+    const error = typeof rec.error === 'string' ? rec.error : '';
+    const desc = typeof rec.error_description === 'string' ? rec.error_description : '';
+    // A spent or revoked single-use refresh token cannot recover locally — surface
+    // the sign-in-again state (rotation race or ~4-week TTL elapsed).
+    if (error === 'invalid_grant' || desc.includes('invalid_grant')) claudeNeedsReauth = true;
+    const detail = desc || error || `HTTP ${res.status}`;
+    throw new Error(`Claude token refresh failed: ${detail}`);
+  }
+  return parseTokenResponse(body, tokens.refreshToken);
+}
+
+/** Exact rate_limit_tier → display label. Unknown tiers pass through verbatim and
+ *  the claude_pro family maps to Pro — the plan is never guessed. */
+const CLAUDE_TIER_LABELS: Record<string, string> = {
+  default_claude_max_20x: 'Max 20x',
+  default_claude_max_5x: 'Max 5x',
+};
+
+function claudeTierLabel(rawTier: string): string {
+  const known = CLAUDE_TIER_LABELS[rawTier];
+  if (known) return known;
+  if (rawTier.includes('claude_pro')) return 'Pro';
+  return rawTier;
+}
+
+async function refreshClaudeTier(fetchImpl?: FetchLike): Promise<void> {
+  const tokens = tokensOf('claude');
+  if (!tokens) return;
+  const profileUrl = assertHttpsHost(claudeProfileUrl(), CLAUDE_PROFILE_ALLOWED_HOSTS, 'Claude profile URL');
+  const res = await doFetch(profileUrl.toString(), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${tokens.accessToken}`,
+      'anthropic-beta': CLAUDE_OAUTH_BETA,
+    },
+  }, fetchImpl);
+  if (!res.ok) return; // 429-prone surface — degrade to label-only status
+  const body = await readJson(res);
+  const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
+  const org = rec.organization && typeof rec.organization === 'object'
+    ? rec.organization as Record<string, unknown>
+    : {};
+  if (typeof org.rate_limit_tier !== 'string' || !org.rate_limit_tier) return;
+  saveStore({ ...loadStore(), claudeTier: { tier: claudeTierLabel(org.rate_limit_tier), checkedAt: nowFn() } });
+}
+
+// =============================================================================
 // Refresh-on-demand
 // =============================================================================
 
-export async function ensureOAuthAccessToken(
+async function refreshOAuthTokens(
   vendor: OAuthVendor,
-  opts: { fetchImpl?: FetchLike } = {},
+  tokens: OAuthTokens,
+  fetchImpl?: FetchLike,
 ): Promise<string | undefined> {
-  const tokens = tokensOf(vendor);
-  if (!tokens) return undefined;
-  if (tokens.expiresAt - nowFn() > REFRESH_SKEW_MS) return tokens.accessToken;
   try {
     const next = vendor === 'xai'
-      ? await refreshXai(tokens, opts.fetchImpl)
-      : await refreshOpenAi(tokens, opts.fetchImpl);
+      ? await refreshXai(tokens, fetchImpl)
+      : vendor === 'claude'
+        ? await refreshClaude(tokens, fetchImpl)
+        : await refreshOpenAi(tokens, fetchImpl);
     // A refresh response may omit id_token — keep the previously stored one so the
-    // ChatGPT account-id derivation survives token rotation.
-    persistTokens(vendor, { ...next, idToken: next.idToken ?? tokens.idToken });
+    // ChatGPT account-id derivation survives token rotation. Same for scope: the
+    // Claude refresh grant replays exactly what was originally granted.
+    persistTokens(vendor, {
+      ...next,
+      idToken: next.idToken ?? tokens.idToken,
+      scope: next.scope ?? tokens.scope,
+    });
     return next.accessToken;
   } catch (e) {
     // Keep the existing access token — a 401 on inference is the honest next signal.
@@ -557,8 +814,28 @@ export async function ensureOAuthAccessToken(
   }
 }
 
+export async function ensureOAuthAccessToken(
+  vendor: OAuthVendor,
+  opts: { fetchImpl?: FetchLike } = {},
+): Promise<string | undefined> {
+  const tokens = tokensOf(vendor);
+  if (!tokens) return undefined;
+  if (tokens.expiresAt - nowFn() > REFRESH_SKEW_MS) return tokens.accessToken;
+  if (vendor !== 'claude') return refreshOAuthTokens(vendor, tokens, opts.fetchImpl);
+  // Single-flight (claude only): concurrent callers must share ONE refresh
+  // round-trip or the loser burns the rotation and the store is left holding a
+  // spent token (invalid_grant lockout).
+  if (claudeRefreshFlight) return claudeRefreshFlight;
+  const flight = refreshOAuthTokens('claude', tokens, opts.fetchImpl).finally(() => {
+    if (claudeRefreshFlight === flight) claudeRefreshFlight = null;
+  });
+  claudeRefreshFlight = flight;
+  return flight;
+}
+
 export function oauthVendorForProvider(provider: string): OAuthVendor | undefined {
   if (provider === 'xai') return 'xai';
   if (provider === 'chatgpt') return 'openai';
+  if (provider === 'anthropic') return 'claude';
   return undefined;
 }

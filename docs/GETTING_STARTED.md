@@ -160,8 +160,11 @@ take a `provider` field.
   Reference](API_REFERENCE.md#subscription-oauth-chatgpt-plan-claudegrok-plans).
 - Cursor Plan: install the `cursor-agent` CLI, sign in, then connect — the
   CLI's own login is used, keyless.
-- Claude/Grok plans: sign in through Settings (Anthropic PKCE / X DEVICE
-  flow); tokens stay on the server.
+- Claude Pro/Max: sign in through Settings with the Claude PKCE flow — open the
+  authorize URL, then paste the callback code back. Tokens stay on the server and
+  ride the `anthropic` provider (subscription usage, not metered API credits). The
+  local `claude` CLI connector still works separately under Local agents.
+- Grok plans: sign in through Settings (X device flow); tokens stay on the server.
 - OpenRouter and other hosted providers: set the provider key as shown in
   Configure A Model above.
 
