@@ -8,6 +8,7 @@
 
   var PAGES = [
     { group: 'Command' },
+    { id: 'workspace', file: '/app/', label: 'Workspace', icon: 'W' },
     { id: 'overview', file: 'overview.html', label: 'Overview', icon: 'O' },
     { id: 'mission', file: 'mission.html', label: 'Mission', icon: 'M' },
     { id: 'operators', file: 'operators.html', label: 'Operatives', icon: 'P' },

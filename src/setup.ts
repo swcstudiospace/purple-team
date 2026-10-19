@@ -9,7 +9,8 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import boxen from 'boxen';
 import ora from 'ora';
-import { config, AVAILABLE_MODELS, hasApiKey, setApiKey } from './config/index.js';
+import { config, hasApiKey, setApiKey } from './config/index.js';
+import { resolveProviderModels } from './config/provider-models.js';
 import { LLMBackbone } from './llm/index.js';
 import { getBanner } from './index.js';
 
@@ -516,22 +517,26 @@ async function setupLiteLLMProxy(): Promise<boolean> {
 
 async function selectDefaultModel(): Promise<void> {
   const provider = config.get('defaultProvider');
-  const models = AVAILABLE_MODELS[provider];
+  let llm: { baseUrl?: string; apiKey?: string; authType?: 'api-key' | 'oauth' } = {};
+  try {
+    llm = config.getLLMConfig(provider);
+  } catch {
+    // No remote config for this provider: the resolver reports it as unavailable.
+  }
+  const listing = await resolveProviderModels(provider, { baseUrl: llm.baseUrl, apiKey: llm.apiKey, authType: llm.authType });
 
-  if (!models || models.length === 0) {
-    showWarning('No models available for the current provider');
+  if (listing.source === 'unavailable') {
+    showWarning(listing.note ?? 'No models available for the current provider');
     return;
   }
+  if (listing.note) showWarning(listing.note);
 
   const { model } = await inquirer.prompt([
     {
       type: 'list',
       name: 'model',
       message: 'Select your default model:',
-      choices: models.map(m => ({
-        name: `${m.name} (${m.provider}) - ${m.contextWindow.toLocaleString()} tokens`,
-        value: m.id,
-      })),
+      choices: listing.models.map(m => ({ name: m.id, value: m.id })),
       default: config.get('defaultModel'),
     },
   ]);

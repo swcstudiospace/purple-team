@@ -1,13 +1,14 @@
 /**
- * Subscription OAuth for SuperGrok / Super Grok Heavy (xAI device-code),
- * Claude Pro / Max (Anthropic PKCE), and ChatGPT Plan (OpenAI PKCE). Tokens
- * live in a 0600 file under ~/.t3mp3st — never in Conf export, never in API
- * responses, never in logs.
+ * Subscription OAuth for SuperGrok / Super Grok Heavy (xAI device-code) and
+ * ChatGPT Plan (OpenAI PKCE). Tokens live in a 0600 file under ~/.t3mp3st —
+ * never in Conf export, never in API responses, never in logs.
  *
  * Inference uses the access token as a Bearer against the provider's public API
- * (api.x.ai / api.anthropic.com / chatgpt.com Codex backend). This is the same
- * public-client flow the official Grok CLI, Claude Code, and Codex CLI use;
- * T3MP3ST does not mint API keys.
+ * (api.x.ai / chatgpt.com Codex backend). This is the same public-client flow the
+ * official Grok CLI and Codex CLI use; T3MP3ST does not mint API keys.
+ *
+ * Claude Pro/Max is deliberately not handled here. Claude subscriptions run only
+ * through the user's own locally installed `claude` CLI (src/agent/local-agents.ts).
  */
 
 import { createHash, randomBytes } from 'crypto';
@@ -15,7 +16,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'f
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 
-export type OAuthVendor = 'xai' | 'anthropic' | 'openai';
+export type OAuthVendor = 'xai' | 'openai';
 
 export interface OAuthTokens {
   accessToken: string;
@@ -44,12 +45,6 @@ export interface XaiDeviceStart {
   interval: number;
 }
 
-export interface AnthropicPkceStart {
-  flowId: string;
-  authorizeUrl: string;
-  state: string;
-}
-
 export interface OpenAiPkceStart {
   flowId: string;
   authorizeUrl: string;
@@ -75,19 +70,6 @@ const XAI_DEFAULT_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
 const XAI_SCOPE = 'openid profile email offline_access grok-cli:access api:access';
 const XAI_ALLOWED_HOSTS = new Set(['auth.x.ai', 'accounts.x.ai']);
 
-const ANTHROPIC_AUTHORIZE_URL = 'https://claude.ai/oauth/authorize';
-const ANTHROPIC_TOKEN_URL = 'https://console.anthropic.com/v1/oauth/token';
-const ANTHROPIC_REDIRECT_URI = 'https://console.anthropic.com/oauth/code/callback';
-const ANTHROPIC_DEFAULT_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const ANTHROPIC_SCOPE = 'org:create_api_key user:profile user:inference';
-const ANTHROPIC_ALLOWED_HOSTS = new Set([
-  'claude.ai',
-  'claude.com',
-  'console.anthropic.com',
-  'platform.claude.com',
-  'api.anthropic.com',
-]);
-
 // OpenAI / ChatGPT Plan — PKCE with the Codex CLI's public client. The redirect URI is a
 // loopback HTTP listener (the CLI's own pattern), NOT an https endpoint — it is pasted/
 // captured locally and is deliberately not run through assertHttpsHost.
@@ -106,19 +88,12 @@ const FLOW_TTL_MS = 15 * 60 * 1000;
 
 interface StoreFile {
   xai?: OAuthTokens;
-  anthropic?: OAuthTokens;
   openai?: OAuthTokens;
 }
 
 interface PendingXai {
   deviceCode: string;
   intervalMs: number;
-  expiresAt: number;
-}
-
-interface PendingAnthropic {
-  verifier: string;
-  state: string;
   expiresAt: number;
 }
 
@@ -129,7 +104,6 @@ interface PendingOpenAi {
 }
 
 const pendingXai = new Map<string, PendingXai>();
-const pendingAnthropic = new Map<string, PendingAnthropic>();
 const pendingOpenAi = new Map<string, PendingOpenAi>();
 
 let storeCache: StoreFile | null = null;
@@ -149,7 +123,6 @@ export function __setOAuthNow(fn: (() => number) | undefined): void {
 export function __resetOAuthState(): void {
   storeCache = null;
   pendingXai.clear();
-  pendingAnthropic.clear();
   pendingOpenAi.clear();
 }
 
@@ -161,18 +134,6 @@ export function oauthStorePath(): string {
 
 function xaiClientId(): string {
   return (process.env.T3MP3ST_XAI_OAUTH_CLIENT_ID || '').trim() || XAI_DEFAULT_CLIENT_ID;
-}
-
-function anthropicClientId(): string {
-  return (process.env.T3MP3ST_ANTHROPIC_OAUTH_CLIENT_ID || '').trim() || ANTHROPIC_DEFAULT_CLIENT_ID;
-}
-
-function anthropicAuthorizeUrl(): string {
-  return (process.env.T3MP3ST_ANTHROPIC_OAUTH_AUTHORIZE || '').trim() || ANTHROPIC_AUTHORIZE_URL;
-}
-
-function anthropicTokenUrl(): string {
-  return (process.env.T3MP3ST_ANTHROPIC_OAUTH_TOKEN || '').trim() || ANTHROPIC_TOKEN_URL;
 }
 
 function openaiClientId(): string {
@@ -258,18 +219,12 @@ export function hasOAuth(vendor: OAuthVendor): boolean {
 
 export function oauthStatus(): Record<OAuthVendor, OAuthStatus> {
   const xai = tokensOf('xai');
-  const anthropic = tokensOf('anthropic');
   const openai = tokensOf('openai');
   return {
     xai: {
       connected: Boolean(xai),
       expiresAt: xai?.expiresAt,
       label: 'Super Grok Heavy',
-    },
-    anthropic: {
-      connected: Boolean(anthropic),
-      expiresAt: anthropic?.expiresAt,
-      label: 'Claude Pro / Max',
     },
     openai: {
       connected: Boolean(openai),
@@ -468,10 +423,11 @@ async function refreshXai(tokens: OAuthTokens, fetchImpl?: FetchLike): Promise<O
 }
 
 // =============================================================================
-// Anthropic — PKCE (Claude Pro / Max, Claude Code public client)
+// OpenAI — PKCE (ChatGPT Plan, Codex backend public client)
 // =============================================================================
 
-export function parseAnthropicAuthCode(raw: string): { code: string; state?: string } {
+/** Parses the pasted ChatGPT callback: raw code, code#state, or full callback URL. */
+export function parseOpenAiAuthCode(raw: string): { code: string; state?: string } {
   const trimmed = (raw || '').trim();
   if (!trimmed) return { code: '' };
   try {
@@ -485,102 +441,6 @@ export function parseAnthropicAuthCode(raw: string): { code: string; state?: str
   const hash = trimmed.split('#');
   if (hash.length >= 2) return { code: hash[0], state: hash.slice(1).join('#') };
   return { code: trimmed };
-}
-
-export async function startAnthropicPkceFlow(): Promise<AnthropicPkceStart> {
-  const authorize = assertHttpsHost(anthropicAuthorizeUrl(), ANTHROPIC_ALLOWED_HOSTS, 'Claude authorize URL');
-  const verifier = base64url(randomBytes(32));
-  const challenge = base64url(createHash('sha256').update(verifier).digest());
-  const state = randomId();
-  const flowId = randomId();
-  pendingAnthropic.set(flowId, { verifier, state, expiresAt: nowFn() + FLOW_TTL_MS });
-
-  authorize.searchParams.set('client_id', anthropicClientId());
-  authorize.searchParams.set('response_type', 'code');
-  authorize.searchParams.set('redirect_uri', ANTHROPIC_REDIRECT_URI);
-  authorize.searchParams.set('scope', ANTHROPIC_SCOPE);
-  authorize.searchParams.set('code_challenge', challenge);
-  authorize.searchParams.set('code_challenge_method', 'S256');
-  authorize.searchParams.set('state', state);
-
-  return { flowId, authorizeUrl: authorize.toString(), state };
-}
-
-export async function completeAnthropicPkceFlow(
-  flowId: string,
-  rawCode: string,
-  opts: { fetchImpl?: FetchLike } = {},
-): Promise<void> {
-  const pending = pendingAnthropic.get(flowId);
-  if (!pending) throw new Error('unknown or expired Claude login — start again');
-  if (nowFn() > pending.expiresAt) {
-    pendingAnthropic.delete(flowId);
-    throw new Error('Claude login timed out — start again');
-  }
-
-  const parsed = parseAnthropicAuthCode(rawCode);
-  if (!parsed.code) throw new Error('paste the authorization code from the Claude callback page');
-  if (parsed.state && parsed.state !== pending.state) {
-    pendingAnthropic.delete(flowId);
-    throw new Error('Claude login state mismatch — start again');
-  }
-
-  const tokenUrl = assertHttpsHost(anthropicTokenUrl(), ANTHROPIC_ALLOWED_HOSTS, 'Claude token URL');
-  const res = await doFetch(tokenUrl.toString(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'authorization_code',
-      client_id: anthropicClientId(),
-      code: parsed.code,
-      redirect_uri: ANTHROPIC_REDIRECT_URI,
-      code_verifier: pending.verifier,
-      state: pending.state,
-    }),
-  }, opts.fetchImpl);
-
-  const body = await readJson(res);
-  pendingAnthropic.delete(flowId);
-  if (!res.ok) {
-    const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
-    const detail = typeof rec.error_description === 'string' ? rec.error_description
-      : typeof rec.error === 'string' ? rec.error
-      : `HTTP ${res.status}`;
-    throw new Error(`Claude token exchange failed: ${detail}`);
-  }
-  persistTokens('anthropic', parseTokenResponse(body));
-}
-
-async function refreshAnthropic(tokens: OAuthTokens, fetchImpl?: FetchLike): Promise<OAuthTokens> {
-  if (!tokens.refreshToken) throw new Error('Claude session has no refresh token — sign in again');
-  const tokenUrl = assertHttpsHost(anthropicTokenUrl(), ANTHROPIC_ALLOWED_HOSTS, 'Claude token URL');
-  const res = await doFetch(tokenUrl.toString(), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({
-      grant_type: 'refresh_token',
-      client_id: anthropicClientId(),
-      refresh_token: tokens.refreshToken,
-    }),
-  }, fetchImpl);
-  const body = await readJson(res);
-  if (!res.ok) {
-    const rec = (body && typeof body === 'object') ? body as Record<string, unknown> : {};
-    const detail = typeof rec.error_description === 'string' ? rec.error_description
-      : typeof rec.error === 'string' ? rec.error
-      : `HTTP ${res.status}`;
-    throw new Error(`Claude token refresh failed: ${detail}`);
-  }
-  return parseTokenResponse(body, tokens.refreshToken);
-}
-
-// =============================================================================
-// OpenAI — PKCE (ChatGPT Plan, Codex backend public client)
-// =============================================================================
-
-/** Same parsing contract as the Claude callback: raw code, code#state, or full callback URL. */
-export function parseOpenAiAuthCode(raw: string): { code: string; state?: string } {
-  return parseAnthropicAuthCode(raw);
 }
 
 export async function startOpenAiPkceFlow(): Promise<OpenAiPkceStart> {
@@ -684,8 +544,6 @@ export async function ensureOAuthAccessToken(
   try {
     const next = vendor === 'xai'
       ? await refreshXai(tokens, opts.fetchImpl)
-      : vendor === 'anthropic'
-      ? await refreshAnthropic(tokens, opts.fetchImpl)
       : await refreshOpenAi(tokens, opts.fetchImpl);
     // A refresh response may omit id_token — keep the previously stored one so the
     // ChatGPT account-id derivation survives token rotation.
@@ -701,12 +559,6 @@ export async function ensureOAuthAccessToken(
 
 export function oauthVendorForProvider(provider: string): OAuthVendor | undefined {
   if (provider === 'xai') return 'xai';
-  if (provider === 'anthropic') return 'anthropic';
   if (provider === 'chatgpt') return 'openai';
   return undefined;
 }
-
-/** Identity prefix Anthropic requires on OAuth-billed Messages API calls. */
-export const CLAUDE_OAUTH_IDENTITY = "You are Claude Code, Anthropic's official CLI for Claude.";
-
-export const ANTHROPIC_OAUTH_BETA = 'oauth-2025-04-20';

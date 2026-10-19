@@ -1,5 +1,6 @@
 node_modules/
 dist/
+ui/dist/
 .env
 *.tsbuildinfo
 # Rust build output (cargo check/build in src-tauri/)

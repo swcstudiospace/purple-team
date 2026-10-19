@@ -55,11 +55,11 @@ pub fn run() {
                 if let Ok(exe) = std::env::current_exe() {
                     if let Some(dir) = exe.parent() {
                         if let Some(sidecar_path) = sidecar_binary(dir) {
-                            // express.static('docs') is cwd-relative. Bundle
-                            // resources map ../docs/ → resource_dir/docs, so
-                            // the sidecar's cwd is the resource dir when that
-                            // mount exists. State stays in-memory unless
-                            // T3MP3ST_STATE_DIR is set, so this cwd is safe.
+                            // express.static('docs') and express.static('ui/dist') are
+                            // cwd-relative. Bundle resources map ../docs/ → resource_dir/docs
+                            // and ../ui/dist/ → resource_dir/ui/dist, so the sidecar's cwd is
+                            // the resource dir when the docs mount exists. State stays
+                            // in-memory unless T3MP3ST_STATE_DIR is set, so this cwd is safe.
                             let cwd = app
                                 .path()
                                 .resource_dir()
@@ -84,7 +84,14 @@ pub fn run() {
                                         // the API share 127.0.0.1, so the
                                         // existing origin gate applies unchanged.
                                         if let Some(window) = app.get_webview_window("main") {
-                                            let url = format!("http://127.0.0.1:{SIDECAR_PORT}/ui/");
+                                            // Land on the React dashboard when its build ships in the
+                                            // bundle; a bundle without it keeps the static pages.
+                                            let entry = if cwd.join("ui").join("dist").join("index.html").is_file() {
+                                                "app"
+                                            } else {
+                                                "ui"
+                                            };
+                                            let url = format!("http://127.0.0.1:{SIDECAR_PORT}/{entry}/");
                                             match url.parse::<tauri::Url>() {
                                                 Ok(parsed) => {
                                                     if let Err(err) = window.navigate(parsed) {

@@ -11,6 +11,26 @@ updated: "2026-07-20"
 ---
 # Purple Team Changelog
 
+## 2026-10-19 — Purple Team platform: dashboard, Agent Panel, providers, packaging
+
+**New**
+- React + Vite dashboard (`ui/`, built by `npm run ui:build`, served at `/app/`): an Overview that reads six live server routes, a four-agent Agent Panel with a `/` command palette bound to real routes (coverage, workflow, stage, synthesize, hunt, recon, findings, mission, agents, stop, help), streaming free-text chat (`POST /api/chat`, Vercel AI SDK), a Generative UI panel (`POST /api/genui/generate`, OpenUI), and a Reports view with severity and status charts and JSON, Markdown and print export. The section lives in the URL hash.
+- The packaged desktop window and the bare `/` route land on `/app/` when `ui/dist` exists. The static pages stay at `/ui/`, and the static nav links to the new Workspace. Installers built before this change (for example prerelease `build-965beb0`) open the static UI.
+- White and Purple design tokens with self-hosted DM Sans, Space Mono and Anybody (the Greptile site fonts).
+- Z.ai provider: API key on `https://api.z.ai/api/paas/v4`. The GLM Coding Plan endpoint is not used.
+- CI publishes a `build-<sha7>` prerelease with Linux, macOS and Windows installers for every push.
+
+**Changed (breaking)**
+- Anthropic Pro/Max direct OAuth is removed, because Anthropic's Consumer Terms bar third-party apps from offering Claude.ai login or routing requests through Pro/Max credentials. Use an Anthropic API key, or connect the local `claude` CLI as a local agent. `/api/oauth/anthropic/*` now returns 404.
+- Model lists come only from each provider's live catalog. `/api/models` returns `{ provider, source: 'live' | 'stale' | 'unavailable', models, fetchedAt, note? }` with a 6 h per-key cache; OpenRouter and `local` list without a key. `AVAILABLE_MODELS` and `ModelInfo` are no longer exported; use `LLM_PROVIDER_IDS`.
+- The `local` provider no longer falls back to `ZAI_API_KEY` or `ZHIPUAI_API_KEY`, because a provider key must never reach a custom endpoint. Set `TEMPEST_LOCAL_API_KEY`.
+- `npm run test:pr` also type-checks and builds the UI. `cargo check` in `src-tauri/` needs `npm run ui:build` first, because `ui/dist` is a bundled resource; `tauri dev` and `tauri build` run it for you.
+
+**Known gaps**
+- Sign-in was not exercised with real accounts for ChatGPT/Codex or xAI, and no valid-key Anthropic call was made. Z.ai and Cursor have no documented public login flow. Generative UI has not been run against a live model. Free text is not routed per hat yet.
+
+Verified on this tree: root and UI typecheck clean; lint 0 errors / 177 warnings; vitest 114 files / 1297 tests pass; a local `tauri build --bundles deb` bundles `ui/dist`, and the extracted app run under Xvfb spawns its sidecar and shows the dashboard (see `docs/TAURI.md` section 11); CI on the pushed branch published prerelease `build-965beb0` with `.dmg`, `.AppImage`, `.deb`, `.exe` and `.msi`.
+
 ## 2026-10-15 — Purple Team rebrand (user-facing)
 
 The product is presented as Purple Team, a four-hat educational vulnerability AI (Red, Blue, White, Black). Renamed: UI page titles, brand marks and footers, README, VISION, WHITEPAPER and docs prose, CLI banner and tagline, server, MCP and Tauri log prefixes (`[purple-team]`), setup wizard copy, the npm package name (`purple-team`) and description, Tauri `productName` and window title. Unchanged on purpose: `T3MP3ST_*` and `TEMPEST_*` environment variables, `t3mp3st`/`tempest` CLI commands, `~/.t3mp3st` state paths, `t3mp3st_*` localStorage keys, `tempest_*` tool and `tempest-*` skill ids, bundle id `com.t3mp3st.app`, the `t3mp3st-server` binary, and container and image names.

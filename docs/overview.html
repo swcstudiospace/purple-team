@@ -35,18 +35,15 @@
 
 <section class="card" aria-labelledby="keylessTitle">
 <h2 class="card__title" id="keylessTitle">Run keyless</h2>
-<p class="text-secondary" id="keylessCalloutText">Sign in with <strong>Super Grok Heavy</strong> or <strong>Claude Pro/Max</strong>, or connect Claude Code / Codex / Hermes. No API key required.</p>
+<p class="text-secondary" id="keylessCalloutText">Sign in with <strong>Super Grok Heavy</strong>, or connect the local <strong>Claude Code</strong> CLI / Codex / Hermes. No API key required.</p>
 <div class="card__row">
 <span class="badge badge--neutral" id="oauthXaiStatus">offline</span>
 <span class="text-secondary">Super Grok Heavy</span>
-<span class="badge badge--neutral" id="oauthAnthropicStatus">offline</span>
-<span class="text-secondary">Claude Pro/Max</span>
 <span class="badge badge--neutral" id="oauthOpenaiStatus">offline</span>
 <span class="text-secondary">ChatGPT Plan</span>
 <a class="btn btn--sm" href="settings.html">Set up in Settings</a>
 </div>
 <div class="provider-card__body" id="oauthXaiBody" hidden></div>
-<div class="provider-card__body" id="oauthAnthropicBody" hidden></div>
 <div class="provider-card__body" id="oauthOpenaiBody" hidden></div>
 </section>
 
@@ -59,9 +56,9 @@
 <option value="venice">Venice · OpenAI-compatible</option>
 <option value="openai">OpenAI · OpenAI-compatible</option>
 <option value="nanogpt">NanoGPT · OpenAI-compatible</option>
-<option value="novita">Novita AI · OpenAI-compatible</option>
+<option value="novita">Novita AI · OpenAI-compatible</option><option value="zai">Z.ai (GLM API) · OpenAI-compatible</option>
 <option value="xai">xAI Grok · SuperGrok OAuth or API key</option>
-<option value="anthropic">Claude · Anthropic Messages API / Pro-Max OAuth</option>
+<option value="anthropic">Claude · Anthropic Messages API</option>
 </select></div>
 </div>
 <div style="margin-top:8px"><label class="flabel" for="heroArtifactDraft">Artifact bytes <span class="text-secondary">(optional, sent as one utf8 inline artifact)</span></label><textarea class="form-input mono" id="heroArtifactDraft" rows="3" placeholder="Paste a record, rule, or sample. Leave empty for a normal Red start."></textarea></div>
@@ -271,7 +268,7 @@ function getApiBase() { return (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_AP
 function getApiKey() {
   var s = state.settings || {};
   var p = s.activeProvider || 'openrouter';
-  var byProvider = { openrouter: s.openrouterKey, venice: s.veniceKey, anthropic: s.anthropicKey, openai: s.openaiKey, xai: s.xaiKey, huggingface: s.huggingfaceKey, nanogpt: s.nanogptKey, novita: s.novitaKey };
+  var byProvider = { openrouter: s.openrouterKey, venice: s.veniceKey, anthropic: s.anthropicKey, openai: s.openaiKey, xai: s.xaiKey, huggingface: s.huggingfaceKey, nanogpt: s.nanogptKey, novita: s.novitaKey, zai: s.zaiKey };
   return byProvider[p] || s.openrouterKey || s.veniceKey || s.anthropicKey || s.openaiKey || '';
 }
 function buildLocalBaseUrl() {
@@ -361,10 +358,9 @@ var T3MP3ST_API = {
   }
 };
 
-// ── Subscription OAuth (Super Grok Heavy + Claude Pro/Max + ChatGPT Plan) ──
+// ── Subscription OAuth (Super Grok Heavy + ChatGPT Plan) ──
 var oauthXaiTimer = null;
 var oauthXaiFlowId = null;
-var oauthAnthropicFlowId = null;
 var oauthOpenaiFlowId = null;
 function oauthApi(path, body) {
   var base = getApiBase();
@@ -374,27 +370,31 @@ function oauthApi(path, body) {
     body: body === undefined ? undefined : JSON.stringify(body)
   });
 }
+// Subscription backends pin no model. After sign-in the mission takes the first id from the
+// provider's own live list (the list settings.html offers). undefined leaves the server default in force.
+async function oauthLiveModel(provider) {
+  try {
+    var r = await oauthApi('/api/models', { provider: provider });
+    if (!r.ok) return undefined;
+    var d = await r.json();
+    return d.models && d.models.length ? d.models[0].id : undefined;
+  } catch (e) { return undefined; }
+}
 function paintOAuthStatus(oauth) {
   var x = oauth && oauth.xai;
-  var a = oauth && oauth.anthropic;
   var o = oauth && oauth.openai;
   var xs = document.getElementById('oauthXaiStatus');
-  var as = document.getElementById('oauthAnthropicStatus');
   var os = document.getElementById('oauthOpenaiStatus');
   if (xs) { xs.textContent = x && x.connected ? 'connected' : 'offline'; xs.className = 'badge ' + (x && x.connected ? 'badge--ok' : 'badge--neutral'); }
-  if (as) { as.textContent = a && a.connected ? 'connected' : 'offline'; as.className = 'badge ' + (a && a.connected ? 'badge--ok' : 'badge--neutral'); }
   if (os) { os.textContent = o && o.connected ? 'connected' : 'offline'; os.className = 'badge ' + (o && o.connected ? 'badge--ok' : 'badge--neutral'); }
   var xb = document.getElementById('oauthXaiBody');
-  var ab = document.getElementById('oauthAnthropicBody');
   var ob = document.getElementById('oauthOpenaiBody');
   if (xb && x && x.connected) xb.textContent = 'Signed in. Super Grok Heavy models are available in Model Selection.';
-  if (ab && a && a.connected) ab.textContent = 'Signed in. Claude Opus / Sonnet run on your Pro or Max subscription.';
   if (ob && o && o.connected) ob.textContent = 'Signed in. ChatGPT Plan models run on your subscription.';
   var callout = document.getElementById('keylessCalloutText');
   if (callout) {
     var names = [];
     if (x && x.connected) names.push('Super Grok Heavy');
-    if (a && a.connected) names.push('Claude Pro/Max');
     if (o && o.connected) names.push('ChatGPT Plan');
     if (names.length) callout.textContent = 'Keyless backends signed in: ' + names.join(', ') + '. Missions can run without an API key.';
   }
@@ -448,40 +448,6 @@ async function startXaiOAuth() {
     toast('SuperGrok sign-in failed: ' + (e.message || e), 'error');
   }
 }
-async function startAnthropicOAuth() {
-  var body = document.getElementById('oauthAnthropicBody');
-  try {
-    var r = await oauthApi('/api/oauth/anthropic/start', {});
-    var d = await r.json();
-    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-    oauthAnthropicFlowId = d.flowId;
-    if (d.authorizeUrl) window.open(d.authorizeUrl, '_blank', 'noopener');
-    if (body) {
-      body.hidden = false;
-      body.innerHTML = '<div>Authorize in the browser, then paste the callback code (or the full URL):</div>'
-        + '<input id="oauthAnthropicCode" class="form-input" placeholder="code#state">'
-        + '<button class="btn btn--primary btn--sm" style="margin-top:8px;" onclick="completeAnthropicOAuth()">Complete sign-in</button>';
-    }
-  } catch (e) {
-    if (body) { body.hidden = false; body.textContent = e.message || String(e); }
-    toast('Claude sign-in failed: ' + (e.message || e), 'error');
-  }
-}
-async function completeAnthropicOAuth() {
-  var input = document.getElementById('oauthAnthropicCode');
-  var code = input ? input.value.trim() : '';
-  if (!code || !oauthAnthropicFlowId) { toast('Paste the Claude callback code first', 'error'); return; }
-  try {
-    var r = await oauthApi('/api/oauth/anthropic/complete', { flowId: oauthAnthropicFlowId, code: code });
-    var d = await r.json();
-    if (!r.ok) throw new Error(d.error || ('HTTP ' + r.status));
-    paintOAuthStatus(d.oauth);
-    if (typeof T3MP3ST_API !== 'undefined' && T3MP3ST_API.checkHealth) T3MP3ST_API.checkHealth();
-    toast('Claude Pro/Max connected', 'success');
-  } catch (e) {
-    toast('Claude complete failed: ' + (e.message || e), 'error');
-  }
-}
 async function startOpenaiOAuth() {
   var body = document.getElementById('oauthOpenaiBody');
   try {
@@ -521,7 +487,7 @@ async function logoutOAuth(vendor) {
     var r = await oauthApi('/api/oauth/' + vendor + '/logout', {});
     var d = await r.json();
     paintOAuthStatus(d.oauth);
-    var label = vendor === 'xai' ? 'SuperGrok' : (vendor === 'openai' ? 'ChatGPT' : 'Claude');
+    var label = vendor === 'xai' ? 'SuperGrok' : 'ChatGPT';
     toast(label + ' signed out', 'info');
   } catch (e) {
     toast('Sign-out failed: ' + (e.message || e), 'error');
@@ -649,8 +615,7 @@ async function launchMissionFromOverview() {
           if (os.ok) {
             var od = await os.json();
             var wiring = [
-              { id: 'xai', name: 'Super Grok Heavy', backend: 'xai', model: 'xai:grok-4-heavy', auth: 'oauth', ready: !!(od.xai && od.xai.connected) },
-              { id: 'anthropic', name: 'Claude Pro/Max', backend: 'anthropic', model: 'claude-sonnet-4', auth: 'oauth', ready: !!(od.anthropic && od.anthropic.connected) },
+              { id: 'xai', name: 'Super Grok Heavy', backend: 'xai', model: null, auth: 'oauth', ready: !!(od.xai && od.xai.connected) },
               { id: 'openai', name: 'ChatGPT Plan', backend: 'openai', model: 'gpt-5', auth: 'oauth', ready: !!(od.openai && od.openai.connected) }
             ];
             oauthPick = wiring.find(function (w) { return w.ready; }) || null;
@@ -666,10 +631,10 @@ async function launchMissionFromOverview() {
           addMissionLog('info', 'LLM backend: local agent (' + dispatchAgent.id + ')' + shownModel + ' — no API key needed');
         } else if (oauthReady) {
           provider = oauthPick.backend;
-          model = oauthPick.model || oauthPick.id;
+          model = oauthPick.model || await oauthLiveModel(provider);
           missionKey = undefined;
           addIntel('BACKEND', 'Subscription OAuth — ' + oauthPick.name + ' (' + provider + ')', 'success');
-          addMissionLog('info', 'LLM backend: ' + provider + '/' + model + ' via OAuth — no API key sent');
+          addMissionLog('info', 'LLM backend: ' + provider + '/' + (model || 'server default') + ' via OAuth — no API key sent');
         } else if (!apiKey) {
           addIntel('BACKEND', 'No browser API key — using the server-configured LLM backend', 'success');
           addMissionLog('info', 'LLM backend: server default — no browser API key sent');
@@ -1076,6 +1041,7 @@ function paintAdmiralBackbone() {
     let provider, model, resolvedKey = apiKey || undefined, resolvedBase = undefined;
     if (localCfg) { provider = localCfg.provider; model = localCfg.model; resolvedKey = localCfg.apiKey; resolvedBase = localCfg.baseUrl; }
     else if (dispatchAgent) { provider = 'local-agent'; model = dispatchAgent.model; }
+    else if (typeof state !== 'undefined' && state.settings && (document.getElementById('quickProvider') || {}).value && !['openrouter', 'openai', 'anthropic'].includes(document.getElementById('quickProvider').value) && state.settings[document.getElementById('quickProvider').value + 'Key']) { provider = document.getElementById('quickProvider').value; resolvedKey = state.settings[provider + 'Key']; model = ''; }
     else if (apiKey && apiKey.startsWith('sk-ant-')) { provider = 'anthropic'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4').replace('anthropic/', ''); }
     else if (apiKey && apiKey.startsWith('sk-') && !apiKey.startsWith('sk-or-')) { provider = 'openai'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4'); }
     else if (apiKey) { provider = 'openrouter'; model = ((typeof state !== 'undefined' && state.settings && state.settings.selectedModel) || 'anthropic/claude-sonnet-4'); }
@@ -1098,13 +1064,6 @@ function paintAdmiralBackbone() {
   function setActiveAgentStored(id){ try { if (id) localStorage.setItem('t3mp3st_active_agent', id); else localStorage.removeItem('t3mp3st_active_agent'); } catch(e) {} }
 
   // Which Claude model the local Claude Code CLI should run (passed through as its --model flag).
-  // '' = the CLI's own account default. Claude Code accepts the aliases opus/sonnet/haiku or a full id.
-  const CLAUDE_MODELS = [
-    { id: '',       label: 'Account default (Claude Code setting)' },
-    { id: 'opus',   label: 'Claude Opus (latest)' },
-    { id: 'sonnet', label: 'Claude Sonnet (latest)' },
-    { id: 'haiku',  label: 'Claude Haiku (latest, fast)' }
-  ];
   function getClaudeModel(){ try { return localStorage.getItem('t3mp3st_claude_model') || ''; } catch(e) { return ''; } }
   function setClaudeModelStored(m){ try { if (m) localStorage.setItem('t3mp3st_claude_model', m); else localStorage.removeItem('t3mp3st_claude_model'); } catch(e) {} }
   // The underlying model to run for a given agent id — only Claude Code exposes a picker today.

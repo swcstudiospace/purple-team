@@ -1,0 +1,128 @@
+.chat-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+
+.chat-stream-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-stream-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.chat-stream-status {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.chat-stream-stop {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chat-stream-stop:hover {
+  background: var(--brand);
+  color: #FFFFFF;
+}
+
+.chat-stream-stop:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.chat-stream-error {
+  margin: 0;
+  color: var(--ap-error);
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.chat-stream-error-detail {
+  font-weight: 400;
+}
+
+.chat-stream-empty {
+  margin: 0;
+  padding: 12px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.chat-stream-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-stream-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--brand);
+  border-radius: 8px;
+}
+
+.chat-stream-msg--user {
+  border-left-color: var(--text-secondary);
+}
+
+.chat-stream-role {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.chat-stream-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Text is rendered as plain text nodes; keep the model's line breaks visible. */
+.chat-stream-text p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-stream *,
+  .chat-stream *::before,
+  .chat-stream *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

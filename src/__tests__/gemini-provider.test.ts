@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { config, AVAILABLE_MODELS } from '../config/index.js';
+import { config } from '../config/index.js';
 
 // Regression coverage for #52: native Google Gemini support.
 // The engine dispatches Gemini through OpenAIAdapter, which posts to
@@ -21,13 +21,6 @@ describe('Gemini native provider wiring (#52)', () => {
     const cfg = config.getLLMConfig('gemini');
     expect(cfg.model).toBe('gemini-2.5-flash');
     expect(cfg.model.startsWith('google/')).toBe(false);
-  });
-
-  it('publishes a non-empty native Gemini model catalog with bare ids', () => {
-    expect(AVAILABLE_MODELS.gemini?.length ?? 0).toBeGreaterThan(0);
-    for (const m of AVAILABLE_MODELS.gemini) {
-      expect(m.id.startsWith('google/')).toBe(false);
-    }
   });
 
   it('maps the gemini provider to the GEMINI_API_KEY environment variable', () => {

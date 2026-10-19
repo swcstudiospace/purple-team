@@ -35,8 +35,8 @@ export * from './types/index.js';
 // =============================================================================
 
 // Configuration
-export { config, getApiKey, setApiKey, hasApiKey, getLLMConfig, getConfiguredProviders, AVAILABLE_MODELS } from './config/index.js';
-export type { TempestSettings, ModelInfo } from './config/index.js';
+export { config, getApiKey, setApiKey, hasApiKey, getLLMConfig, getConfiguredProviders, LLM_PROVIDER_IDS } from './config/index.js';
+export type { TempestSettings } from './config/index.js';
 
 // LLM
 export {

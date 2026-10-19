@@ -1,5 +1,5 @@
 import { describe, expect, it, afterEach, vi } from 'vitest';
-import { config, AVAILABLE_MODELS } from '../config/index.js';
+import { config } from '../config/index.js';
 import { createNovitaBackbone } from '../llm/index.js';
 
 const KEY = 'sk_novita-test-key-0123456789';
@@ -86,9 +86,8 @@ describe('Novita AI provider wiring', () => {
     expect(config.getLLMConfig('novita').fallbackChain).toEqual([]);
   });
 
-  it('publishes a non-empty Novita model catalog and configured provider state', () => {
+  it('surfaces configured provider state', () => {
     process.env.NOVITA_API_KEY = KEY;
-    expect(AVAILABLE_MODELS.novita?.length ?? 0).toBeGreaterThan(0);
     expect(config.getConfiguredProviders()).toContain('novita');
   });
 });

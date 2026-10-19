@@ -1,0 +1,328 @@
+/*
+ * GenUI layout. Colours come from the UI tokens in ui/src/styles.css. Severity
+ * and tone colours use the docs palette (docs/assets/tokens.css) as fallbacks,
+ * because the UI does not load those tokens.
+ */
+.genui-panel {
+  --genui-sev-critical: var(--danger, #B91C1C);
+  --genui-sev-high: var(--warn, #92400E);
+  --genui-sev-medium: var(--brand, #6D28D9);
+  --genui-sev-low: var(--info, #1E40AF);
+  --genui-sev-info: var(--text-secondary, #595959);
+  --genui-tone-info: var(--info, #1E40AF);
+  --genui-tone-warning: var(--warning, #92400E);
+  --genui-tone-error: var(--danger, #B91C1C);
+
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 960px;
+}
+
+.genui-heading {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin: 0 0 0.5rem;
+}
+
+.genui-muted {
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* Prompt form */
+
+.genui-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.genui-label {
+  font-weight: 600;
+}
+
+.genui-textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.genui-controls {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.genui-button {
+  font: inherit;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--brand);
+  border-radius: 6px;
+  background: var(--brand);
+  color: var(--bg);
+  cursor: pointer;
+  transition: background-color 150ms ease-out;
+}
+
+.genui-button:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.genui-button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.genui-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.genui-button-secondary {
+  background: var(--surface);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+.genui-button-secondary:hover:not(:disabled) {
+  background: var(--surface-alt);
+  border-color: var(--border);
+}
+
+.genui-status {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.genui-status[data-status='error'] {
+  color: var(--genui-tone-error);
+}
+
+/* Preview canvas */
+
+.genui-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.genui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.genui-card,
+.genui-badge {
+  --sev: var(--genui-sev-info);
+}
+
+.genui-card[data-severity='critical'],
+.genui-badge[data-severity='critical'] {
+  --sev: var(--genui-sev-critical);
+}
+
+.genui-card[data-severity='high'],
+.genui-badge[data-severity='high'] {
+  --sev: var(--genui-sev-high);
+}
+
+.genui-card[data-severity='medium'],
+.genui-badge[data-severity='medium'] {
+  --sev: var(--genui-sev-medium);
+}
+
+.genui-card[data-severity='low'],
+.genui-badge[data-severity='low'] {
+  --sev: var(--genui-sev-low);
+}
+
+.genui-card[data-severity='info'],
+.genui-badge[data-severity='info'] {
+  --sev: var(--genui-sev-info);
+}
+
+.genui-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--sev);
+  border-radius: 8px;
+}
+
+.genui-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.genui-card-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  overflow-wrap: anywhere;
+}
+
+.genui-badge {
+  flex-shrink: 0;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--sev);
+  border-radius: 999px;
+  color: var(--sev);
+  background: color-mix(in srgb, var(--sev) 12%, var(--bg));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.genui-cvss {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.genui-cvss-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.genui-evidence {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.genui-next-title {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.genui-next ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+}
+
+/* Callout */
+
+.genui-callout {
+  --tone: var(--genui-tone-info);
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.625rem 0.875rem;
+  border-left: 4px solid var(--tone);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  overflow-wrap: anywhere;
+}
+
+.genui-callout[data-tone='warning'] {
+  --tone: var(--genui-tone-warning);
+}
+
+.genui-callout[data-tone='error'] {
+  --tone: var(--genui-tone-error);
+}
+
+.genui-callout-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--tone);
+}
+
+/* Severity bars */
+
+.genui-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.genui-bar {
+  display: grid;
+  grid-template-columns: minmax(6rem, max-content) 1fr minmax(3ch, max-content);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.genui-bar-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  overflow: hidden;
+}
+
+.genui-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+  transition: width 200ms var(--ease-out, ease-out);
+}
+
+.genui-bar-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Error fallback */
+
+.genui-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.genui-fallback pre {
+  margin: 0;
+  max-height: 24rem;
+  overflow: auto;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Actions */
+
+.genui-actions ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .genui-button,
+  .genui-bar-fill {
+    transition: none;
+  }
+}
