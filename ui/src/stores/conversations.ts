@@ -2,7 +2,7 @@
  * Conversation sidebar state (phase 36 §3.4) — the UI's first zustand store.
  *
  * The server JSON store is the single durable substrate: there is no
- * localStorage mirror of messages (avoids split-brain). This store holds the
+ * browser-side mirror of messages (avoids split-brain). This store holds the
  * meta list, the active id, and the debounced 1s PUT-sync seam ChatStream
  * reports settled threads into. Composer drafts live in
  * ui/src/components/chat/drafts.ts keyed by the same thread id.

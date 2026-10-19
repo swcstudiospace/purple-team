@@ -72,7 +72,14 @@ const UNSUPPORTED_VIEWS: Record<string, true> = {
 
 /** Any `scheme://userinfo@` prefix — `user:token@`, `ghp_…@`, bare `user@` — caught before URL parsing can relocate it. */
 const EMBEDDED_CREDENTIALS = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/?#\s]+@/;
-const CONTROL_CHARS = /[\x00-\x1f\x7f]/;
+/** True when any UTF-16 unit is an ASCII control character (0x00-0x1f, 0x7f). Scan, not regex, so lint's no-control-regex stays on. */
+function hasControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code <= 0x1f || code === 0x7f) return true;
+  }
+  return false;
+}
 
 function fail(fault: RepoUrlFault, message: string): RepoUrlParseResult {
   return { ok: false, fault, message };
@@ -108,7 +115,7 @@ function refRuleViolation(ref: string): string | null {
   if (ref.startsWith('/')) return 'ref must not start with "/"';
   if (!/^[A-Za-z0-9._/-]+$/.test(ref)) return `ref "${ref}" may contain only ASCII letters, digits, ".", "_", "-", and "/"`;
   if (ref.includes('..')) return `ref "${ref}" contains ".."`;
-  if (CONTROL_CHARS.test(ref)) return `ref "${ref}" contains control characters`;
+  if (hasControlChars(ref)) return `ref "${ref}" contains control characters`;
   return null;
 }
 

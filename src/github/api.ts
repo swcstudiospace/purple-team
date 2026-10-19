@@ -450,7 +450,14 @@ export interface ParsedGitHubRepoUrl {
 
 const OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 const REPO_RE = /^(?!-)(?!\.)(?!.*[.-]$)[A-Za-z0-9._-]{1,100}$/;
-const REF_RE = /^[^\u0000-\u001f]{1,255}$/;
+const MAX_REF_LENGTH = 255;
+
+function hasControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    if (value.charCodeAt(i) <= 0x1f) return true;
+  }
+  return false;
+}
 
 function safeDecode(segment: string): string {
   try {
@@ -513,7 +520,7 @@ export function parseGitHubRepoUrl(raw: string): ParsedGitHubRepoUrl | null {
   let repo = safeDecode(segments[1]);
   if (repo.endsWith('.git')) repo = repo.slice(0, -4);
   if (!OWNER_RE.test(owner) || owner.includes('--') || !REPO_RE.test(repo)) return null;
-  if (ref !== undefined && (ref === '' || ref.startsWith('/') || ref.includes('..') || !REF_RE.test(ref))) {
+  if (ref !== undefined && (ref === '' || ref.startsWith('/') || ref.includes('..') || ref.length > MAX_REF_LENGTH || hasControlChars(ref))) {
     return null;
   }
   return { owner, repo, ref: ref || undefined };

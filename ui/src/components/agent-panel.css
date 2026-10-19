@@ -150,9 +150,13 @@
   color: var(--text-secondary);
 }
 
-  .ap-spinner {
-    opacity: 1;
-  }
+.ap-spinner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: ap-pulse 1.2s ease-in-out infinite;
+}
 
 .ap-error {
   margin: 0;
@@ -166,6 +170,10 @@
   100% {
     opacity: 0.25;
   }
+  50% {
+    opacity: 1;
+  }
+}
 
 .ap-result-wrap {
   display: flex;
