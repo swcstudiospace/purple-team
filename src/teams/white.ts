@@ -63,6 +63,24 @@ function hostInScope(host: string, allowed: string): boolean {
   return host === a || host.endsWith(`.${a}`);
 }
 
+/** Most allowed targets an out-of-scope rationale names. The rest are counted; the ROE text keeps the full list. */
+const RATIONALE_TARGETS_SHOWN = 5;
+
+/** Longest allowed target an out-of-scope rationale prints. A longer one is cut and marked with "...". */
+const RATIONALE_TARGET_CHARS = 64;
+
+/**
+ * The allowed-target list as a rationale prints it. A rationale is stored once per action, so a long
+ * list would repeat in every verdict. A list within the bounds prints exactly as before.
+ */
+function summarizeAllowedTargets(allowedTargets: string[]): string {
+  const shown = allowedTargets.slice(0, RATIONALE_TARGETS_SHOWN).map((target) =>
+    target.length > RATIONALE_TARGET_CHARS ? `${target.slice(0, RATIONALE_TARGET_CHARS)}...` : target,
+  );
+  const hidden = allowedTargets.length - shown.length;
+  return hidden > 0 ? `${shown.join(', ')}, and ${hidden} more` : shown.join(', ');
+}
+
 /**
  * Audit actions against the ROE. Precedence: out-of-scope targets are violations
  * (approval does not expand scope); active techniques without allowActive are
@@ -73,6 +91,7 @@ export function roeAudit(actions: AuditedAction[], roe: RoeSpec): RoeVerdict[] {
   const allowedTargets = Array.isArray(roe.allowedTargets)
     ? roe.allowedTargets.filter((t): t is string => typeof t === 'string')
     : [];
+  const allowedSummary = summarizeAllowedTargets(allowedTargets);
 
   return actions.map((action, actionIndex) => {
     const safeAction = (action && typeof action === 'object') ? action : {};
@@ -88,7 +107,7 @@ export function roeAudit(actions: AuditedAction[], roe: RoeSpec): RoeVerdict[] {
       return {
         actionIndex,
         verdict: 'violation' as const,
-        rationale: `target "${target}" is outside the ROE allowed targets (${allowedTargets.join(', ')})`,
+        rationale: `target "${target}" is outside the ROE allowed targets (${allowedSummary})`,
         conditions: ['remove the target from the plan, or amend the ROE with a signed scope change before execution'],
       };
     }

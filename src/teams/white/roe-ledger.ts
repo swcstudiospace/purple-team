@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { mkdir, open, readFile, type FileHandle } from 'node:fs/promises';
 import { join } from 'node:path';
 import { redactSecrets, redactString } from '../../redact.js';
 import { roeAudit, type AuditedAction, type RoeVerdict } from '../white.js';
@@ -169,6 +169,32 @@ export function buildRevision(input: BuildRevisionInput): RoeLedgerLine {
     createdAt: input.previous?.createdAt ?? input.recordedAt,
     recordedAt: input.recordedAt,
     ...(input.provenance ? { provenance: input.provenance } : {}),
+  };
+}
+
+/** Outcome of checking whether redaction changes the audit. Reasons name action indexes, never values. */
+export type RedactionFidelity = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Secret redaction can make two distinct values read the same. A 40-character host label matches the
+ * AWS secret pattern and becomes `[redacted]`, so an out-of-scope host reads as an allowed one. Stored
+ * verdicts are re-derived from the redacted values, so a revision whose verdict kinds change under
+ * redaction is refused rather than recorded with a wrong verdict. Pure.
+ */
+export function redactionFidelity(text: string, actions: AuditedAction[]): RedactionFidelity {
+  const raw = parseRoe(text);
+  const redacted = parseRoe(redactString(text));
+  if (raw.ok !== redacted.ok) {
+    return { ok: false, reason: 'ROE parse outcome changes once secrets are redacted; no revision recorded' };
+  }
+  if (!raw.ok) return { ok: true };
+  const before = roeAudit(actions, raw.roe);
+  const after = roeAudit(redactSecrets(actions) as AuditedAction[], redacted.roe);
+  const index = before.findIndex((verdict, i) => verdict.verdict !== after[i]?.verdict);
+  if (index === -1) return { ok: true };
+  return {
+    ok: false,
+    reason: `action ${index} would get a different verdict once secrets are redacted (a target or allowed target matches a secret pattern and collides with another value); no revision recorded`,
   };
 }
 
@@ -336,7 +362,7 @@ export type LegacyMigrationOutcome =
 
 /**
  * Import the legacy `latest` record (rows = state.json roeRecords) into the ledger, once.
- * Runs only when the `latest` ledger file does not exist yet, so a second run appends nothing.
+ * Runs only while the `latest` ledger holds no non-blank line, so a second run appends nothing.
  * A skipped row logs a warning with its reason only.
  */
 export async function migrateLegacyLatest(backend: RoeLedgerBackend, rows: unknown): Promise<LegacyMigrationOutcome> {
@@ -345,7 +371,14 @@ export async function migrateLegacyLatest(backend: RoeLedgerBackend, rows: unkno
     : undefined;
   if (row === undefined) return 'no-legacy';
   const latest = DEFAULT_MISSION_ID as MissionId;
-  if ((await backend.readLines(latest)) !== null) return 'already-present';
+  const existing = await backend.readLines(latest);
+  // A file with a non-blank line already holds revisions. An empty file holds none, so the import
+  // may write its first line. A file of blank lines only is corrupt for the store and is not appended to.
+  if (existing !== null && existing.some((line) => line.trim() !== '')) return 'already-present';
+  if (existing !== null && !(existing.length === 1 && existing[0] === '')) {
+    console.warn('[purple-team] ROE ledger migration skipped: latest.jsonl holds only blank lines');
+    return 'skipped-invalid';
+  }
   const imported = importLegacyRecord(row);
   if (!imported.ok) {
     console.warn(`[purple-team] ROE ledger migration skipped the legacy latest record: ${imported.reason}`);
@@ -367,6 +400,13 @@ export interface RoeLedgerBackend {
   appendLine(missionId: MissionId, line: string): Promise<void>;
 }
 
+/** Whether the last byte of an open, non-empty file is a newline. */
+async function endsWithNewline(handle: FileHandle, size: number): Promise<boolean> {
+  const last = Buffer.alloc(1);
+  await handle.read(last, 0, 1, size - 1);
+  return last[0] === 0x0a;
+}
+
 /** File-backed ledger under `dir`, one `<missionId>.jsonl` per mission. */
 export function fsBackend(dir: string): RoeLedgerBackend {
   return {
@@ -382,7 +422,16 @@ export function fsBackend(dir: string): RoeLedgerBackend {
     },
     async appendLine(missionId, line) {
       await mkdir(dir, { recursive: true });
-      await appendFile(join(dir, `${missionId}.jsonl`), line, 'utf8');
+      const handle = await open(join(dir, `${missionId}.jsonl`), 'a+');
+      try {
+        const { size } = await handle.stat();
+        // A file whose last byte is not a newline would take the new line onto its last line.
+        // A separator keeps every earlier byte in place and starts the new line on its own.
+        const separator = size > 0 && !(await endsWithNewline(handle, size)) ? '\n' : '';
+        await handle.appendFile(`${separator}${line}`, 'utf8');
+      } finally {
+        await handle.close();
+      }
     },
   };
 }

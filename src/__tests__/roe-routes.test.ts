@@ -479,3 +479,38 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
     expect(serverSource, 'startup imports the legacy row once').toContain('migrateLegacyLatest(roeLedgerBackend, legacyRoeRows)');
   });
 });
+
+describe('ROE routes refuse a revision whose verdict redaction would change (phase 39 follow-up)', () => {
+  const ALLOWED_SECRET_SHAPED = `${'a'.repeat(40)}.example.com`;
+  const OUT_OF_SCOPE_SECRET_SHAPED = `${'b'.repeat(40)}.example.com`;
+
+  it('answers 422, appends nothing and emits nothing when redaction makes an out-of-scope host read as allowed', async () => {
+    const { ledgerDir, store } = setup();
+    const m = await mount(store);
+    const reply = await request(m.base, 'PUT', '/api/teams/white/roe', {
+      text: `scope: ${ALLOWED_SECRET_SHAPED}\nallow active: no\n`,
+      actions: [{ command: 'curl https://x', target: OUT_OF_SCOPE_SECRET_SHAPED }],
+    });
+    expect(reply.status).toBe(422);
+    expect(reply.body.error).toContain('action 0');
+    expect(reply.text).not.toContain('bbbbbbbb');
+    expect(existsSync(join(ledgerDir, 'latest.jsonl'))).toBe(false);
+    expect(m.emitted).toEqual([]);
+    expect(m.receipts).toEqual([]);
+    const get = await request(m.base, 'GET', '/api/teams/white/roe');
+    expect(get.body.verdicts).toBeUndefined();
+  });
+
+  it('records a host that redaction leaves alone with the verdict the audit gives', async () => {
+    const { ledgerDir, store } = setup();
+    const m = await mount(store);
+    const put = await request(m.base, 'PUT', '/api/teams/white/roe', {
+      text: 'scope: app.example.com\nallow active: no\n',
+      actions: [{ command: 'curl https://x', target: 'other.example.net' }],
+    });
+    expect(put.status).toBe(200);
+    expect(ledgerLines(join(ledgerDir, 'latest.jsonl'))[0].verdicts).toMatchObject([{ actionIndex: 0, verdict: 'violation' }]);
+    const get = await request(m.base, 'GET', '/api/teams/white/roe');
+    expect(get.body.verdicts).toMatchObject([{ actionIndex: 0, verdict: 'violation' }]);
+  });
+});

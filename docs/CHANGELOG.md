@@ -1,5 +1,15 @@
 # Purple Team Changelog
 
+## 2026-10-21 — Phase 39 follow-ups: ROE ledger fixes
+
+**Changed (breaking)**
+- `PUT /api/teams/white/roe` answers `422` with `error` naming the action index, and appends nothing, when secret redaction would change an audit verdict. Redaction can make two distinct hosts read the same: a 40-character alphanumeric host label matches the `aws_secret_key` pattern and becomes `[redacted]`, so an out-of-scope host could read as allowed. The verdict is now refused rather than recorded. Ordinary hostnames and IPs without a secret-pattern match are unaffected.
+- The out-of-scope `roeAudit` rationale names at most five allowed targets, each cut at 64 characters, then `and N more`. The verdict, action index and conditions are unchanged. A stored revision for a long allowed list was up to 47 times its request; it is now under twice.
+
+**Fixed**
+- A ledger file that already holds a complete last line but no trailing newline no longer has the next revision written onto that line. The backend starts the new line on its own line. A reader still refuses such a file as a torn tail, as before.
+- An existing but empty `latest.jsonl` is now treated as not yet migrated, so a legacy `latest` row is imported. A file holding only blank lines is not appended to.
+
 ## 2026-10-21 — Phase 39: ROE verdict ledger and revision history
 
 **New**

@@ -18,6 +18,7 @@ import {
   parseLedger,
   parseMissionId,
   provenanceOf,
+  redactionFidelity,
   serializeLine,
   type LedgerAppendResult,
   type LedgerRead,
@@ -479,5 +480,78 @@ describe('fail-closed on torn tails, malformed verdicts and prototype keys', () 
         reason: 'actions must be an array of action objects',
       });
     }
+  });
+});
+
+describe('appending to a file that does not end in a newline', () => {
+  it('starts the new revision on its own line and keeps the existing bytes', async () => {
+    const file = join(dir, 'latest.jsonl');
+    const tail = serializeLine(first).slice(0, -1);
+    writeFileSync(file, tail);
+    await fsBackend(dir).appendLine(LATEST, serializeLine(second));
+    const content = readFileSync(file, 'utf8');
+    expect(content).toBe(`${tail}\n${serializeLine(second)}`);
+    expect(parseLedger(LATEST, content.split('\n'))).toEqual({ ok: true, records: [first, second] });
+  });
+
+  it('adds no separator after a file that already ends in a newline, or into an empty file', async () => {
+    const backend = fsBackend(dir);
+    await backend.appendLine(LATEST, serializeLine(first));
+    await backend.appendLine(LATEST, serializeLine(second));
+    expect(readFileSync(join(dir, 'latest.jsonl'), 'utf8')).toBe(`${serializeLine(first)}${serializeLine(second)}`);
+  });
+});
+
+describe('legacy migration into an existing but empty ledger file', () => {
+  it('imports the legacy latest record into an empty latest.jsonl, which holds no revision yet', async () => {
+    writeFileSync(join(dir, 'latest.jsonl'), '');
+    const backend = fsBackend(dir);
+    expect(await migrateLegacyLatest(backend, [legacyRow()])).toBe('imported');
+    expect(await createRoeLedgerStore(backend).read(LATEST)).toMatchObject({
+      ok: true,
+      records: [{ revision: 4, createdAt: LEGACY_CREATED }],
+    });
+  });
+
+  it('does not append after a file that holds only blank lines, and warns', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const file = join(dir, 'latest.jsonl');
+    writeFileSync(file, '\n  \n');
+    expect(await migrateLegacyLatest(fsBackend(dir), [legacyRow()])).toBe('skipped-invalid');
+    expect(readFileSync(file, 'utf8')).toBe('\n  \n');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('only blank lines'));
+  });
+});
+
+describe('redaction fidelity', () => {
+  const HOST_A = `${'a'.repeat(40)}.example.com`;
+  const HOST_B = `${'b'.repeat(40)}.example.com`;
+
+  it('refuses a revision whose out-of-scope host redaction makes read as allowed, naming no value', () => {
+    const result = redactionFidelity(`scope: ${HOST_A}\nallow active: no`, [{ command: 'curl x', target: HOST_B }]);
+    expect(result).toEqual({ ok: false, reason: expect.stringContaining('action 0') });
+    expect(JSON.stringify(result)).not.toContain('aaaa');
+    expect(JSON.stringify(result)).not.toContain('bbbb');
+  });
+
+  it('accepts a secret-shaped host whose verdict redaction leaves unchanged', () => {
+    expect(redactionFidelity(`scope: ${HOST_A}\nallow active: no`, [{ command: 'curl x', target: HOST_A }])).toEqual({ ok: true });
+  });
+
+  it('accepts ordinary hostnames and IPs in scope and out of scope', () => {
+    const text = 'scope: app.example.com, 10.0.0.5, k8s-deploy-7f9c5d6b8a-x2k4p.internal.example.com\nallow active: no';
+    const targets = ['app.example.com', '10.0.0.5', 'k8s-deploy-7f9c5d6b8a-q8w1z.internal.example.com', '192.168.1.9'];
+    expect(redactionFidelity(text, targets.map((target) => ({ command: 'curl x', target })))).toEqual({ ok: true });
+  });
+});
+
+describe('stored size of a revision', () => {
+  it('keeps a revision under twice its request when the allowed list is long and every action is out of scope', () => {
+    const targets = Array.from({ length: 1000 }, (_, i) => `host${String(i).padStart(4, '0')}.corp.example.net`);
+    const text = `scope: ${targets.join(', ')}\nallow active: no`;
+    const actions = Array.from({ length: 50 }, (_, i) => ({ command: 'curl', target: `out${i}.other.test` }));
+    const line = buildRevision({ missionId: LATEST, text, actions, previous: null, recordedAt: RECORDED_AT });
+    const request = Buffer.byteLength(text, 'utf8') + Buffer.byteLength(JSON.stringify(actions), 'utf8');
+    expect(Buffer.byteLength(serializeLine(line), 'utf8')).toBeLessThan(2 * request);
   });
 });

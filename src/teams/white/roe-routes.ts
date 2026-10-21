@@ -24,6 +24,7 @@ import {
   listRevisions,
   memoryBackend,
   parseMissionId,
+  redactionFidelity,
   type LedgerAppendResult,
   type LedgerRead,
   type MissionId,
@@ -145,6 +146,11 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
     }
     if (Buffer.byteLength(JSON.stringify(actions), 'utf8') > ROE_BODY_CAP_BYTES) {
       res.status(413).json({ error: 'ROE actions exceed the 64 KiB cap' });
+      return;
+    }
+    const fidelity = redactionFidelity(text, actions);
+    if (!fidelity.ok) {
+      res.status(422).json(redactSecrets({ error: fidelity.reason }));
       return;
     }
     let appended: LedgerAppendResult;
