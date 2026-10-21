@@ -96,11 +96,24 @@ afterEach(() => {
 });
 
 describe('parseMissionId', () => {
-  it('defaults an absent id to latest and accepts valid ids', () => {
+  it('defaults an absent id to latest and accepts lowercase ids', () => {
     expect(parseMissionId(undefined)).toEqual({ ok: true, missionId: 'latest' });
     expect(parseMissionId('latest')).toEqual({ ok: true, missionId: 'latest' });
-    expect(parseMissionId('a-1_B')).toMatchObject({ ok: true, missionId: 'a-1_B' });
+    expect(parseMissionId('mission-1')).toEqual({ ok: true, missionId: 'mission-1' });
+    expect(parseMissionId('a-1_b')).toMatchObject({ ok: true, missionId: 'a-1_b' });
     expect(parseMissionId('a'.repeat(64))).toMatchObject({ ok: true });
+    expect(parseMissionId('com0')).toMatchObject({ ok: true, missionId: 'com0' });
+  });
+
+  it('rejects uppercase ids so case-insensitive volumes cannot alias two missions', () => {
+    expect(parseMissionId('LATEST').ok).toBe(false);
+    expect(parseMissionId('Mission-1').ok).toBe(false);
+  });
+
+  it('rejects Windows reserved device names in any letter case', () => {
+    for (const name of ['CON', 'nul', 'PRN', 'Aux', 'COM1', 'lpt9', 'com5']) {
+      expect(parseMissionId(name)).toEqual({ ok: false, reason: 'missionId must not be a reserved device name' });
+    }
   });
 
   it('rejects path segments, empty, over-long, leading-dash, and non-string ids', () => {

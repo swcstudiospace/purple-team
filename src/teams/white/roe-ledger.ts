@@ -26,8 +26,11 @@ export const ROE_LEDGER_DIR = 'roe-ledger';
 /** Mission used when a request does not name one (the single-slot scope of phase 28 and earlier). */
 export const DEFAULT_MISSION_ID = 'latest';
 
-/** Accepted mission id shape. Mission ids become file names, so this regex is the path-safety gate. */
-export const MISSION_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+/** Accepted mission id shape: lowercase only, so case-insensitive volumes cannot map two ids onto one file. Mission ids become file names, so this regex is the path-safety gate. */
+export const MISSION_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
+
+/** Windows reserved device names. A file named after one is a device on Windows, so these ids are refused in any case. */
+const RESERVED_DEVICE_NAME_RE = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 
 /** A mission id that passed parseMissionId. Backends accept only this type. */
 export type MissionId = string & { readonly __brand: 'MissionId' };
@@ -38,8 +41,11 @@ export type MissionIdParse = { ok: true; missionId: MissionId } | { ok: false; r
 export function parseMissionId(raw: unknown): MissionIdParse {
   if (raw === undefined) return { ok: true, missionId: DEFAULT_MISSION_ID as MissionId };
   if (typeof raw !== 'string') return { ok: false, reason: 'missionId must be a string' };
+  if (RESERVED_DEVICE_NAME_RE.test(raw)) {
+    return { ok: false, reason: 'missionId must not be a reserved device name' };
+  }
   if (!MISSION_ID_RE.test(raw)) {
-    return { ok: false, reason: 'missionId must match ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$' };
+    return { ok: false, reason: 'missionId must match ^[a-z0-9][a-z0-9_-]{0,63}$' };
   }
   return { ok: true, missionId: raw as MissionId };
 }
