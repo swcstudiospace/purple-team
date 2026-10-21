@@ -16,13 +16,16 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 
 ## Current Milestone
 
-🚀 **v2 Audit Follow-ups, Lint Gate & Deferred v2 Requirements (Phases 37-41)** — started 2026-10-21. Scope is the candidate list recorded at v1.4 close in `.planning/PROJECT.md` (owner-accepted). Phases 39-41 are grey areas and need owner decisions before execution.
+🚀 **v2 Audit Follow-ups, Lint Gate & Deferred v2 Requirements** — started 2026-10-21. Scope is the candidate list recorded at v1.4 close in `.planning/PROJECT.md` (owner-accepted). Phases 39-41 were grey areas; their owner decisions are recorded and resolved in `.planning/v2-REQUIREMENTS.md`.
 
 - [ ] Phase 37 (partly done): F-20-01 retargeted to shipped doctrine sources, 38/38 (33/38 measured 2026-10-21 before retargeting); stale v1.3 Nyquist prose refreshed; Phase 23 Tier-cell browser render observed and 23-VERIFICATION reconciled. Open: stray repo-root artifact (deletion not approved; left in place)
 - [x] Phase 38: Lint scope and gates — merged as PR #9 (b2671b4). F-25-01 closed: lint covers `src/**/*.ts` with 0 errors; per-rule budgets are blocking in doctor
 - [ ] Phase 39: ROE verdict ledger and revision history — grey area, owner design decision needed
+  - Requirements: .planning/v2-REQUIREMENTS.md
 - [ ] Phase 40: ROE text provenance and purple auto-consumption of recorded verdicts — grey area; depends on Phase 39
+  - Requirements: .planning/v2-REQUIREMENTS.md
 - [ ] Phase 41: Install-and-launch verification of the built `.deb` / AppImage — environment-dependent
+  - Requirements: .planning/v2-REQUIREMENTS.md
 
 <details>
 <summary>✅ v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel (Phases 34-36) — shipped 2026-10-21</summary>

@@ -3,7 +3,7 @@ gsd_state_version: "1.0"
 milestone: v2
 milestone_name: Audit Follow-ups, Lint Gate & Deferred v2 Requirements
 status: Phase 37 partly done; stray directory open
-last_updated: "2026-10-21T05:00:00.000Z"
+last_updated: "2026-10-21T10:10:53.000Z"
 last_activity: 2026-10-21
 last_activity_desc: Closeout run — v1.6 archived, v1.7 closed (PR #7 merged), v2 bootstrapped
 state_head: 95c63331bce121c06d5bcb8c67567cd034db1231
@@ -54,7 +54,7 @@ Last activity: 2026-10-21 — v1.6 archived; v1.7 closed; v2 bootstrapped
 ## Operator Next Steps
 
 - Phase 37: the stray repo-root directory `Heads-up: while wiring GET ` needs your approval before deletion.
-- Phases 39–41 need owner design decisions before execution (ledger shape, provenance fields, install-verification environment).
+- Phases 39–41 owner design decisions are recorded in `.planning/v2-REQUIREMENTS.md` (ledger shape, provenance fields, install-verification environment).
 - PR #4 (`feat/purple-team-rebrand`) is stale (base is the v1.4-era main) and conflicts with main: decide merge, close or hold.
 - `feat/purple-team-platform` has 21 unmerged commits and no PR: decide whether to open one.
 - R1 live Claude Pro/Max login and the D2 mission-level run remain user-run validations.
