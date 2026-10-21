@@ -177,6 +177,22 @@ matrix (`deb`/`appimage` on Linux, `msi`/`nsis` on Windows, `app`/`dmg` on
 macOS); iOS/Android jobs exist as `workflow_dispatch`-only manual jobs because
 they need signing identities and SDK/NDK toolchains unavailable to push builds.
 
+`install-launch` (phase 41) runs after the desktop matrix on pull requests to
+`main` and on pushes to `main`. It downloads the `desktop-linux` artifact
+(`.deb` and `.AppImage`) and runs `scripts/desktop-install-launch-check.sh`
+inside a headless `ubuntu:22.04` container with no DISPLAY and no X server. The
+check installs the `.deb` with `apt-get install -y`, confirms `dpkg -s` reports
+`install ok installed`, runs `ldd` on each installed ELF executable, starts the
+installed `t3mp3st-server` sidecar with a bearer token and polls
+`GET /health` for HTTP 200, then stops it and records its exit code. It extracts
+the AppImage with `--appimage-extract` (no FUSE mount) and repeats the sidecar
+health check on the bundled sidecar, or records not-applicable if the AppImage
+does not bundle one. The JSON receipt is uploaded as the
+`desktop-install-launch-receipt` artifact (`receipt.json`) and carries each
+artifact's sha256 and byte size, the container image reference, and one status
+per check. Claim boundary, verbatim: "headless install + ldd + sidecar /health
+only; no GUI window or desktop session was launched."
+
 ## 8. Bundle wiring manifest (verified 2026-10-09 against docs/IA.md)
 
 `frontendDist` is `../docs`, so the bundle ships the FINAL static asset set —

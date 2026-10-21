@@ -76,6 +76,65 @@ jobs:
             src-tauri/target/release/bundle/**/*-setup.exe
             src-tauri/target/release/bundle/**/*.dmg
 
+  install-launch:
+    name: Install and launch (linux, headless container)
+    # Runs after the whole desktop matrix succeeds, so the linux .deb and AppImage exist.
+    needs: desktop
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      # Pinned by digest (ubuntu:22.04 index digest as pulled on 2026-10-21).
+      CONTAINER_IMAGE: ubuntu:22.04@sha256:0a9887931b0e38af2e3487ed39e29436b0535c4f3f52e57745baaf79d1898956
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Download Linux desktop bundles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: gh run download "$RUN_ID" --name desktop-linux --dir dist/linux
+      - name: Install and launch check (headless ubuntu 22.04 container)
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          CI_ARTIFACT: desktop-linux
+        run: |
+          mkdir -p receipt
+          docker run --rm \
+            --env CONTAINER_IMAGE \
+            --env SOURCE_SHA \
+            --env SOURCE_RUN_ID \
+            --env CI_ARTIFACT \
+            --volume "$PWD/dist/linux:/artifacts:ro" \
+            --volume "$PWD/receipt:/receipt" \
+            --volume "$PWD/scripts/desktop-install-launch-check.sh:/check/desktop-install-launch-check.sh:ro" \
+            "$CONTAINER_IMAGE" \
+            bash /check/desktop-install-launch-check.sh /artifacts /receipt
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -s receipt/summary.md ]; then
+            cat receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Desktop install and launch (Linux, headless)"
+              echo ""
+              echo "No receipt was written: the container check stopped before completing."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload install-launch receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-install-launch-receipt
+          if-no-files-found: error
+          retention-days: 14
+          path: receipt/receipt.json
+
   ios:
     name: iOS init check (manual only)
     if: github.event_name == 'workflow_dispatch' && inputs.mobile == 'true'
