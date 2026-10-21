@@ -1,0 +1,389 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AuditedAction } from '../teams/white.js';
+import { parseRoe } from '../teams/white/roe-parser.js';
+import {
+  buildRevision,
+  createRoeLedgerStore,
+  fsBackend,
+  getRevision,
+  isValidRoeAction,
+  latestRevision,
+  listRevisions,
+  memoryBackend,
+  migrateLegacyLatest,
+  parseLedger,
+  parseMissionId,
+  provenanceOf,
+  serializeLine,
+  type LedgerAppendResult,
+  type MissionId,
+  type RoeLedgerLine,
+  type RoeLedgerStore,
+} from '../teams/white/roe-ledger.js';
+
+const ROE_TEXT = 'scope: example.com\nallow active: yes';
+const RECORDED_AT = '2026-10-20T10:00:00.000Z';
+const LEGACY_CREATED = '2026-10-01T00:00:00.000Z';
+const LEGACY_UPDATED = '2026-10-02T00:00:00.000Z';
+const SECRET = 'sk-abcdefghijklmnopqrstuvwxyz0123';
+
+function asMission(raw: string): MissionId {
+  const parsed = parseMissionId(raw);
+  if (!parsed.ok) throw new Error(parsed.reason);
+  return parsed.missionId;
+}
+
+const LATEST = asMission('latest');
+
+function sha16(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 16);
+}
+
+async function revise(
+  store: RoeLedgerStore,
+  missionId: MissionId,
+  text: string,
+  actions: AuditedAction[] = [],
+): Promise<LedgerAppendResult> {
+  return store.append(missionId, (previous) =>
+    buildRevision({ missionId, text, actions, previous, recordedAt: RECORDED_AT }),
+  );
+}
+
+async function reviseOk(
+  store: RoeLedgerStore,
+  missionId: MissionId,
+  text: string,
+  actions: AuditedAction[] = [],
+): Promise<RoeLedgerLine> {
+  const result = await revise(store, missionId, text, actions);
+  if (!result.ok) throw new Error(result.reason);
+  return result.line;
+}
+
+function legacyRow(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  const actions = [{ command: 'ls', target: 'example.com' }];
+  return {
+    id: 'latest',
+    revision: 4,
+    textHash: sha16(ROE_TEXT),
+    actionsHash: sha16(JSON.stringify(actions)),
+    text: ROE_TEXT,
+    actions,
+    createdAt: LEGACY_CREATED,
+    updatedAt: LEGACY_UPDATED,
+    ...overrides,
+  };
+}
+
+const first = buildRevision({ missionId: LATEST, text: ROE_TEXT, actions: [], previous: null, recordedAt: RECORDED_AT });
+const second = buildRevision({ missionId: LATEST, text: ROE_TEXT, actions: [], previous: first, recordedAt: RECORDED_AT });
+const third = buildRevision({ missionId: LATEST, text: ROE_TEXT, actions: [], previous: second, recordedAt: RECORDED_AT });
+
+let dir: string;
+
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), 'roe-ledger-'));
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  rmSync(dir, { recursive: true, force: true });
+});
+
+describe('parseMissionId', () => {
+  it('defaults an absent id to latest and accepts valid ids', () => {
+    expect(parseMissionId(undefined)).toEqual({ ok: true, missionId: 'latest' });
+    expect(parseMissionId('latest')).toEqual({ ok: true, missionId: 'latest' });
+    expect(parseMissionId('a-1_B')).toMatchObject({ ok: true, missionId: 'a-1_B' });
+    expect(parseMissionId('a'.repeat(64))).toMatchObject({ ok: true });
+  });
+
+  it('rejects path segments, empty, over-long, leading-dash, and non-string ids', () => {
+    for (const bad of ['../x', '', 'a'.repeat(65), '-a', 'a/b', null, 42, ['a']]) {
+      expect(parseMissionId(bad).ok).toBe(false);
+    }
+  });
+});
+
+describe('isValidRoeAction', () => {
+  it('accepts action objects and rejects anything else', () => {
+    expect(isValidRoeAction({ command: 'ls', target: 'x', approved: true, scope: ['a'] })).toBe(true);
+    expect(isValidRoeAction({})).toBe(true);
+    expect(isValidRoeAction(null)).toBe(false);
+    expect(isValidRoeAction(['ls'])).toBe(false);
+    expect(isValidRoeAction({ command: 1 })).toBe(false);
+    expect(isValidRoeAction({ scope: [1] })).toBe(false);
+  });
+});
+
+describe('buildRevision', () => {
+  it('starts at revision 1 and hashes the stored text and actions', () => {
+    expect(first).toMatchObject({
+      schemaVersion: 1,
+      revision: 1,
+      missionId: 'latest',
+      textHash: sha16(ROE_TEXT),
+      actionsHash: sha16('[]'),
+      text: ROE_TEXT,
+      parseOk: true,
+      createdAt: RECORDED_AT,
+      recordedAt: RECORDED_AT,
+    });
+    expect(first).not.toHaveProperty('provenance');
+  });
+
+  it('continues the revision and keeps createdAt from the previous line', () => {
+    const later = buildRevision({
+      missionId: LATEST,
+      text: ROE_TEXT,
+      actions: [],
+      previous: first,
+      recordedAt: '2026-10-21T00:00:00.000Z',
+    });
+    expect(later.revision).toBe(2);
+    expect(later.createdAt).toBe(RECORDED_AT);
+    expect(later.recordedAt).toBe('2026-10-21T00:00:00.000Z');
+  });
+
+  it('redacts secrets in text and actions before hashing them', () => {
+    const text = `scope: example.com\nallow active: yes\n# key ${SECRET}`;
+    const line = buildRevision({
+      missionId: LATEST,
+      text,
+      actions: [{ command: `ls ${SECRET}`, target: 'example.com' }],
+      previous: null,
+      recordedAt: RECORDED_AT,
+    });
+    const redactedText = 'scope: example.com\nallow active: yes\n# key [redacted]';
+    const redactedActions = [{ command: 'ls [redacted]', target: 'example.com' }];
+    expect(line.text).toBe(redactedText);
+    expect(line.textHash).toBe(sha16(redactedText));
+    expect(line.actions).toEqual(redactedActions);
+    expect(line.actionsHash).toBe(sha16(JSON.stringify(redactedActions)));
+    expect(JSON.stringify(line)).not.toContain(SECRET);
+  });
+
+  it('stamps verdicts with the revision, text hash and resolved ROE lines', () => {
+    const line = buildRevision({
+      missionId: LATEST,
+      text: ROE_TEXT,
+      actions: [
+        { command: 'ls', target: 'example.com' },
+        { command: 'nmap -sV', target: 'example.com' },
+      ],
+      previous: null,
+      recordedAt: RECORDED_AT,
+    });
+    const roeLines = parseRoe(ROE_TEXT).resolved.map((r) => r.line);
+    expect(line.verdicts.map((v) => v.verdict)).toEqual(['compliant', 'needs_approval']);
+    for (const verdict of line.verdicts) {
+      expect(verdict).toMatchObject({ roeRevision: 1, roeTextHash: line.textHash, roeLines });
+    }
+  });
+
+  it('records no verdicts when the ROE text does not parse', () => {
+    const line = buildRevision({
+      missionId: LATEST,
+      text: 'nothing here',
+      actions: [{ command: 'ls', target: 'example.com' }],
+      previous: null,
+      recordedAt: RECORDED_AT,
+    });
+    expect(line.parseOk).toBe(false);
+    expect(line.verdicts).toEqual([]);
+  });
+});
+
+describe('parseLedger', () => {
+  it('reads an empty ledger and tolerates one trailing newline', () => {
+    expect(parseLedger(LATEST, [])).toEqual({ ok: true, records: [] });
+    expect(parseLedger(LATEST, [serializeLine(first), ''])).toEqual({ ok: true, records: [first] });
+  });
+
+  it.each([
+    ['a blank middle line', [serializeLine(first), '', serializeLine(second)], 2, 'blank line'],
+    ['a torn tail', [serializeLine(first), serializeLine(second).slice(0, 40)], 2, 'not valid JSON'],
+    ['a revision gap', [serializeLine(first), serializeLine(third)], 2, 'revision must be 2'],
+    [
+      'a tampered text',
+      [serializeLine(first), serializeLine({ ...second, text: 'scope: evil.com\nallow active: yes' })],
+      2,
+      'textHash',
+    ],
+    ['a non-object line', [serializeLine(first), '[1,2]'], 2, 'not a JSON object'],
+    ['a foreign mission', [serializeLine({ ...first, missionId: 'other' })], 1, 'missionId'],
+  ])('fails closed on %s and names line %i', (_label, lines, line, reason) => {
+    expect(parseLedger(LATEST, lines)).toEqual({ ok: false, line, reason: expect.stringContaining(reason) });
+  });
+
+  it('accepts a provenance block only in the recorded shape', () => {
+    const recorded = { ...first, provenance: { status: 'recorded', recordedAt: RECORDED_AT, source: 'api', recordedBy: null } };
+    expect(parseLedger(LATEST, [serializeLine(recorded as RoeLedgerLine)])).toMatchObject({ ok: true });
+    const malformed = { ...first, provenance: { status: 'unknown' } };
+    expect(parseLedger(LATEST, [serializeLine(malformed as RoeLedgerLine)])).toMatchObject({
+      ok: false,
+      line: 1,
+      reason: expect.stringContaining('provenance'),
+    });
+  });
+});
+
+describe('ledger store on the filesystem', () => {
+  it('creates the file and appends exactly one line', async () => {
+    const store = createRoeLedgerStore(fsBackend(dir));
+    const line = await reviseOk(store, LATEST, ROE_TEXT);
+    expect(line.revision).toBe(1);
+    const content = readFileSync(join(dir, 'latest.jsonl'), 'utf8');
+    expect(content.split('\n')).toHaveLength(2);
+    expect(JSON.parse(content.split('\n')[0])).toMatchObject({ revision: 1 });
+  });
+
+  it('keeps the first line byte-identical after a second append', async () => {
+    const store = createRoeLedgerStore(fsBackend(dir));
+    await reviseOk(store, LATEST, ROE_TEXT);
+    const before = readFileSync(join(dir, 'latest.jsonl'), 'utf8');
+    const second = await reviseOk(store, LATEST, 'scope: other.com\nallow active: no');
+    const after = readFileSync(join(dir, 'latest.jsonl'), 'utf8');
+    expect(second.revision).toBe(2);
+    expect(after.startsWith(before)).toBe(true);
+    expect(after.split('\n')).toHaveLength(3);
+  });
+
+  it('numbers revisions contiguously', async () => {
+    const store = createRoeLedgerStore(fsBackend(dir));
+    await reviseOk(store, LATEST, ROE_TEXT);
+    await reviseOk(store, LATEST, ROE_TEXT);
+    await reviseOk(store, LATEST, ROE_TEXT);
+    const read = await store.read(LATEST);
+    if (!read || !read.ok) throw new Error('ledger must read back ok');
+    expect(read.records.map((r) => r.revision)).toEqual([1, 2, 3]);
+  });
+
+  it('serializes 25 concurrent appends into revisions 1..25', async () => {
+    const store = createRoeLedgerStore(fsBackend(dir));
+    const results = await Promise.all(Array.from({ length: 25 }, () => revise(store, LATEST, ROE_TEXT)));
+    const revisions = results.map((r) => (r.ok ? r.line.revision : -1)).sort((a, b) => a - b);
+    expect(revisions).toEqual(Array.from({ length: 25 }, (_, index) => index + 1));
+  });
+
+  it('reports a missing file as null, not as an error, and creates nothing', async () => {
+    const store = createRoeLedgerStore(fsBackend(dir));
+    expect(await store.read(LATEST)).toBeNull();
+    expect(existsSync(join(dir, 'latest.jsonl'))).toBe(false);
+  });
+
+  it('fails closed on a corrupt line for reads and writes and leaves the file untouched', async () => {
+    const file = join(dir, 'latest.jsonl');
+    writeFileSync(file, `${serializeLine(first)}not json\n${serializeLine(second)}`);
+    const before = readFileSync(file, 'utf8');
+    const store = createRoeLedgerStore(fsBackend(dir));
+    expect(await store.read(LATEST)).toEqual({ ok: false, line: 2, reason: 'line is not valid JSON' });
+    expect(await revise(store, LATEST, ROE_TEXT)).toEqual({ ok: false, line: 2, reason: 'line is not valid JSON' });
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('rejects when the backend fails with an I/O error instead of hiding it', async () => {
+    mkdirSync(join(dir, 'latest.jsonl'));
+    await expect(createRoeLedgerStore(fsBackend(dir)).read(LATEST)).rejects.toThrow();
+  });
+
+  it('stores redacted text and actions that read back with matching hashes', async () => {
+    const store = createRoeLedgerStore(fsBackend(dir));
+    const text = `scope: example.com\nallow active: yes\n# key ${SECRET}`;
+    const line = await reviseOk(store, LATEST, text, [{ command: `ls ${SECRET}`, target: 'example.com' }]);
+    expect(line.text).toBe('scope: example.com\nallow active: yes\n# key [redacted]');
+    expect(readFileSync(join(dir, 'latest.jsonl'), 'utf8')).not.toContain(SECRET);
+    expect(await store.read(LATEST)).toMatchObject({ ok: true, records: [{ revision: 1 }] });
+  });
+});
+
+describe('ledger store in memory', () => {
+  it('appends and reads back the same revisions', async () => {
+    const store = createRoeLedgerStore(memoryBackend());
+    await reviseOk(store, LATEST, ROE_TEXT);
+    await reviseOk(store, LATEST, ROE_TEXT);
+    expect(await store.read(LATEST)).toMatchObject({ ok: true, records: [{ revision: 1 }, { revision: 2 }] });
+    expect(await createRoeLedgerStore(memoryBackend()).read(asMission('other'))).toBeNull();
+  });
+});
+
+describe('legacy migration', () => {
+  it('imports the legacy latest record once, keeping its revision and timestamps', async () => {
+    const backend = fsBackend(dir);
+    const store = createRoeLedgerStore(backend);
+    expect(await migrateLegacyLatest(backend, [legacyRow()])).toBe('imported');
+    const read = await store.read(LATEST);
+    if (!read || !read.ok) throw new Error('migrated ledger must read back ok');
+    const [migrated] = read.records;
+    expect(migrated).toMatchObject({
+      revision: 4,
+      textHash: sha16(ROE_TEXT),
+      createdAt: LEGACY_CREATED,
+      recordedAt: LEGACY_UPDATED,
+      parseOk: true,
+    });
+    expect(provenanceOf(migrated)).toEqual({ status: 'unknown' });
+    expect((await reviseOk(store, LATEST, 'scope: other.com\nallow active: no')).revision).toBe(5);
+  });
+
+  it('appends nothing when the migration runs again', async () => {
+    const backend = fsBackend(dir);
+    expect(await migrateLegacyLatest(backend, [legacyRow()])).toBe('imported');
+    const before = readFileSync(join(dir, 'latest.jsonl'), 'utf8');
+    expect(await migrateLegacyLatest(backend, [legacyRow()])).toBe('already-present');
+    expect(readFileSync(join(dir, 'latest.jsonl'), 'utf8')).toBe(before);
+  });
+
+  it('does not import a legacy row whose stored hash does not match, and warns without its text', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const backend = fsBackend(dir);
+    expect(await migrateLegacyLatest(backend, [legacyRow({ textHash: '0000000000000000' })])).toBe('skipped-drift');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('do not match'));
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain('scope:');
+    expect(await createRoeLedgerStore(backend).read(LATEST)).toBeNull();
+  });
+
+  it('skips an invalid legacy row and reports no legacy record for other ids', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const backend = fsBackend(dir);
+    expect(await migrateLegacyLatest(backend, [legacyRow({ revision: 0 })])).toBe('skipped-invalid');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(await migrateLegacyLatest(backend, [legacyRow({ id: 'other' })])).toBe('no-legacy');
+    expect(await migrateLegacyLatest(backend, undefined)).toBe('no-legacy');
+  });
+});
+
+describe('ledger views', () => {
+  it('lists, selects and summarises revisions', () => {
+    const audited = buildRevision({
+      missionId: LATEST,
+      text: ROE_TEXT,
+      actions: [
+        { command: 'ls', target: 'example.com' },
+        { command: 'nmap -sV', target: 'example.com' },
+      ],
+      previous: null,
+      recordedAt: RECORDED_AT,
+    });
+    expect(listRevisions([audited])).toEqual([
+      {
+        revision: 1,
+        textHash: audited.textHash,
+        actionsHash: audited.actionsHash,
+        recordedAt: RECORDED_AT,
+        parseOk: true,
+        verdictCounts: { compliant: 1, violation: 0, needs_approval: 1 },
+        provenance: { status: 'unknown' },
+      },
+    ]);
+    expect(getRevision([audited], 1)).toBe(audited);
+    expect(getRevision([audited], 2)).toBeNull();
+    expect(latestRevision([])).toBeNull();
+    expect(latestRevision([first, audited])).toBe(audited);
+  });
+});
