@@ -1,5 +1,21 @@
 # Purple Team Changelog
 
+## 2026-10-21 — Phase 40: ROE text provenance and purple consumption of recorded verdicts
+
+**New**
+- Every new ROE revision carries `provenance: { status: 'recorded', recordedAt, source: 'api', recordedBy }`. `recordedAt` is server time, `source` is always `api`, and `recordedBy` is the optional `author` from the PUT body. It is caller-asserted: the server records it as given (trimmed, redacted) and verifies nothing. It is `null` when absent, `null` or blank. A non-string author, or one over 128 characters after trimming, answers `400`.
+- Revisions written before this phase, and revisions migrated from the legacy store, read as `provenance: { status: 'unknown' }`. No recorded values are backfilled or synthesized.
+- `POST /api/teams/purple/synthesize` consumes the verdicts of the latest ROE revision for `missionId` (default `latest`) when `verdicts` is absent, each stamped with `roeRevision` and `roeTextHash`. Every synthesis response and `GET /api/teams/purple/synthesize` carry `verdictSource`: `{ kind: 'ledger', missionId, revision, textHash }`, `{ kind: 'request' }`, or `{ kind: 'none', missionId, reason: 'no-ledger' | 'parse-not-ok' }`.
+
+**Changed (breaking)**
+- `verdicts` on `POST /api/teams/purple/synthesize` is optional. A request that omits it now consumes the ledger instead of failing with `400`. A present non-array `verdicts` still answers `400`.
+- The `provenance` block on `GET /api/teams/white/roe` is `{ revision, textHash, status }`, with `recordedAt`, `source` and `recordedBy` only when `status` is `recorded`. The phase 39 shape `{ revision, textHash, recordedAt }` is gone, so a legacy revision no longer shows a `recordedAt`.
+- An MCP `tempest_purple_synthesize` call without `verdicts` no longer sends `verdicts: []`, so it consumes the ledger. The MCP tool does not pass a `missionId`, so it always consumes the `latest` mission; the API accepts any valid `missionId`.
+
+**Known limitations**
+- No verdicts are fabricated: a mission with no ledger, or whose latest revision did not parse, gets `verdicts: []` and a `none` verdict source.
+- `recordedBy` cannot be trusted as an identity. It is whatever the caller wrote.
+
 ## 2026-10-21 — Phase 39 follow-ups: ROE ledger fixes
 
 **Changed (breaking)**
