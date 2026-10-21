@@ -95,8 +95,8 @@ import { FAMILY_TEAM_MAPPING, TEAM_ARCHETYPES, teamToolGrants } from './teams/in
 import { HAT_ARCHETYPES, hatTeam, hatToolGrants, type HatArchetype } from './teams/hats.js';
 import { isStructuredStart, validateStructuredStart, StructuredStartError, bindInlineArtifacts, artifactHash, ArtifactValidationError, RED_ARCHETYPES } from './teams/contracts.js';
 import type { BoundInlineArtifact } from './types/index.js';
-import { synthesize, type DarkPurpleSynthesis, type PurpleVerdictByFinding } from './teams/purple.js';
-import { hardeningPlan, type DetectionGap, type ObservedArtifactIds } from './teams/blue.js';
+import { createPurpleSynthesizeHandlers, type PurpleSynthesisRecord } from './teams/purple-synthesize-routes.js';
+import { hardeningPlan, type ObservedArtifactIds } from './teams/blue.js';
 import { coverageGaps } from './teams/blue/coverage.js';
 import { sigmaRulepack } from './teams/blue/rulepacks.js';
 import { registryTelemetry } from './teams/blue/telemetry.js';
@@ -109,7 +109,6 @@ import { createRoeHandlers } from './teams/white/roe-routes.js';
 import { ROE_LEDGER_DIR, createRoeLedgerStore, fsBackend, memoryBackend, migrateLegacyLatest } from './teams/white/roe-ledger.js';
 import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
-import { type RoeVerdict } from './teams/white.js';
 import { stageRoeAudit, type ApprovalBearingAction, type RoeStageMeta } from './teams/white/workflow.js';
 import {
   listRegisteredHatTools,
@@ -994,12 +993,6 @@ const missionReports = new Map<string, string>();
 let lastMissionReport: { missionId: string; report: string; generatedAt: number } | null = null;
  
  /** Latest dark-purple synthesis result — one slot, overwritten per synthesis. */
-interface PurpleSynthesisRecord {
-  id: string;
-  createdAt: string;
-  correlation: DarkPurpleSynthesis['correlation'];
-  synthesis: DarkPurpleSynthesis;
-}
 const purpleSyntheses = new Map<string, PurpleSynthesisRecord>();
 
 /**
@@ -7036,112 +7029,22 @@ app.get('/api/teams/tool-grants', (_req: Request, res: Response) => {
 });
 
 /**
- * POST /api/teams/purple/synthesize — correlate red findings, blue detection gaps,
- * and white ROE verdicts into a dark-purple posture ledger.
- *
- * Body: { findings: [{ id, title?, severity? }], detections: DetectionGap[],
- *         verdicts: RoeVerdict[], verdictsByFinding?: Record<findingId,
- *         { verdict: 'compliant' | 'violation' | 'needs_approval', rationale? }> }
- * verdictsByFinding switches the correlation to id-keyed (verdict X always joins
- * finding X regardless of insertion order); without it the v1 positional join
- * applies and the result declares correlation: 'positional-fallback'. A present
- * but invalid verdictsByFinding is rejected 400 — never coerced.
- * Findings whose id exists in the findingsLedger get their stored title/severity
- * merged in READ-ONLY (the ledger is never mutated by this route). Responds 201
- * with the DarkPurpleSynthesis; the counts event reaches the SSE stream + state
- * event log via emitContractEvent, and the LATEST synthesis persists through the
- * same snapshot machinery (purpleSyntheses slot in buildStateSnapshot).
+ * Purple synthesis (phase 40). Handlers live in teams/purple-synthesize-routes.ts.
+ * POST body: { findings, detections, verdicts?, verdictsByFinding?, missionId? }. When
+ * verdicts is absent, the verdicts are consumed from the latest ROE ledger revision for
+ * missionId (default latest); an array is used as given. Every response carries
+ * verdictSource. The latest synthesis is held in the purpleSyntheses slot, which the
+ * snapshot machinery persists.
  */
-app.get('/api/teams/purple/synthesize', (_req: Request, res: Response): void => {
-  const latest = purpleSyntheses.get('latest');
-  if (!latest) {
-    res.json({ synthesis: null });
-    return;
-  }
-  res.json(redactSecrets({
-    synthesis: latest.synthesis,
-    createdAt: latest.createdAt,
-    correlation: latest.correlation,
-  }));
+const purpleSynthesizeRoutes = createPurpleSynthesizeHandlers({
+  store: roeStore,
+  findings: findingsLedger,
+  purpleSyntheses,
+  emitContractEvent,
+  nowIso,
 });
-
-app.post('/api/teams/purple/synthesize', (req: Request, res: Response): void => {
-  const body = (req.body ?? {}) as Record<string, unknown>;
-  const findings = body.findings;
-  const detections = body.detections;
-  const verdicts = body.verdicts;
-  if (!Array.isArray(findings) || !Array.isArray(detections) || !Array.isArray(verdicts)) {
-    res.status(400).json({ error: 'findings, detections, and verdicts must each be an array' });
-    return;
-  }
-  const rawVerdictsByFinding = body.verdictsByFinding;
-  let verdictsByFinding: Record<string, PurpleVerdictByFinding> | undefined;
-  if (rawVerdictsByFinding !== undefined && rawVerdictsByFinding !== null) {
-    if (typeof rawVerdictsByFinding !== 'object' || Array.isArray(rawVerdictsByFinding)) {
-      res.status(400).json({ error: 'verdictsByFinding must be an object of findingId → { verdict, rationale? }' });
-      return;
-    }
-    const byFinding: Record<string, PurpleVerdictByFinding> = {};
-    for (const [findingId, rawEntry] of Object.entries(rawVerdictsByFinding as Record<string, unknown>)) {
-      if (!rawEntry || typeof rawEntry !== 'object' || Array.isArray(rawEntry)) {
-        res.status(400).json({ error: `verdictsByFinding[${findingId}] must be an object with a verdict` });
-        return;
-      }
-      const entry = rawEntry as Record<string, unknown>;
-      const verdict = entry.verdict;
-      if (verdict !== 'compliant' && verdict !== 'violation' && verdict !== 'needs_approval') {
-        res.status(400).json({ error: `verdictsByFinding[${findingId}].verdict must be one of: compliant, violation, needs_approval` });
-        return;
-      }
-      byFinding[findingId] = typeof entry.rationale === 'string' && entry.rationale
-        ? { verdict, rationale: entry.rationale }
-        : { verdict };
-    }
-    verdictsByFinding = byFinding;
-  }
-  const correlated = (findings as unknown[])
-    .filter((raw): raw is Record<string, unknown> => Boolean(raw) && typeof raw === 'object')
-    .map((raw) => {
-      const id = typeof raw.id === 'string' ? raw.id : '';
-      const ledger = id ? findingsLedger.get(id) : undefined;
-      return {
-        id,
-        title: typeof raw.title === 'string' && raw.title ? raw.title : ledger?.title,
-        severity: typeof raw.severity === 'string' && raw.severity ? raw.severity : ledger?.severity,
-      };
-    })
-    .filter((entry) => entry.id);
-  const gapInputs = (detections as unknown[]).filter(
-    (raw): raw is DetectionGap => Boolean(raw) && typeof raw === 'object',
-  );
-  const verdictInputs = (verdicts as unknown[]).filter(
-    (raw): raw is RoeVerdict => Boolean(raw) && typeof raw === 'object',
-  );
-  const synthesis = synthesize({
-    findings: correlated,
-    detections: gapInputs,
-    verdicts: verdictInputs,
-    verdictsByFinding,
-  });
-  // Persist the LATEST synthesis through the existing snapshot machinery: one
-  // slot keyed 'latest', overwritten per synthesis; emitContractEvent below
-  // schedules the debounced full-snapshot write that flushes it to state.json.
-  purpleSyntheses.set('latest', {
-    id: 'latest',
-    createdAt: nowIso(),
-    correlation: synthesis.correlation,
-    synthesis,
-  });
-  emitContractEvent('purple.synthesis', {
-    findings: correlated.length,
-    detections: gapInputs.length,
-    verdicts: verdictInputs.length,
-    correlation: synthesis.correlation,
-    unresolved: synthesis.unresolved.length,
-    nextMissions: synthesis.nextMissions.length,
-  });
-  res.status(201).json(synthesis);
-});
+app.get('/api/teams/purple/synthesize', purpleSynthesizeRoutes.getSynthesis);
+app.post('/api/teams/purple/synthesize', purpleSynthesizeRoutes.postSynthesis);
 
 // =============================================================================
 // BLUE DETECTION PIPELINE (Phase 15) — read-only projections of the v2 blue

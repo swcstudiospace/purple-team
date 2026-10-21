@@ -25,7 +25,7 @@ function block(source: string, startMarker: string, endMarker: string): string {
 describe('Dark Purple teams server integration', () => {
   it('server imports the teams module (single source of truth), never the reverse', () => {
     expect(server).toContain("from './teams/index.js'");
-    expect(server).toContain("from './teams/purple.js'");
+    expect(server).toContain("from './teams/purple-synthesize-routes.js'");
     // Dependency direction: server → teams only. The teams modules must not reach
     // back into the server (they stay pure, no server state, no I/O).
     expect(teamsIndex).not.toMatch(/from ['"]\.\.\/server(\.js)?['"]/);
@@ -73,35 +73,30 @@ describe('Dark Purple teams server integration', () => {
     expect(server).toContain("app.post('/api/teams/purple/synthesize'");
   });
 
-  it('purple synthesis route: 201 with the DarkPurpleSynthesis + counts event', () => {
-    const route = block(
-      server,
-      "app.post('/api/teams/purple/synthesize'",
-      '// POST /api/models',
-    );
+  it('purple synthesis routes: server delegates, handler is 201 with DarkPurpleSynthesis + verdictSource + counts event', () => {
+    const route = readFileSync(join(process.cwd(), 'src/teams/purple-synthesize-routes.ts'), 'utf8');
+    // The literals stay in server.ts; the handler bodies moved to the purple route module.
+    expect(server).toContain("app.get('/api/teams/purple/synthesize', purpleSynthesizeRoutes.getSynthesis);");
+    expect(server).toContain("app.post('/api/teams/purple/synthesize', purpleSynthesizeRoutes.postSynthesis);");
 
     expect(route).toContain('synthesize({');
-    expect(route).toMatch(/res\.status\(201\)\.json\(synthesis\)/);
+    expect(route).toContain('res.status(201).json(redactSecrets({ ...synthesis, verdictSource }))');
     // The counts event reaches the SSE stream + state event log.
     expect(route).toContain("emitContractEvent('purple.synthesis', {");
     expect(route).toContain('unresolved: synthesis.unresolved.length');
     expect(route).toContain('nextMissions: synthesis.nextMissions.length');
-    // Non-array inputs are rejected, never coerced.
-    expect(route).toMatch(/!Array\.isArray\(findings\)/);
+    // Non-array inputs are rejected, never coerced. verdicts is optional; when present it must be an array.
+    expect(route).toMatch(/!Array\.isArray\(findingsInput\)/);
     expect(route).toMatch(/!Array\.isArray\(detections\)/);
-    expect(route).toMatch(/!Array\.isArray\(verdicts\)/);
+    expect(route).toMatch(/!Array\.isArray\(rawVerdicts\)/);
     expect(route).toMatch(/400/);
   });
 
   it('purple synthesis reads the findings ledger READ-ONLY (merge, never mutate)', () => {
-    const route = block(
-      server,
-      "app.post('/api/teams/purple/synthesize'",
-      '// POST /api/models',
-    );
-
-    expect(route).toContain('findingsLedger.get(');
-    expect(route).not.toMatch(/findingsLedger\.set\(/);
-    expect(route).not.toMatch(/findingsLedger\.delete\(/);
+    const route = readFileSync(join(process.cwd(), 'src/teams/purple-synthesize-routes.ts'), 'utf8');
+    expect(server).toContain('findings: findingsLedger,');
+    expect(route).toContain('findings.get(');
+    expect(route).not.toMatch(/findings\.set\(/);
+    expect(route).not.toMatch(/findings\.delete\(/);
   });
 });
