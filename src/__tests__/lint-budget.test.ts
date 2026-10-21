@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateLintBudget } from '../../scripts/lint-budget.mjs';
+import { evaluateLintBudget, aggregateEslintResults } from '../../scripts/lint-budget.mjs';
 
 const budgets = {
   scope: 'src/**/*.ts',
@@ -53,5 +53,58 @@ describe('evaluateLintBudget', () => {
       '@typescript-eslint/no-explicit-any': { errors: 0, warnings: 0 },
     };
     expect(evaluateLintBudget(counts, budgets)).toEqual({ ok: true, violations: [] });
+  });
+});
+
+describe('aggregateEslintResults', () => {
+  it('aggregates a multi-file ESLint report per rule and feeds the budget evaluator', () => {
+    const report = [
+      {
+        filePath: '/repo/src/a.ts',
+        messages: [
+          { ruleId: '@typescript-eslint/no-explicit-any', severity: 2 },
+          { ruleId: 'curly', severity: 1 },
+        ],
+      },
+      {
+        filePath: '/repo/src/b.ts',
+        messages: [
+          { ruleId: '@typescript-eslint/no-explicit-any', severity: 1 },
+          { ruleId: null, severity: 2 },
+        ],
+      },
+    ];
+    const counts = aggregateEslintResults(report);
+    expect(counts).toEqual({
+      '@typescript-eslint/no-explicit-any': { errors: 1, warnings: 1 },
+      curly: { errors: 0, warnings: 1 },
+      parse: { errors: 1, warnings: 0 },
+    });
+
+    const passingBudgets = {
+      maxErrors: 0,
+      rules: {
+        '@typescript-eslint/no-explicit-any': { maxErrors: 1, maxWarnings: 1 },
+        curly: { maxWarnings: 1 },
+        parse: { maxErrors: 1 },
+      },
+    };
+    expect(evaluateLintBudget(counts, passingBudgets)).toEqual({ ok: true, violations: [] });
+
+    const failingBudgets = {
+      maxErrors: 0,
+      rules: {
+        '@typescript-eslint/no-explicit-any': { maxErrors: 0, maxWarnings: 0 },
+        curly: { maxWarnings: 1 },
+      },
+    };
+    expect(evaluateLintBudget(counts, failingBudgets)).toEqual({
+      ok: false,
+      violations: [
+        '@typescript-eslint/no-explicit-any: 1 error(s) exceed maxErrors 0',
+        '@typescript-eslint/no-explicit-any: 1 warning(s) exceed maxWarnings 0',
+        'parse: 1 error(s) exceed maxErrors 0',
+      ],
+    });
   });
 });
