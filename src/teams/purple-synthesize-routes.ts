@@ -7,9 +7,10 @@
  * ROE ledger for `missionId` (default `latest`) are consumed. They are ordered by action index,
  * while synthesize() joins by finding position, so consumed verdicts never enter the positional
  * join. They join findings ONLY through `verdictsByFinding` (id-keyed). Without it the join input
- * is empty and the consumed verdicts are reported in `verdictSource`. When a request supplies a
- * `verdicts` array, that array is the positional join input, unchanged. Nothing is fabricated: no
- * revision, or an unparsed latest revision, gives zero verdicts with kind `none`.
+ * is empty and the consumed verdicts are reported as `verdictSource.unjoinedVerdicts`; with it,
+ * `unjoinedVerdicts` is absent. When a request supplies a `verdicts` array, that array is the
+ * positional join input, unchanged. Nothing is fabricated: no revision, or an unparsed latest
+ * revision, gives zero verdicts with kind `none`.
  */
 import type { Request, Response } from 'express';
 import { redactSecrets } from '../redact.js';
@@ -27,7 +28,7 @@ import type { RoeVerdict } from './white.js';
 
 /** Where the verdicts of one synthesis came from. */
 export type VerdictSource =
-  | { kind: 'ledger'; missionId: string; revision: number; textHash: string; verdicts: StampedVerdict[] }
+  | { kind: 'ledger'; missionId: string; revision: number; textHash: string; unjoinedVerdicts?: StampedVerdict[] }
   | { kind: 'request'; reason?: string }
   | { kind: 'none'; missionId: string; reason: 'no-ledger' | 'parse-not-ok' };
 
@@ -56,16 +57,23 @@ function noVerdicts(missionId: MissionId, reason: 'no-ledger' | 'parse-not-ok'):
 }
 
 /**
- * The verdict source of the latest ledger revision for a mission: its verdicts, stamped with
- * that revision, and the revision identity. `read` is the ledger store result: null when no
+ * The verdict source of the latest ledger revision for a mission: the revision identity and,
+ * unless `idKeyed` is true, `unjoinedVerdicts`, the revision's verdicts stamped with it (AC-40-06).
+ * `idKeyed` is true when the request sent `verdictsByFinding`, which joins by finding id; the
+ * consumed verdicts are then not reported at all. `read` is the ledger store result: null when no
  * ledger file exists. A corrupt ledger is a failure, never verdicts. Pure.
  */
-export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: MissionId): ConsumeResult {
+export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: MissionId, idKeyed: boolean): ConsumeResult {
   if (read === null) return noVerdicts(missionId, 'no-ledger');
   if (!read.ok) return { ok: false, line: read.line, reason: read.reason };
   const latest = latestRevision(read.records);
   if (latest === null) return noVerdicts(missionId, 'no-ledger');
   if (!latest.parseOk) return noVerdicts(missionId, 'parse-not-ok');
+  const unjoinedVerdicts = latest.verdicts.map((verdict) => ({
+    ...verdict,
+    roeRevision: latest.revision,
+    roeTextHash: latest.textHash,
+  }));
   return {
     ok: true,
     verdictSource: {
@@ -73,11 +81,7 @@ export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: Missio
       missionId,
       revision: latest.revision,
       textHash: latest.textHash,
-      verdicts: latest.verdicts.map((verdict) => ({
-        ...verdict,
-        roeRevision: latest.revision,
-        roeTextHash: latest.textHash,
-      })),
+      ...(idKeyed ? {} : { unjoinedVerdicts }),
     },
   };
 }
@@ -169,7 +173,7 @@ export function createPurpleSynthesizeHandlers(deps: PurpleSynthesizeDeps): Purp
         res.status(503).json(redactSecrets({ error: 'ROE ledger is unreadable; no synthesis recorded' }));
         return;
       }
-      const consumed = consumeLedgerVerdicts(read, mission.missionId);
+      const consumed = consumeLedgerVerdicts(read, mission.missionId, verdictsByFinding !== undefined);
       if (!consumed.ok) {
         res.status(409).json(redactSecrets({
           error: `ROE ledger is corrupt at line ${consumed.line}`,

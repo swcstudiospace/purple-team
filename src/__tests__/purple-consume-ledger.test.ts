@@ -106,14 +106,14 @@ async function request(base: string, method: string, path: string, body?: unknow
 
 describe('consumeLedgerVerdicts (phase 40)', () => {
   it('no ledger gives no verdicts with reason no-ledger (AC-40-05)', () => {
-    expect(consumeLedgerVerdicts(null, LATEST)).toEqual({
+    expect(consumeLedgerVerdicts(null, LATEST, false)).toEqual({
       ok: true,
       verdictSource: { kind: 'none', missionId: 'latest', reason: 'no-ledger' },
     });
   });
 
   it('an empty ledger file gives no verdicts with reason no-ledger (AC-40-05)', () => {
-    expect(consumeLedgerVerdicts({ ok: true, records: [] }, LATEST)).toEqual({
+    expect(consumeLedgerVerdicts({ ok: true, records: [] }, LATEST, false)).toEqual({
       ok: true,
       verdictSource: { kind: 'none', missionId: 'latest', reason: 'no-ledger' },
     });
@@ -121,7 +121,7 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
 
   it('a corrupt ledger is a failure and never yields verdicts (AC-40-05)', () => {
     const corrupt: LedgerRead = { ok: false, line: 3, reason: 'line is not valid JSON' };
-    expect(consumeLedgerVerdicts(corrupt, LATEST)).toEqual({ ok: false, line: 3, reason: 'line is not valid JSON' });
+    expect(consumeLedgerVerdicts(corrupt, LATEST, false)).toEqual({ ok: false, line: 3, reason: 'line is not valid JSON' });
   });
 
   it('an unparsed latest revision gives no verdicts with reason parse-not-ok (AC-40-05)', () => {
@@ -133,7 +133,7 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
       recordedAt: T,
     });
     expect(unparsed.parseOk).toBe(false);
-    expect(consumeLedgerVerdicts({ ok: true, records: [unparsed] }, LATEST)).toEqual({
+    expect(consumeLedgerVerdicts({ ok: true, records: [unparsed] }, LATEST, false)).toEqual({
       ok: true,
       verdictSource: { kind: 'none', missionId: 'latest', reason: 'parse-not-ok' },
     });
@@ -149,16 +149,26 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
       recordedAt: T,
     });
     expect(second.verdicts).toHaveLength(ACTIONS.length);
-    expect(consumeLedgerVerdicts({ ok: true, records: [first, second] }, LATEST)).toEqual({
+    expect(consumeLedgerVerdicts({ ok: true, records: [first, second] }, LATEST, false)).toEqual({
       ok: true,
       verdictSource: {
         kind: 'ledger',
         missionId: 'latest',
         revision: 2,
         textHash: second.textHash,
-        verdicts: second.verdicts.map((verdict) => ({ ...verdict, roeRevision: 2, roeTextHash: second.textHash })),
+        unjoinedVerdicts: second.verdicts.map((verdict) => ({ ...verdict, roeRevision: 2, roeTextHash: second.textHash })),
       },
     });
+  });
+
+  it('with verdictsByFinding the consumed verdicts are not reported at all (AC-40-04, AC-40-06)', () => {
+    const revision = buildRevision({ missionId: LATEST, text: OK_TEXT, actions: ACTIONS, previous: null, recordedAt: T });
+    const consumed = consumeLedgerVerdicts({ ok: true, records: [revision] }, LATEST, true);
+    expect(consumed).toEqual({
+      ok: true,
+      verdictSource: { kind: 'ledger', missionId: 'latest', revision: 1, textHash: revision.textHash },
+    });
+    expect(consumed).not.toHaveProperty('verdictSource.unjoinedVerdicts');
   });
 });
 
@@ -176,7 +186,7 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
         missionId: 'latest',
         revision: put.body.revision,
         textHash: put.body.textHash,
-        verdicts: expect.arrayContaining([expect.objectContaining({ actionIndex: 0, verdict: 'violation' })]),
+        unjoinedVerdicts: expect.arrayContaining([expect.objectContaining({ actionIndex: 0, verdict: 'violation' })]),
       },
       coverageMatrix: [expect.not.objectContaining({ verdict: expect.anything() })],
     });
@@ -298,7 +308,7 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
   it('id-keyed verdictsByFinding keeps its correlation when verdicts are absent (AC-40-07)', async () => {
     const { store } = setup();
     const { base } = await mount({ store });
-    await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    const put = await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
     const post = await request(base, 'POST', SYNTH, {
       findings: [{ id: 'F-1' }, { id: 'F-2' }],
       detections: [],
@@ -306,8 +316,10 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
     });
     expect(post.body).toMatchObject({
       correlation: 'id',
+      verdictSource: { kind: 'ledger', revision: put.body.revision },
       coverageMatrix: [{ findingId: 'F-1' }, { findingId: 'F-2', verdict: 'compliant' }],
     });
+    expect(post.body.verdictSource).not.toHaveProperty('unjoinedVerdicts');
   });
 
   it('a record written before verdictSource existed reads as request-supplied (AC-40-06)', async () => {
@@ -383,7 +395,7 @@ describe('consumed verdicts join findings only through verdictsByFinding (amende
         missionId: 'latest',
         revision: put.body.revision,
         textHash: put.body.textHash,
-        verdicts: [
+        unjoinedVerdicts: [
           { actionIndex: 0, verdict: 'violation', roeRevision: put.body.revision, roeTextHash: put.body.textHash },
           { actionIndex: 1, roeRevision: put.body.revision, roeTextHash: put.body.textHash },
         ],
