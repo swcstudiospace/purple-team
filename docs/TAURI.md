@@ -193,6 +193,12 @@ artifact's sha256 and byte size, the container image reference, and one status
 per check. Claim boundary, verbatim: "headless install + ldd + sidecar /health
 only; no GUI window or desktop session was launched."
 
+The linux desktop leg sets `NO_STRIP=1` for linuxdeploy. Without it, linuxdeploy
+strips the bundled `t3mp3st-server` sidecar, which removes the pkg payload
+appended after its ELF sections; the AppImage copy then fails at startup with
+`Pkg: Error reading from file` or a `SyntaxError` while the deb copy passes.
+The install-launch check is unchanged and still fails closed.
+
 ## 8. Bundle wiring manifest (verified 2026-10-09 against docs/IA.md)
 
 `frontendDist` is `../docs`, so the bundle ships the FINAL static asset set —
