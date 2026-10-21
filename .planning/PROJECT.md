@@ -62,10 +62,21 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 
 ### Active
 
-- [ ] Deliver runtime-authoritative four-hat selection, grants, dispatch, and result attribution.
-- [ ] Complete Blue, Black, and White tools, skills, prompts, and evidence/retest workflows at substantive Red parity.
-- [ ] Connect all supported role workflows to the UI, MCP, and mission-local inputs with honest availability/error states.
-- [ ] Verify security boundaries, Red regression, accessibility, and end-to-end behavior before milestone completion.
+- [ ] Close the v1.4 audit follow-ups: F-20-01 prompt audit (retargeted to shipped doctrine sources), stale v1.3 Nyquist prose (refreshed), Phase 23 Tier-cell browser check (observed), F-25-01 lint scope (widened).
+- [ ] Persisted verdict ledger slot and ROE revision history.
+- [ ] Purple auto-consumption of recorded verdicts.
+- [ ] Text provenance (who/when/source) on ROE records.
+- [ ] Install-and-launch verification of the built `.deb`/AppImage.
+- [ ] Per-rule lint budgets and doctor-integrated lint gate.
+
+### Deferred (not in v2)
+
+- [ ] Phase 29 (v1.5 integrated acceptance): owner accepted the gap; not a passed verification.
+- [ ] FH-EXEC-4 (unmounted) and the 72 pending v1.5 AC/NFR rows.
+- [ ] Runtime-authoritative four-hat selection, grants, dispatch, and result attribution (v1.5 remainder).
+- [ ] Substantive Blue, Black, and White tools, skills, prompts, and evidence/retest workflows at Red parity (v1.5 remainder).
+- [ ] Connect all supported role workflows to the UI, MCP, and mission-local inputs with honest availability/error states (v1.5 remainder).
+- [ ] Security boundaries, Red regression, accessibility, and end-to-end verification before milestone completion (v1.5 remainder).
 
 ### Out of Scope
 

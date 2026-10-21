@@ -1,12 +1,12 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v1.7",
+  "milestone": "v2",
   "phases": [],
   "next": {
-    "command": "/gsd:progress",
-    "label": "Show progress",
-    "reason": "Unsure of state — showing progress"
+    "command": "/gsd:plan-phase",
+    "label": "Plan phase 37",
+    "reason": "v2 bootstrapped; phase 37 has no plan yet"
   },
-  "updated_at": "2026-10-21T02:47:29.224Z"
+  "updated_at": "2026-10-21T08:10:00.000Z"
 }
