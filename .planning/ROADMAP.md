@@ -20,11 +20,11 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 
 - [ ] Phase 37 (partly done): F-20-01 retargeted to shipped doctrine sources, 38/38 (33/38 measured 2026-10-21 before retargeting); stale v1.3 Nyquist prose refreshed; Phase 23 Tier-cell browser render observed and 23-VERIFICATION reconciled. Open: stray repo-root artifact (deletion not approved; left in place)
 - [x] Phase 38: Lint scope and gates — merged as PR #9 (b2671b4). F-25-01 closed: lint covers `src/**/*.ts` with 0 errors; per-rule budgets are blocking in doctor
-- [ ] Phase 39: ROE verdict ledger and revision history — merged in PR #13 (c704922); fix-forward follow-ups pending in a separate PR, not yet done. Owner decisions are in `.planning/v2-REQUIREMENTS.md`.
+- [x] Phase 39: ROE verdict ledger and revision history — merged in PR #13 (c704922); fix-forward follow-ups merged in PR #15 (09144d5). Owner decisions are in `.planning/v2-REQUIREMENTS.md`.
   - Requirements: .planning/v2-REQUIREMENTS.md
-- [ ] Phase 40: ROE text provenance and purple auto-consumption of recorded verdicts — owner decisions recorded: provenance on new ROE records only, no backfill (existing records marked unknown); purple auto-consumes recorded verdicts from the phase 39 ledger; depends on Phase 39
+- [x] Phase 40: ROE text provenance and purple auto-consumption of recorded verdicts — merged in PR #14 (bf6ea6c). Provenance on new ROE records only (existing records read as unknown, no backfill); `verdictSource.kind` is caller, ledger or none.
   - Requirements: .planning/v2-REQUIREMENTS.md
-- [ ] Phase 41: Install-and-launch verification of the built `.deb` / AppImage — owner decision recorded: verify in a headless Linux container in CI (Linux only; no GUI or desktop launch claimed beyond what the container proves)
+- [x] Phase 41: Install-and-launch verification of the built `.deb` / AppImage — merged in PR #12 (e98fecd). Headless Linux container in CI; the AppImage sidecar is restored byte-identical to the `.deb` sidecar after linuxdeploy.
   - Requirements: .planning/v2-REQUIREMENTS.md
 
 <details>
