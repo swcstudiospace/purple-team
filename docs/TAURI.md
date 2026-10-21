@@ -193,19 +193,21 @@ artifact's sha256 and byte size, the container image reference, and one status
 per check. Claim boundary, verbatim: "headless install + ldd + sidecar /health
 only; no GUI window or desktop session was launched."
 
-AppImage sidecar layout (phase 41, owner decision). The AppImage used to carry
-the sidecar in `usr/bin`, where `linuxdeploy --appdir` rewrites the RPATH of
-every ELF with patchelf. patchelf inserts 8 KiB before the ELF section headers,
-which shifts the pkg payload appended to the sidecar, so the copy failed with
-`Pkg: Error reading from file` or a `SyntaxError`. The sidecar now ships outside
-`usr/bin` on Linux only. `src-tauri/tauri.linux.conf.json` sets `bundle.externalBin` to `null` and maps
-the sidecar from `binaries/t3mp3st-server`, the triple-free copy that
-`scripts/build-sidecar.mjs` writes for each Linux target. `bundle.linux.deb.files`
-keeps the deb layout (`usr/bin/t3mp3st-server`), and `bundle.linux.appimage.files`
-places it at `usr/lib/t3mp3st-sidecar/t3mp3st-server`.
-`sidecar_binary` in `src-tauri/src/lib.rs` looks next to the app binary first,
-then under `../lib/t3mp3st-sidecar`. The pkg payload format is unchanged. The
-install-launch check stays fail-closed and AC-41-06 is not relaxed.
+AppImage sidecar restore (phase 41, owner decision). `linuxdeploy --appdir` runs
+patchelf on the ELF files in the AppDir. On the bundled `t3mp3st-server` that
+inserts 8 KiB before the section headers and shifts the pkg payload appended to
+the sidecar, so the AppImage copy fails with `Pkg: Error reading from file` or a
+`SyntaxError`. The deb copy of the same build passes. The sidecar format is not
+changed. After `tauri-action` builds the AppImage, the `Restore pre-linuxdeploy
+sidecar in AppImage` step in `.github/workflows/tauri-build.yml` runs
+`scripts/repack-linux-appimage.sh`. The script extracts the AppImage, copies the
+build-output sidecar (`src-tauri/binaries/t3mp3st-server-x86_64-unknown-linux-gnu`)
+back over the one in the AppDir, rebuilds the AppImage with `appimagetool` 1.9.1
+(pinned by sha256), and re-extracts the result to confirm the sidecar matches.
+The bundler's sidecar placement is unchanged (`externalBin`, `usr/bin`) for both
+packages. The install-launch check records the sha256 of the deb and AppImage
+sidecars and fails `appimage-sidecar-identity` unless they match. The check stays
+fail-closed and AC-41-06 is not relaxed.
 
 ## 8. Bundle wiring manifest (verified 2026-10-09 against docs/IA.md)
 

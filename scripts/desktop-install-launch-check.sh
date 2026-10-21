@@ -16,6 +16,7 @@
 #   deb-sidecar-health        installed t3mp3st-server answers /health 200; exit recorded (AC-41-05)
 #   appimage-extract-no-fuse  AppImage extracts with --appimage-extract, no FUSE    (AC-41-06)
 #   appimage-sidecar-health   bundled sidecar answers /health 200, else n/a         (AC-41-06)
+#   appimage-sidecar-identity AppImage t3mp3st-server sha256 equals the deb sidecar's (AC-41-06)
 #
 # Exit 0 only when every check passed or is not-applicable. Exit 1 on any
 # failure or when the run stops before its last line (fail closed).
@@ -40,6 +41,7 @@ ARTIFACTS="$WORK/artifacts.ndjson"
 : >"$ARTIFACTS"
 RUN_COMPLETE=0
 RECORD_ERRORS=0
+DEB_SIDECAR_SHA=""
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -201,6 +203,8 @@ check_deb_sidecar() { # <package>
     record_check deb-sidecar-health fail "package $pkg does not ship an executable t3mp3st-server"
     return 0
   fi
+  DEB_SIDECAR_SHA="$(sha256sum "$sidecar" | cut -d' ' -f1)"
+  record_artifact deb-sidecar "$sidecar"
   # Same cwd rule as src-tauri/src/lib.rs: the resource dir when it holds docs/, else the binary dir.
   while IFS= read -r path; do
     if [ -d "$path" ] && [ "$(basename "$path")" = docs ]; then
@@ -240,6 +244,20 @@ deb_check() { # <path to .deb in artifact dir>
   check_deb_sidecar "$pkg"
 }
 
+# check_sidecar_identity <AppImage sidecar path>: the AppImage sidecar must be byte-identical
+# to the deb sidecar (same sha256), so the bundled copy is the one the .deb ships.
+check_sidecar_identity() {
+  local sha
+  sha="$(sha256sum "$1" | cut -d' ' -f1)"
+  if [ -z "$DEB_SIDECAR_SHA" ]; then
+    record_check appimage-sidecar-identity fail "deb sidecar sha256 not available; AppImage sidecar sha256 $sha not compared"
+  elif [ "$sha" = "$DEB_SIDECAR_SHA" ]; then
+    record_check appimage-sidecar-identity pass "AppImage t3mp3st-server sha256 $sha equals deb sidecar sha256"
+  else
+    record_check appimage-sidecar-identity fail "AppImage t3mp3st-server sha256 $sha differs from deb sidecar sha256 $DEB_SIDECAR_SHA"
+  fi
+}
+
 appimage_check() { # <path to .AppImage in artifact dir>
   local app root="$WORK/squashfs-root" rc sidecar resource_root="" fuse="absent" path
   app="$WORK/$(basename "$1")"
@@ -256,13 +274,17 @@ appimage_check() { # <path to .AppImage in artifact dir>
     echo "[desktop-check] appimage-extract log follows:" >&2
     cat "$WORK/appimage-extract.log" >&2
     record_check appimage-sidecar-health fail "not run: AppImage extraction failed"
+    record_check appimage-sidecar-identity fail "not run: AppImage extraction failed"
     return 0
   fi
   sidecar="$(find "$root" -type f -name t3mp3st-server 2>/dev/null | head -n 1)"
   if [ -z "$sidecar" ]; then
+    record_check appimage-sidecar-identity fail "AppImage does not bundle t3mp3st-server; identity with the deb sidecar not shown"
     record_check appimage-sidecar-health not-applicable "AppImage does not bundle t3mp3st-server; not a pass"
     return 0
   fi
+  record_artifact appimage-sidecar "$sidecar"
+  check_sidecar_identity "$sidecar"
   if [ ! -x "$sidecar" ]; then
     record_check appimage-sidecar-health fail "AppImage t3mp3st-server is not executable in the extracted tree; permissions are not repaired"
     return 0

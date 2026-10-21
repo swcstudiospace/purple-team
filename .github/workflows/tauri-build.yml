@@ -63,6 +63,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
+      - name: Restore pre-linuxdeploy sidecar in AppImage
+        if: matrix.target == 'linux'
+        env:
+          # appimagetool 1.9.1 x86_64 release asset, pinned by sha256.
+          APPIMAGETOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+        run: |
+          set -euo pipefail
+          tool="$RUNNER_TEMP/appimagetool"
+          curl -sfL -o "$tool" https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "$APPIMAGETOOL_SHA256  $tool" | sha256sum -c -
+          chmod +x "$tool"
+          shopt -s nullglob
+          apps=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          [ "${#apps[@]}" -eq 1 ] || { echo "expected one AppImage, found ${#apps[@]}"; exit 1; }
+          bash scripts/repack-linux-appimage.sh "${apps[0]}" src-tauri/binaries/t3mp3st-server-x86_64-unknown-linux-gnu "$tool"
       - name: Upload desktop bundles
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
