@@ -61,11 +61,6 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # linuxdeploy strips every ELF it bundles by default; stripping the
-          # server sidecar removes the pkg payload appended after its ELF
-          # sections and breaks it at runtime. NO_STRIP=1 keeps linux bytes
-          # intact. Only linuxdeploy reads it; windows and macos legs get ''.
-          NO_STRIP: ${{ matrix.target == 'linux' && '1' || '' }}
         with:
           args: ${{ matrix.args }}
       - name: Upload desktop bundles

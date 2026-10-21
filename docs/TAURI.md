@@ -193,11 +193,16 @@ artifact's sha256 and byte size, the container image reference, and one status
 per check. Claim boundary, verbatim: "headless install + ldd + sidecar /health
 only; no GUI window or desktop session was launched."
 
-The linux desktop leg sets `NO_STRIP=1` for linuxdeploy. Without it, linuxdeploy
-strips the bundled `t3mp3st-server` sidecar, which removes the pkg payload
-appended after its ELF sections; the AppImage copy then fails at startup with
-`Pkg: Error reading from file` or a `SyntaxError` while the deb copy passes.
-The install-launch check is unchanged and still fails closed.
+Known failure (open, phase 41): the AppImage's `t3mp3st-server` sidecar does not
+answer `/health`. Tauri's AppImage script runs `linuxdeploy --appdir`, which
+rewrites the RPATH of every ELF in `usr/bin` with patchelf. patchelf inserts
+8 KiB before the ELF section headers, which shifts the pkg payload appended to
+the sidecar, so the copy fails with `Pkg: Error reading from file` or a
+`SyntaxError`. The deb copy of the same build passes. Stripping is not the
+cause: the bundled sidecar is not stripped, and `NO_STRIP` does not change the
+result. A packaging-only fix is not established; see the phase 41 report for
+the product-level options. The check stays fail-closed and AC-41-06 is not
+relaxed.
 
 ## 8. Bundle wiring manifest (verified 2026-10-09 against docs/IA.md)
 
