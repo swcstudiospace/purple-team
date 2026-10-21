@@ -2,7 +2,7 @@
 gsd_state_version: "1.0"
 milestone: v2
 milestone_name: Audit Follow-ups, Lint Gate & Deferred v2 Requirements
-status: Ready to plan phase 37
+status: Phase 37 partly done; stray directory open
 last_updated: "2026-10-21T05:00:00.000Z"
 last_activity: 2026-10-21
 last_activity_desc: Closeout run — v1.6 archived, v1.7 closed (PR #7 merged), v2 bootstrapped
@@ -29,9 +29,9 @@ See: `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/milestones/`
 
 ## Current Position
 
-Phase: 37 — Audit follow-ups (not started)
+Phase: 37 — Audit follow-ups (partly done)
 Plan: —
-Status: Ready to plan phase 37
+Status: Phase 37 partly done. F-20-01 retargeted (38/38); Nyquist and Phase 23 complete. Open: stray repo-root directory.
 Last activity: 2026-10-21 — v1.6 archived; v1.7 closed; v2 bootstrapped
 
 ## Completed Context (v1.7)

@@ -16,7 +16,7 @@
 | `npx tsc --noEmit` | clean |
 | `npm test` | 100 files / **1103 tests passed**; ops preflight 11/11; model matrix 19/19; refusal-frontier self-test in script (exit 0) |
 | `npm run doctor` | exit 0 (warnings: optional tools absent; API offline — no server running, matches v1.2 baseline) |
-| `npm run prompt:audit` | exit 0 — 39/39 directive-preservation baseline |
+| `npm run prompt:audit` | exit 0 — 39/39 directive-preservation baseline (not reproducible: 29/34 at the frozen boundary, see F-20-01; reproducible baseline 33/38 measured 2026-10-21 before retargeting, 38/38 after retargeting) |
 
 Unit-level: purple-v2 11 tests (shuffled-map id join vs positional decoy, 16-row risk table, fallback modes); Defend UI replicated the ui-inline-scripts gates (43/43 on touched suites).
 
