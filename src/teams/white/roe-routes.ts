@@ -75,6 +75,24 @@ function corruptBody(read: { line: number; reason: string }): Record<string, unk
   return { error: `ROE ledger is corrupt at line ${read.line}`, line: read.line, reason: read.reason };
 }
 
+type RouteHandler = (req: Request, res: Response) => Promise<void>;
+
+/**
+ * Wraps one route handler so an unexpected throw answers 500 JSON. Express 4 does
+ * not catch a rejected async handler, so without this the request would never be answered.
+ * Only the message is logged; the body names the route and carries no error text.
+ */
+function guarded(route: string, handler: RouteHandler): RouteHandler {
+  return async (req, res) => {
+    try {
+      await handler(req, res);
+    } catch (error) {
+      console.warn(`[purple-team] ${route} failed: ${error instanceof Error ? error.message : String(error)}`);
+      if (!res.headersSent) res.status(500).json(redactSecrets({ error: `${route} failed unexpectedly` }));
+    }
+  };
+}
+
 export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
   const { store, emitContractEvent, recordReceipt } = deps;
 
@@ -101,7 +119,16 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       return;
     }
     const rawActions = body.actions;
-    if (!Array.isArray(rawActions) || !rawActions.every(isValidRoeAction)) {
+    if (!Array.isArray(rawActions)) {
+      res.status(400).json({ error: 'actions must be an array of action objects' });
+      return;
+    }
+    const forbiddenActionKeys = ['__proto__', 'constructor', 'prototype'];
+    if (rawActions.some((a) => typeof a === 'object' && a !== null && forbiddenActionKeys.some((key) => Object.hasOwn(a, key)))) {
+      res.status(400).json({ error: 'actions must not carry __proto__, constructor or prototype keys' });
+      return;
+    }
+    if (!rawActions.every(isValidRoeAction)) {
       res.status(400).json({ error: 'actions must be an array of action objects' });
       return;
     }
@@ -201,7 +228,7 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       ...v,
       roeRevision: latest.revision,
       roeTextHash: latest.textHash,
-      roeLines: resolvedLines,
+      roeLines: [...resolvedLines],
     }));
     res.json(redactSecrets({ ...parse, missionId, provenance, verdicts }));
   }
@@ -265,5 +292,10 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
     res.json(redactSecrets(line));
   }
 
-  return { putRoe, getRoe, getRoeRevisions, getRoeRevision };
+  return {
+    putRoe: guarded('ROE PUT', putRoe),
+    getRoe: guarded('ROE GET', getRoe),
+    getRoeRevisions: guarded('ROE revisions', getRoeRevisions),
+    getRoeRevision: guarded('ROE revision', getRoeRevision),
+  };
 }

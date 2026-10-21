@@ -4,7 +4,7 @@
 
 **New**
 - ROE text is an append-only verdict ledger. Each `PUT /api/teams/white/roe` appends one JSONL line to `<stateRoot>/roe-ledger/<missionId>.jsonl`. Earlier lines are never rewritten, truncated or pruned. Each line stores the redacted text and actions, the hashes, the `parseRoe` outcome, and the `roeAudit` verdicts at record time.
-- `missionId` (query on GET, body field on PUT) selects a mission ledger. It defaults to `latest` and must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`; anything else answers `400`.
+- `missionId` (query on GET, body field on PUT) selects a mission ledger. It defaults to `latest` and must match `^[a-z0-9][a-z0-9_-]{0,63}$` (lowercase only); Windows device names (`con`, `prn`, `aux`, `nul`, `com1`-`com9`, `lpt1`-`lpt9`) are refused in any letter case. Anything else answers `400`.
 - `GET /api/teams/white/roe/revisions` lists the full revision history (per-revision hashes, timestamps, parse outcome and verdict counts). `GET /api/teams/white/roe/revisions/:revision` returns one full revision; an unknown revision answers `404`.
 - `PUT /api/teams/white/roe` also answers `missionId` next to `revision` and `textHash`.
 
@@ -14,6 +14,8 @@
 - A corrupt ledger line fails the mission closed: GET answers cannot-derive with `ledger: { status: 'corrupt', line, reason }`, PUT answers `409` and appends nothing, and the history routes answer `409`.
 - Hashes are computed over the redacted text and actions. Secret-free text keeps the same `textHash`; text that contained a secret now hashes differently.
 - `PUT /api/teams/white/roe` refuses an `actions` payload whose serialized JSON exceeds 64 KiB utf8 bytes with `413`, the same cap as the text. Earlier releases accepted any size.
+- `PUT /api/teams/white/roe` refuses an action object with an own `__proto__`, `constructor` or `prototype` key with `400`. An unexpected handler error answers `500` JSON instead of leaving the request open.
+- Each verdict's `roeLines` is now its own array. Before, every verdict shared one array, and redaction printed every verdict after the first as `[circular]`.
 
 **Known limitations**
 - A corrupt or torn ledger line, such as a torn final line after a crash, blocks reads and writes for that mission until a person repairs the file by hand. No repair tool ships in v2.

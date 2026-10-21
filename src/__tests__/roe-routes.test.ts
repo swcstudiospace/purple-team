@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import express from 'express';
 import { redactSecrets } from '../redact.js';
 import { createRoeHandlers, ROE_BODY_CAP_BYTES, roeLedgerBackendFor } from '../teams/white/roe-routes.js';
+import type { LedgerRead } from '../teams/white/roe-ledger.js';
 import {
   createRoeLedgerStore,
   fsBackend,
@@ -52,14 +53,17 @@ function tempDir(): string {
   return dir;
 }
 
-async function mount(store: RoeLedgerStore): Promise<Mounted> {
+async function mount(
+  store: RoeLedgerStore,
+  overrides: { emitContractEvent?: (type: string, payload: Record<string, unknown>) => void } = {},
+): Promise<Mounted> {
   const emitted: Mounted['emitted'] = [];
   const receipts: Mounted['receipts'] = [];
   const handlers = createRoeHandlers({
     store,
-    emitContractEvent: (type, payload) => {
+    emitContractEvent: overrides.emitContractEvent ?? ((type, payload) => {
       emitted.push({ type, payload });
-    },
+    }),
     recordReceipt: (binding) => {
       receipts.push({ ...binding });
       return binding;
@@ -394,6 +398,67 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
     expect(over.status).toBe(413);
     expect(over.body).toEqual({ error: 'ROE actions exceed the 64 KiB cap' });
     expect(ledgerLines(join(ledgerDir, 'latest.jsonl'))).toHaveLength(1);
+  });
+
+  it('gives every verdict its own roeLines array of numbers, with no shared reference (Greptile)', async () => {
+    const { store } = setup();
+    const m = await mount(store);
+    await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    const get = await request(m.base, 'GET', '/api/teams/white/roe');
+    const verdicts = get.body.verdicts as Array<Record<string, unknown>>;
+    expect(verdicts).toHaveLength(ACTIONS.length);
+    for (const verdict of verdicts) {
+      const lines = verdict.roeLines as unknown[];
+      expect(Array.isArray(lines)).toBe(true);
+      expect(lines.every((line) => typeof line === 'number')).toBe(true);
+      expect(lines).toEqual([2, 3]);
+    }
+    expect(get.text, 'a shared array would be redacted to [circular]').not.toContain('[circular]');
+  });
+
+  it('refuses action objects with __proto__, constructor or prototype keys with 400 and stores nothing (Greptile)', async () => {
+    const { ledgerDir, store } = setup();
+    const m = await mount(store);
+    for (const key of ['__proto__', 'constructor', 'prototype']) {
+      // Raw JSON, so the key is an own property exactly as a client would send it.
+      const body = `{"text":${JSON.stringify(OK_TEXT)},"actions":[{"command":"curl x","target":"app.example.com","${key}":{"polluted":true}}]}`;
+      const res = await fetch(`${m.base}/api/teams/white/roe`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      expect(res.status, `key ${key}`).toBe(400);
+      expect(await res.json(), `key ${key}`).toEqual({ error: 'actions must not carry __proto__, constructor or prototype keys' });
+    }
+    // A null element must be a 400, not a thrown TypeError answered as 500.
+    const nullAction = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: [null] });
+    expect(nullAction.status).toBe(400);
+    expect(existsSync(join(ledgerDir, 'latest.jsonl')), 'no line is appended for a refused payload').toBe(false);
+  });
+
+  it('answers 500 JSON when a handler throws unexpectedly, instead of leaving the request open (Greptile)', async () => {
+    const { store } = setup();
+    const failingEmit = await mount(store, {
+      emitContractEvent: () => {
+        throw new Error('forced failure');
+      },
+    });
+    const put = await request(failingEmit.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    expect(put.status).toBe(500);
+    expect(put.body).toEqual({ error: 'ROE PUT failed unexpectedly' });
+    expect(put.text, 'the forced error text must not reach the client').not.toContain('forced failure');
+
+    // A ledger read that yields no records makes the GET derivation throw.
+    const malformed: RoeLedgerStore = {
+      read: async () => ({ ok: true, records: null }) as unknown as LedgerRead,
+      append: async () => {
+        throw new Error('unused');
+      },
+    };
+    const failingGet = await mount(malformed);
+    const get = await request(failingGet.base, 'GET', '/api/teams/white/roe');
+    expect(get.status).toBe(500);
+    expect(get.body).toEqual({ error: 'ROE GET failed unexpectedly' });
   });
 
   it('keeps every ROE route under /api/ and the legacy roeRecords slot out of the server (AC-39-08, AC-39-11)', () => {
