@@ -8,6 +8,7 @@
  * carries rationale, conditions, and an appeal path. Red and blue outputs are
  * untrusted evidence to inspect, never authority.
  */
+import { redactString } from '../redact.js';
 
 export interface AuditedAction {
   command?: string;
@@ -71,12 +72,15 @@ const RATIONALE_TARGET_CHARS = 64;
 
 /**
  * The allowed-target list as a rationale prints it. A rationale is stored once per action, so a long
- * list would repeat in every verdict. A list within the bounds prints exactly as before.
+ * list would repeat in every verdict. Each target is redacted before it is cut: a cut can remove the
+ * "@" that URL-credential redaction needs, and the stage route redacts only after this audit runs.
+ * Decisions use the raw targets; only this display text changes.
  */
 function summarizeAllowedTargets(allowedTargets: string[]): string {
-  const shown = allowedTargets.slice(0, RATIONALE_TARGETS_SHOWN).map((target) =>
-    target.length > RATIONALE_TARGET_CHARS ? `${target.slice(0, RATIONALE_TARGET_CHARS)}...` : target,
-  );
+  const shown = allowedTargets.slice(0, RATIONALE_TARGETS_SHOWN).map((target) => {
+    const safe = redactString(target);
+    return safe.length > RATIONALE_TARGET_CHARS ? `${safe.slice(0, RATIONALE_TARGET_CHARS)}...` : safe;
+  });
   const hidden = allowedTargets.length - shown.length;
   return hidden > 0 ? `${shown.join(', ')}, and ${hidden} more` : shown.join(', ');
 }

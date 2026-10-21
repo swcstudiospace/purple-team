@@ -538,9 +538,9 @@ describe('white team: roeAudit out-of-scope rationale bound', () => {
   });
 
   it('cuts an allowed target longer than 64 characters and marks the cut', () => {
-    const long = `${'x'.repeat(70)}.example.com`;
+    const long = `${'label-'.repeat(12)}example.com`;
     const [verdict] = roeAudit([{ command: 'curl x', target: 'other.test' }], { allowedTargets: [long] });
-    expect(verdict.rationale).toBe(`target "other.test" is outside the ROE allowed targets (${'x'.repeat(64)}...)`);
+    expect(verdict.rationale).toBe(`target "other.test" is outside the ROE allowed targets (${long.slice(0, 64)}...)`);
   });
 
   it('leaves the decision, action index and conditions of every verdict unchanged', () => {
@@ -559,5 +559,12 @@ describe('white team: roeAudit out-of-scope rationale bound', () => {
     expect(verdicts[1].conditions).toEqual([
       'remove the target from the plan, or amend the ROE with a signed scope change before execution',
     ]);
+  });
+
+  it('redacts an allowed URL with credentials before cutting it, so no password prefix survives', () => {
+    const allowed = `postgres://operator:${'hunter2-'.repeat(10)}@db.example.com/app`;
+    const [verdict] = roeAudit([{ command: 'curl x', target: 'other.test' }], { allowedTargets: [allowed] });
+    expect(verdict.rationale).not.toContain('hunter2');
+    expect(verdict.rationale).toContain('[redacted]');
   });
 });
