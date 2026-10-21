@@ -41,7 +41,8 @@ const OPTION_ANNOTATION = /\s+\([^()]*\)$/;
  *   annotations are stripped before matching). null when the hint is not an
  *   enum, no option matches, or the partial already completes the option.
  * - 'example' — draft names a known command and ends with whitespace, so the
- *   next unfilled argument starts empty: that argument's `example` verbatim.
+ *   next unfilled argument starts empty: that argument's `example`, encoded as
+ *   one argument the parser reads back verbatim (see `singleArgument`).
  *
  * Returns null for: empty drafts, prose (non-command) drafts, drafts still in
  * command-name territory, unknown commands, fully bound arguments, and any
@@ -90,7 +91,19 @@ function exampleGhost(draft: string, commands: readonly CommandSpec[]): GhostSug
   if (parsed.kind !== 'command') return null;
   const current = parsed.spec.args.find(arg => parsed.args[arg.name] === undefined);
   if (current?.example === undefined || current.example === '') return null;
-  return { ghost: current.example, kind: 'example' };
+  const argument = singleArgument(current.example);
+  return argument === null ? null : { ghost: argument, kind: 'example' };
+}
+
+/**
+ * Wraps an example so the tokenizer returns it as one argument. Quotes group
+ * whitespace and JSON brackets and have no escape sequences, so the quote
+ * character the example does not contain wraps it. null when it contains both.
+ */
+function singleArgument(example: string): string | null {
+  if (!example.includes("'")) return `'${example}'`;
+  if (!example.includes('"')) return `"${example}"`;
+  return null;
 }
 
 /**

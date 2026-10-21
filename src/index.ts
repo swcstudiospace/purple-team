@@ -280,6 +280,24 @@ const DEFAULT_AGENT_MAX_ITERATIONS = 15;
 const LOCAL_AGENT_MAX_ITERATIONS = Number(process.env.T3MP3ST_LOCAL_AGENT_MAX_ITERATIONS || 30);
 const MAX_PROGRESS_EVENTS = 300;
 
+/** Original structured-run inputs, kept so every later phase's tasks carry the same objective and role inputs. */
+interface StructuredRunSpec {
+  runId: string;
+  objective: string;
+  roles: OperatorArchetype[];
+  roleInputMap: Map<string, Record<string, unknown>>;
+  familySummary: string;
+  artifactSummary: string;
+}
+
+/** Raised when a report is requested for an explicit mission ID that does not exist. */
+export class MissionNotFoundError extends Error {
+  constructor(missionId: string) {
+    super(`Mission not found: ${missionId}`);
+    this.name = 'MissionNotFoundError';
+  }
+}
+
 /**
  * TEMPEST Command - Main orchestration controller
  */
@@ -860,7 +878,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     this.taskSeeded = false;
     this.structuredRun = false;
     this.structuredArtifactOnly = false;
-    this.structuredRoles = [];
+    this.structuredRunSpec = null;
     this.minExecutionStart = 0;
     if (this.tickInterval) {
       clearInterval(this.tickInterval);
@@ -885,7 +903,6 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
   }): Array<{ id: string; role: OperatorArchetype; description: string }> {
     this.structuredRun = true;
     this.structuredArtifactOnly = options.artifactOnly;
-    this.structuredRoles = options.roles || [];
 
     let activeMission = this.mission.getActiveMission();
     if (!activeMission) {
@@ -902,10 +919,6 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
       this.setWhiteboxSource(options.stagedArtifact.raw);
     }
 
-    const targets = this.targetEnv.getAllTargets();
-    const targetSummary = targets.length > 0
-      ? `Targets: ${targets.map((t) => t.address).join(', ')}`
-      : 'Target mode: artifact-only';
     const artifactSummary = options.stagedArtifact
       ? `Staged artifact: id=${options.stagedArtifact.artifactId} hash=${options.stagedArtifact.hash} (${options.stagedArtifact.byteLength} bytes)`
       : 'Staged artifact: none';
@@ -927,17 +940,18 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
 
     const taskQueue = this.mission.getTaskQueue();
     const createdTasks: Array<{ id: string; role: OperatorArchetype; description: string }> = [];
-    for (const role of options.roles) {
-      const roleSpec = roleInputMap.get(role);
-      const roleSpecific = roleSpec ? `Role input: ${JSON.stringify(roleSpec)}` : '';
-      const description = [
-        `[Structured Run ${options.runId}] Role: ${role}`,
-        `Objective: ${options.objective}`,
-        targetSummary,
-        artifactSummary,
-        familySummary,
-        roleSpecific,
-      ].filter(Boolean).join('\n');
+    const spec: StructuredRunSpec = {
+      runId: options.runId,
+      objective: options.objective,
+      roles: options.roles || [],
+      roleInputMap,
+      familySummary,
+      artifactSummary,
+    };
+    this.structuredRunSpec = spec;
+
+    for (const role of spec.roles) {
+      const description = this.buildStructuredDescription(spec, role, activeMission.currentPhase);
       const task: Task = {
         id: randomUUID(),
         missionId: activeMission.id,
@@ -956,6 +970,29 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
 
     this.taskSeeded = true;
     return createdTasks;
+  }
+
+  /**
+   * Build the task description for one structured role. Used by the initial seed
+   * and by every later-phase reseed, so each phase's operators receive the original
+   * objective, staged-artifact summary, family and role inputs.
+   */
+  private buildStructuredDescription(spec: StructuredRunSpec, role: OperatorArchetype, phase: string): string {
+    const targets = this.targetEnv.getAllTargets();
+    const targetSummary = targets.length > 0
+      ? `Targets: ${targets.map((t) => t.address).join(', ')}`
+      : 'Target mode: artifact-only';
+    const roleSpec = spec.roleInputMap.get(role);
+    const roleSpecific = roleSpec ? `Role input: ${JSON.stringify(roleSpec)}` : '';
+    return [
+      `[Structured Run ${spec.runId}] Role: ${role}`,
+      `Phase: ${phase}`,
+      `Objective: ${spec.objective}`,
+      targetSummary,
+      spec.artifactSummary,
+      spec.familySummary,
+      roleSpecific,
+    ].filter(Boolean).join('\n');
   }
 
   /**
@@ -1029,8 +1066,8 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
   private structuredRun: boolean = false;
   private structuredArtifactOnly: boolean = false;
 
-  /** Roles captured from configureStructuredRun so we can reseed equivalent real tasks on each phase advance for full kill-chain progression (scope, execution, reporting). */
-  private structuredRoles: OperatorArchetype[] = [];
+  /** Original structured-run inputs captured in configureStructuredRun; reseeded on each phase advance so later phases keep the objective and role inputs. */
+  private structuredRunSpec: StructuredRunSpec | null = null;
   /** Timestamp when start() armed ticks; defer final completeMission until elapsed >10s so /status shows running >10s and progress events emit. */
   private minExecutionStart: number = 0;
 
@@ -1111,16 +1148,17 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
         this.mission.advancePhase(mission.id);
         this.stallReason = null;
         const targets = this.targetEnv.getAllTargets();
-        if (this.structuredRun && this.structuredRoles.length > 0) {
+        const spec = this.structuredRunSpec;
+        if (this.structuredRun && spec && spec.roles.length > 0) {
           const tq = this.mission.getTaskQueue();
           const curMission = this.mission.getActiveMission()!;
-          for (const role of this.structuredRoles) {
+          for (const role of spec.roles) {
             const task: Task = {
               id: randomUUID(),
               missionId: curMission.id,
               phase: curMission.currentPhase,
               name: `${role.toUpperCase()} — ${curMission.currentPhase}`,
-              description: `[Structured Run] Role: ${role} Phase: ${curMission.currentPhase}\nObjective continues.`,
+              description: this.buildStructuredDescription(spec, role, curMission.currentPhase),
               operatorType: role,
               status: 'pending',
               priority: 10,
@@ -1548,22 +1586,25 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
   }
 
   /**
-   * Generate engagement report
+   * Engagement report plus the ID and status of the mission it covers. An explicit
+   * missionId that does not exist throws MissionNotFoundError; the active/latest
+   * fallback applies only when no ID is given.
    */
-  public generateReport(missionId?: string): string {
-    let mission = missionId
+  public generateReportForMission(missionId?: string): { missionId: string; status: Mission['status']; report: string } {
+    const mission = missionId
       ? this.mission.getMission(missionId)
-      : this.mission.getActiveMission();
+      : this.getLastMission();
     if (!mission) {
-      mission = this.getLastMission();
-    }
-
-    if (!mission) {
-      throw new Error('No mission found for reporting');
+      throw missionId ? new MissionNotFoundError(missionId) : new Error('No mission found for reporting');
     }
 
     const report = this.analysis.generateReport(mission.id, 'full_report');
-    return this.analysis.exportToMarkdown(report);
+    return { missionId: mission.id, status: mission.status, report: this.analysis.exportToMarkdown(report) };
+  }
+
+  /** Generate engagement report (see generateReportForMission). */
+  public generateReport(missionId?: string): string {
+    return this.generateReportForMission(missionId).report;
   }
 
   /**

@@ -249,7 +249,7 @@
   gap: 8px;
   padding: 8px 16px;
   background: var(--brand);
-  color: #FFFFFF;
+  color: var(--bg);
   border: 1px solid var(--brand);
   border-radius: 8px;
   font-family: var(--font-sans);

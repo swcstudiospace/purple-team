@@ -29,6 +29,9 @@ interface ConversationsState {
   activeId: string | null;
   status: ConversationsStatus;
   error: string | null;
+  /** Thread whose reply is streaming right now (null when none); the sidebar gates export on it. */
+  streamingThreadId: string | null;
+  setStreaming: (threadId: string, streaming: boolean) => void;
   /** Loads the list and guarantees an active conversation (creating one when empty). */
   load: (preferredId?: string | null) => Promise<void>;
   createAndActivate: () => Promise<void>;
@@ -67,6 +70,9 @@ function upsertMeta(metas: ConversationMeta[], meta: ConversationMeta): Conversa
   return next;
 }
 
+/** In-flight PUTs per thread, so an export can await a request that already left. */
+const inFlightSyncs = new Map<string, Promise<void>>();
+
 /** Fires (and clears) the pending debounced PUT for one conversation, if any. */
 function flushSync(id: string): void {
   const timer = syncTimers.get(id);
@@ -79,7 +85,7 @@ function flushSync(id: string): void {
   pendingPayloads.delete(id);
   if (payload === lastSyncedPayloads.get(id)) return;
   lastSyncedPayloads.set(id, payload);
-  void putConversationMessages(id, JSON.parse(payload) as UIMessage[])
+  const request = putConversationMessages(id, JSON.parse(payload) as UIMessage[])
     .then(response => {
       useConversationsStore.setState(state => ({
         ...applyEvictions(state, response.evictedIds),
@@ -91,11 +97,29 @@ function flushSync(id: string): void {
       // The next settle re-schedules; surface the failure without blocking chat.
       lastSyncedPayloads.delete(id);
       useConversationsStore.setState({ error: errorMessage(err) });
+    })
+    .finally(() => {
+      if (inFlightSyncs.get(id) === request) inFlightSyncs.delete(id);
     });
+  inFlightSyncs.set(id, request);
+}
+
+/** Settles the thread's queued or in-flight PUT so an export reads the settled replies. */
+export async function flushPendingSync(id: string): Promise<void> {
+  flushSync(id);
+  await inFlightSyncs.get(id);
 }
 
 export const useConversationsStore = create<ConversationsState>()((set, get) => ({
   metas: [],
+  streamingThreadId: null,
+  setStreaming: (threadId, streaming) => {
+    if (streaming) {
+      set({ streamingThreadId: threadId });
+    } else if (get().streamingThreadId === threadId) {
+      set({ streamingThreadId: null });
+    }
+  },
   activeId: null,
   status: 'idle',
   error: null,

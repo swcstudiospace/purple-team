@@ -370,7 +370,7 @@ const NOT_FOUND_FETCH_CODES: Partial<Record<RepoIngestErrorCode, true>> = {
  * Canonical is invariant across candidates (the same path segments, only
  * the split point moves), so the run label never changes on a retry.
  */
-function slashBranchRefCandidates(target: ParsedRepoTarget): ParsedRepoTarget[] {
+export function slashBranchRefCandidates(target: ParsedRepoTarget): ParsedRepoTarget[] {
   if (target.subpath === '') return [target];
   const segments = target.subpath.split('/');
   const candidates: ParsedRepoTarget[] = [target];

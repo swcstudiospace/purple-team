@@ -14,6 +14,7 @@ import { AnnounceContext } from './chat/announce';
 import { Composer, getChatModelChoice, setChatModelChoice, type ChatModelChoice } from './chat/composer';
 import { MessageItem } from './chat/message';
 import { cancelPurpleRunInMessages, upsertPurpleRun } from './chat/run-card';
+import { useConversationsStore } from '../stores/conversations';
 import { toWireMessages, trimHistory } from '../../../src/chat/wire';
 import './chat-stream.css';
 import './chat/chat.css';
@@ -169,6 +170,12 @@ function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNe
     transport,
   });
   const busy = status === 'submitted' || status === 'streaming';
+
+  // Publishes the streaming state so the conversation sidebar can gate export; cleared on thread change and unmount.
+  useEffect(() => {
+    useConversationsStore.getState().setStreaming(threadId, busy);
+    return () => useConversationsStore.getState().setStreaming(threadId, false);
+  }, [threadId, busy]);
   messageCountRef.current = messages.length;
 
   /** Shared send path for the imperative handle, the composer, and the AgentPanel palette. */

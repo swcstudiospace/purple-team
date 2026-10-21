@@ -141,7 +141,7 @@
 .md-btn--primary {
   background: var(--brand);
   border-color: var(--brand);
-  color: #FFFFFF;
+  color: var(--bg);
 }
 
 .md-btn--primary:hover:not(:disabled) {

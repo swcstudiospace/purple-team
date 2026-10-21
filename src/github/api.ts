@@ -6,18 +6,21 @@
  * Design invariants (35-RESEARCH-GITHUB-SECTION.md §4.8):
  * - Every upstream call is ONE request per user action (plus at most one
  *   forced refresh via onAuthFailure): the proxy never auto-retries, so it
- *   cannot trip GitHub's secondary limits by itself.
+ *   cannot trip GitHub's secondary limits by itself. The exception is a resolve
+ *   of a /tree/ URL with a subpath, which probes branch candidates in ingest
+ *   order until one matches: one request per candidate, at most segments + 1.
  * - Rate-limit classification follows GitHub's documented precedence:
  *   `Retry-After` (secondary) → `x-ratelimit-reset` (primary) → 60 s floor.
  * - 60 s in-memory LRU caches (repositories keyed by token fingerprint,
- *   resolve keyed by owner/repo/ref/mode) protect the anonymous 60 req/h
- *   budget and repeated resolve clicks.
+ *   resolve keyed by owner/repo/ref/subpath/mode) protect the anonymous 60 req/h
+ *   repeated resolve clicks.
  * - Error payloads are token-free by construction: status codes, classified
  *   codes, and retry epochs only.
  */
 
 import { createHash } from 'crypto';
 import { parseRepoTarget } from '../recon/repo-url.js';
+import { slashBranchRefCandidates } from '../recon/github-ingest.js';
 
 // =============================================================================
 // Errors + classifier
@@ -386,26 +389,49 @@ export async function resolveGitHubRepo(params: {
   owner: string;
   repo: string;
   ref?: string;
+  subpath?: string;
   token?: string;
   fetchImpl?: GitHubFetchLike;
   onAuthFailure?: () => Promise<string | undefined>;
 }): Promise<GitHubRepoResolution> {
   const mode = params.token ? 'token' : 'anonymous';
-  const cacheKey = `resolve:${mode}:${params.owner}/${params.repo}@${params.ref ?? ''}`;
+  const scope = params.subpath ? `/${params.subpath}` : '';
+  const cacheKey = `resolve:${mode}:${params.owner}/${params.repo}@${params.ref ?? ''}${scope}`;
   const cached = cacheGet(resolveCache, cacheKey);
   if (cached) return { ...cached };
 
   const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}`;
-  const fetchWith = (token: string | undefined) => ghApiGet(path, token, params.fetchImpl);
+  // One upstream call; on a token-expired failure it is retried once with the forced-refresh token.
+  const withAuthRetry = async <T>(call: (token: string | undefined) => Promise<T>): Promise<T> => {
+    try {
+      return await call(params.token);
+    } catch (e) {
+      const fresh = await refreshedTokenAfterAuthFailure(e, params.token, params.onAuthFailure);
+      if (!fresh) throw e;
+      return call(fresh);
+    }
+  };
+  // Whether `branch` names a branch of this repo. A 404 means no; any other failure propagates.
+  const isBranch = async (branch: string): Promise<boolean> => {
+    try {
+      await withAuthRetry((token) => ghApiGet(`${path}/branches/${encodeURIComponent(branch)}`, token, params.fetchImpl));
+      return true;
+    } catch (e) {
+      if (e instanceof GitHubApiError && e.httpStatus === 404) return false;
+      throw e;
+    }
+  };
+  // The parser cannot tell where a slash branch ends, so probe the candidates in ingest order
+  // (shortest ref first) and keep the first that is a branch. No match keeps the parsed ref.
+  const resolveRef = async (ref: string, subpath: string): Promise<string> => {
+    const canonical = `${params.owner}/${params.repo}@${ref}/${subpath}`;
+    for (const candidate of slashBranchRefCandidates({ owner: params.owner, repo: params.repo, ref, subpath, canonical })) {
+      if (await isBranch(candidate.ref)) return candidate.ref;
+    }
+    return ref;
+  };
 
-  let result: ApiCallResult;
-  try {
-    result = await fetchWith(params.token);
-  } catch (e) {
-    const fresh = await refreshedTokenAfterAuthFailure(e, params.token, params.onAuthFailure);
-    if (!fresh) throw e;
-    result = await fetchWith(fresh);
-  }
+  const result = await withAuthRetry((token) => ghApiGet(path, token, params.fetchImpl));
 
   const rec = (result.body && typeof result.body === 'object') ? result.body as RepoRecord : {};
   const s = summaryOf(rec);
@@ -414,7 +440,7 @@ export async function resolveGitHubRepo(params: {
   const value: GitHubRepoResolution = {
     owner: s.owner,
     repo: s.repo,
-    ref: params.ref || s.defaultBranch,
+    ref: params.ref && params.subpath ? await resolveRef(params.ref, params.subpath) : params.ref || s.defaultBranch,
     defaultBranch: s.defaultBranch,
     fullName: s.fullName,
     visibility: s.visibility,
@@ -522,6 +548,8 @@ export interface ParsedGitHubRepoUrl {
   owner: string;
   repo: string;
   ref?: string;
+  /** The /tree/ subpath, when the URL has one. Not part of the ref: the resolve step decides where a slash branch ends. */
+  subpath?: string;
 }
 
 /** Bare `owner/repo[/…]`: a first segment with no scheme, host, or credential characters. */
@@ -531,14 +559,17 @@ const BARE_OWNER_FORM = /^[^/:@.\s?#]+(\/|$)/;
  * Thin adapter over the shared validator (src/recon/repo-url.ts), the only URL
  * parser. Accepts `https://github.com/owner/repo[/tree/<ref>[/<subpath>]]` and bare
  * `owner/repo`. A rejection carries the validator's exact fault message, which the
- * resolve route shows verbatim. The subpath is not part of the resolve contract and
- * is dropped; a `HEAD` ref means the default branch, as when no ref is given.
+ * resolve route shows verbatim. The subpath is returned when present: a branch name
+ * may itself contain '/', so resolveGitHubRepo decides where the ref ends. A `HEAD`
+ * ref means the default branch, as when no ref is given.
  */
 export function parseGitHubRepoUrl(raw: string): { ok: true; value: ParsedGitHubRepoUrl } | { ok: false; message: string } {
   const trimmed = raw.trim();
   const input = BARE_OWNER_FORM.test(trimmed) ? `https://github.com/${trimmed}` : trimmed;
   const result = parseRepoTarget(input);
   if (!result.ok) return { ok: false, message: result.message };
-  const { owner, repo, ref } = result.value;
-  return { ok: true, value: { owner, repo, ref: ref === 'HEAD' ? undefined : ref } };
+  const { owner, repo, ref, subpath } = result.value;
+  const value: ParsedGitHubRepoUrl = { owner, repo, ref: ref === 'HEAD' ? undefined : ref };
+  if (subpath !== '') value.subpath = subpath;
+  return { ok: true, value };
 }

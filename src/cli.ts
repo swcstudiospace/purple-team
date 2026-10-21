@@ -763,6 +763,7 @@ async function purpleTeamTarget(): Promise<void> {
   const pollIntervalMs = 2000;
   const started = Date.now();
   let done = false;
+  let lastActive: boolean | null = null;
   while (!done && Date.now() - started < maxWaitMs) {
     try {
       const sres = await fetch(statusUrl);
@@ -770,6 +771,7 @@ async function purpleTeamTarget(): Promise<void> {
         const sbodyRaw: unknown = await sres.json();
         const sbody = sbodyRaw as { active?: boolean; mission?: { currentPhase?: string; progress?: number } | null; progress?: unknown };
         const active = !!sbody.active;
+        lastActive = active;
         const m = sbody.mission;
         if (m) {
           showInfo(`Phase: ${m.currentPhase || 'unknown'}  progress: ${m.progress ?? 0}%`);
@@ -786,6 +788,16 @@ async function purpleTeamTarget(): Promise<void> {
     if (!done) {
       await new Promise(r => setTimeout(r, pollIntervalMs));
     }
+  }
+
+  if (!done) {
+    const stillRunning = lastActive === true;
+    showWarning(stillRunning
+      ? 'Mission is still running after the 10-minute wait window. The engagement report is not final, so it was not printed.'
+      : 'Mission did not finish within the 10-minute wait window, and its status could not be read. The engagement report was not printed.');
+    console.log(`Check progress: ${chalk.cyan(statusUrl)}`);
+    console.log(`Fetch the report once it finishes: ${chalk.cyan(reportUrl)}`);
+    process.exit(2);
   }
 
   // Now call report (server side generateReport) and print

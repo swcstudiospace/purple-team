@@ -115,6 +115,43 @@ describe('createRateLimiter', () => {
   });
 });
 
+describe('createRateLimiter idle pruning', () => {
+  const BASE = 1_700_000_000_000;
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('drops a client only once its budget has fully refilled, keeping partly drained clients', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(BASE);
+    const limiter = createRateLimiter({ windowMs: 1_000, limit: 1 });
+
+    expect(run(limiter, mockReq('10.0.0.1')).passed).toBe(true);
+    vi.setSystemTime(BASE + 500);
+    expect(run(limiter, mockReq('10.0.0.2')).passed).toBe(true);
+    expect(limiter.bucketCount()).toBe(2);
+
+    // Sweep at BASE + 1000: 10.0.0.1 has refilled to limit and is dropped; 10.0.0.2 is half refilled and kept.
+    vi.setSystemTime(BASE + 1_000);
+    expect(run(limiter, mockReq('10.0.0.3')).passed).toBe(true);
+    expect(limiter.bucketCount()).toBe(2);
+    expect(run(limiter, mockReq('10.0.0.2')).statusCode).toBe(429);
+  });
+
+  it('bounds memory: a crowd of idle clients is dropped at the next window sweep', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(BASE);
+    const limiter = createRateLimiter({ windowMs: 1_000, limit: 1 });
+    for (let i = 1; i <= 50; i++) run(limiter, mockReq(`10.1.0.${i}`));
+    expect(limiter.bucketCount()).toBe(50);
+
+    vi.setSystemTime(BASE + 1_000);
+    expect(run(limiter, mockReq('10.1.0.1')).passed).toBe(true);
+    expect(limiter.bucketCount()).toBe(1);
+  });
+});
+
 describe('clientKey', () => {
   it('uses req.ip and falls back to unknown when absent', () => {
     expect(clientKey(mockReq('192.168.1.5'))).toBe('192.168.1.5');

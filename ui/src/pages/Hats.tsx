@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, useSyncExternalStore } from 'react';
 import { getChatModelChoice } from '../components/ChatStream';
 import { useSelectedRepo, type SelectedRepo } from '../stores/github';
 import { HATS, redactString, repoSource } from './hats-data';
@@ -47,6 +47,33 @@ function failureNotice(status: number, text: string): HatNotice {
   return { tone: 'error', text: `Hat run failed (HTTP ${status}): ${redactString(error).slice(0, 240)}` };
 }
 
+/**
+ * One launch lock for the whole page: while any hat's launch is in flight every
+ * hat button stays disabled. It lives at module scope so a remount during a
+ * request cannot start a second mission beside the first.
+ */
+let launchInFlight = false;
+const launchListeners = new Set<() => void>();
+
+function subscribeLaunch(listener: () => void): () => void {
+  launchListeners.add(listener);
+  return () => {
+    launchListeners.delete(listener);
+  };
+}
+
+function setLaunchInFlight(value: boolean): void {
+  launchInFlight = value;
+  for (const listener of launchListeners) listener();
+}
+
+/** Takes the page-wide launch lock; false when another hat launch already holds it. */
+function acquireLaunchLock(): boolean {
+  if (launchInFlight) return false;
+  setLaunchInFlight(true);
+  return true;
+}
+
 interface HatCardProps {
   hat: (typeof HATS)[number];
   repo: SelectedRepo | null;
@@ -55,16 +82,18 @@ interface HatCardProps {
 
 function HatCard({ hat, repo, defaultBranch }: HatCardProps) {
   const [objective, setObjective] = useState<string>(hat.objective);
-  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState(false);
+  const locked = useSyncExternalStore(subscribeLaunch, () => launchInFlight);
   const [notice, setNotice] = useState<HatNotice | null>(null);
   const objectiveId = useId();
 
   // Mirrors the chat panel's launchHat: same route, same payload shape, redacted failures.
   async function run(): Promise<void> {
-    if (repo === null || busy) return;
+    if (repo === null) return;
     const trimmed = objective.trim();
     const choice = getChatModelChoice();
-    setBusy(true);
+    if (!acquireLaunchLock()) return;
+    setRunning(true);
     setNotice(null);
     try {
       const response = await fetch('/api/mission/start', {
@@ -84,7 +113,8 @@ function HatCard({ hat, repo, defaultBranch }: HatCardProps) {
     } catch (err: unknown) {
       setNotice({ tone: 'error', text: err instanceof Error ? redactString(err.message) : 'Network error' });
     } finally {
-      setBusy(false);
+      setRunning(false);
+      setLaunchInFlight(false);
     }
   }
 
@@ -117,8 +147,8 @@ function HatCard({ hat, repo, defaultBranch }: HatCardProps) {
         value={objective}
         onChange={event => setObjective(event.target.value)}
       />
-      <button type="button" className="hats-btn" disabled={repo === null || busy} onClick={() => void run()}>
-        {busy ? 'Running…' : 'Run'}
+      <button type="button" className="hats-btn" disabled={repo === null || locked} onClick={() => void run()}>
+        {running ? 'Running…' : 'Run'}
       </button>
       {notice !== null && (
         <p className={`hats-status hats-status--${notice.tone}`} role="status">

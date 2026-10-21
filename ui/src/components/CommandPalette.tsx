@@ -15,31 +15,19 @@
  */
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useFocusTrap } from './workbench/focus';
+import { escapeGuard, useFocusTrap } from './workbench/focus';
+import { toggleThemePreference } from './ThemeToggle';
 import './command-palette.css';
 
 /** Keep in sync with the SectionId union + NAV_ITEMS in App.tsx. */
 const SECTIONS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'github', label: 'GitHub' },
+  { id: 'hats', label: '4 Hats' },
   { id: 'chat', label: 'Chat Panel' },
   { id: 'reports', label: 'Reports' },
   { id: 'settings', label: 'Settings' },
 ];
-
-const THEME_STORAGE_KEY = 't3mp3st_theme';
-
-/** Flips the root data-theme and persists the choice for the next session. */
-function toggleTheme(): void {
-  const root = document.documentElement;
-  const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-  root.dataset.theme = next;
-  try {
-    window.localStorage.setItem(THEME_STORAGE_KEY, next);
-  } catch {
-    // Storage can be unavailable (privacy modes); the visual toggle still applies.
-  }
-}
 
 interface PaletteItem {
   id: string;
@@ -58,7 +46,7 @@ const ITEMS: ReadonlyArray<PaletteItem> = [
       if (window.location.hash !== `#${section.id}`) window.location.hash = section.id;
     },
   })),
-  { id: 'toggle-theme', label: 'Toggle dark mode', kind: 'Action', run: toggleTheme },
+  { id: 'toggle-theme', label: 'Toggle dark mode', kind: 'Action', run: toggleThemePreference },
 ];
 
 export default function CommandPalette() {
@@ -80,18 +68,19 @@ export default function CommandPalette() {
   // the trap restores focus to the element focused before the palette opened.
   useFocusTrap(open, dialogRef, close);
 
-  // (Ctrl|Meta)+K toggles the palette from anywhere on the page.
+  // (Ctrl|Meta)+K toggles the palette from anywhere on the page; it cannot open over another modal.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
       if (event.isComposing) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
+        if (!open && escapeGuard.dialogOpen) return;
         setOpen(value => !value);
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [open]);
 
   // A fresh open starts with an empty filter and the first row highlighted.
   useEffect(() => {

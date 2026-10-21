@@ -25,6 +25,9 @@ interface TokenBucket {
   updatedAt: number;
 }
 
+/** A rate-limit middleware that also reports how many client buckets it currently holds. */
+export type RateLimiter = RequestHandler & { bucketCount(): number };
+
 /**
  * Stable per-client identity for limiter/audit bookkeeping. Express populates
  * req.ip from the socket (or trust-proxy chain when configured); loopback-only
@@ -42,8 +45,10 @@ export function clientKey(req: Request): string {
  *
  * Kill-switch: when T3MP3ST_RATE_LIMIT=off every request passes through
  * (checked per request, so it can be toggled without a rebuild).
+ *
+ * Fully refilled buckets are pruned once per window, so memory tracks only recently active clients.
  */
-export function createRateLimiter(options: RateLimiterOptions = {}): RequestHandler {
+export function createRateLimiter(options: RateLimiterOptions = {}): RateLimiter {
   const windowMs = options.windowMs ?? 60_000;
   const limit = options.limit ?? 60;
   const bucketName = options.bucket ?? 'default';
@@ -51,14 +56,26 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RequestHand
   if (!Number.isFinite(limit) || limit <= 0) throw new RangeError('limit must be a positive number');
   const refillPerMs = limit / windowMs;
   const buckets = new Map<string, TokenBucket>();
+  // A bucket untouched for a full window has refilled to `limit`, and a missing
+  // entry starts full, so dropping such a bucket is invisible to its client.
+  let lastPruneAt = Date.now();
+  function pruneFullBuckets(now: number): void {
+    for (const [key, bucket] of buckets) {
+      if (bucket.tokens + (now - bucket.updatedAt) * refillPerMs >= limit) buckets.delete(key);
+    }
+  }
 
-  return function rateLimit(req: Request, res: Response, next: NextFunction): void {
+  const rateLimit = function rateLimit(req: Request, res: Response, next: NextFunction): void {
     if (process.env.T3MP3ST_RATE_LIMIT === 'off') {
       next();
       return;
     }
 
     const now = Date.now();
+    if (now - lastPruneAt >= windowMs) {
+      pruneFullBuckets(now);
+      lastPruneAt = now;
+    }
     const key = bucketName + ':' + clientKey(req);
     let bucket = buckets.get(key);
     if (!bucket) {
@@ -80,6 +97,7 @@ export function createRateLimiter(options: RateLimiterOptions = {}): RequestHand
     res.setHeader('Retry-After', String(retryAfterSeconds));
     res.json({ error: 'Too many requests — retry shortly' });
   };
+  return Object.assign(rateLimit, { bucketCount: () => buckets.size });
 }
 
 // --- Audit event log ----------------------------------------------------------

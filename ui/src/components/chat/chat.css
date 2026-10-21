@@ -706,6 +706,7 @@
 .chat-composer-ghost {
   position: absolute;
   top: 6px; /* matches .chat-composer-textarea padding */
+  bottom: 6px; /* clipped to the textarea's content box, never below the field */
   right: 0;
   left: 0;
   pointer-events: none;
@@ -715,6 +716,7 @@
   font-size: 15px;
   line-height: 1.5;
   white-space: pre-wrap;
+  overflow: hidden;
   overflow-wrap: break-word;
 }
 

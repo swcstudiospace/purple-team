@@ -41,7 +41,7 @@ import {
 } from './net/remote-access.js';
 import { redactString, redactLedgerText, redactSecrets } from './redact.js';
 import { LLMBackbone } from './llm/index.js';
-import { TempestCommand } from './index.js';
+import { TempestCommand, MissionNotFoundError } from './index.js';
 import { OpGeneral } from './general/index.js';
 import type { Directive } from './general/index.js';
 import { detectLocalAgents, pingLocalAgent, runLocalAgent, syncLocalAgentSelection } from './agent/local-agents.js';
@@ -6921,6 +6921,7 @@ app.get('/api/github/resolve', async (req: Request, res: Response): Promise<void
       owner: parsed.value.owner,
       repo: parsed.value.repo,
       ref: parsed.value.ref,
+      subpath: parsed.value.subpath,
       token,
       onAuthFailure: () => forceGitHubTokenRefresh(),
     });
@@ -7755,8 +7756,12 @@ app.post('/api/chat', (req: Request, res: Response): void => {
   const body = (req.body ?? {}) as { messages?: unknown };
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const totalChars = messages.reduce((sum: number, m) => {
-    const content = (m as { content?: unknown } | null)?.content;
-    return sum + (typeof content === 'string' ? content.length : 0);
+    const parts = (m as { parts?: unknown } | null)?.parts;
+    if (!Array.isArray(parts)) return sum;
+    for (const part of parts as Array<{ type?: unknown; text?: unknown } | null>) {
+      if (part?.type === 'text' && typeof part.text === 'string') sum += part.text.length;
+    }
+    return sum;
   }, 0);
   auditLog.appendEvent({
     kind: 'chat.send',
@@ -7810,6 +7815,15 @@ interface RepoUrlIngestPack {
   skipSummary: RepoSkipSummary;
   label: string;
   counters: RepoIngestCounters;
+  repo: { owner: string; repo: string; ref: string; subpath?: string };
+}
+
+/**
+ * Announce the mission a repo run started, so its run card can request the mission
+ * report. Sent once after cmd.start() succeeds, only when the mission ID is known.
+ */
+function emitRepoRunMission(runId: string, repo: RepoUrlIngestPack['repo'], missionId: string): void {
+  broadcastEvent('purple-run', { runId, repo, state: 'completed', missionId });
 }
 
 type RepoUrlIngestOutcome =
@@ -7925,6 +7939,7 @@ async function runRepoUrlIngestPhase(
         skipSummary: fetched.skipSummary,
         label,
         counters: fetched.counters,
+        repo: repoMeta,
       },
     };
   } catch (error) {
@@ -7956,6 +7971,19 @@ async function runRepoUrlIngestPhase(
 
 
 app.use('/api/mission', mutationLimiter);
+
+/**
+ * Audit a successful mission start. Called from the structured (Hats / /hunt) and
+ * legacy start paths, each once, after cmd.start() succeeds.
+ */
+function auditMissionStart(req: Request, name: unknown, operatorCount: number, targetCount: number): void {
+  auditLog.appendEvent({
+    kind: 'mission.start',
+    actor: clientKey(req),
+    summary: 'mission "' + String(name).slice(0, 80) + '" started',
+    meta: { operators: operatorCount, targets: targetCount },
+  });
+}
 
 /**
  * POST /api/mission/start — Start a mission with real backend operators
@@ -8200,6 +8228,10 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       cmd.start();
       const missionForId = cmd.mission.getActiveMission();
       const missionId = missionForId ? missionForId.id : start.runId;
+      auditMissionStart(req, name, spawnedOps.length, structuredTargets.length);
+      if (missionForId && repoUrlPack !== undefined) {
+        emitRepoRunMission(start.runId, repoUrlPack.repo, missionForId.id);
+      }
       broadcastEvent('mission:started', {
         name,
         runId: start.runId,
@@ -8368,13 +8400,10 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       operators: spawnedOps,
       timestamp: Date.now(),
     });
-
-    auditLog.appendEvent({
-      kind: 'mission.start',
-      actor: clientKey(req),
-      summary: 'mission "' + String(name).slice(0, 80) + '" started',
-      meta: { operators: spawnedOps.length, targets: Array.isArray(targets) ? targets.length : 0 },
-    });
+    auditMissionStart(req, name, spawnedOps.length, Array.isArray(targets) ? targets.length : 0);
+    if (missionId !== undefined && repoUrlPack !== undefined) {
+      emitRepoRunMission(repoUrlRunId, repoUrlPack.repo, missionId);
+    }
 
     res.json({
       success: true,
@@ -8434,9 +8463,21 @@ app.post('/api/whitebox/analyze', async (req: Request, res: Response): Promise<v
 });
 
 /**
+ * Cache a mission report only once the mission can no longer change. A running,
+ * paused or stopped mission keeps accumulating findings, so its report is
+ * regenerated on each request instead of being pinned to a partial snapshot.
+ */
+function cacheFinalMissionReport(missionId: string, status: string, report: string): void {
+  if (status === 'completed' || status === 'aborted') {
+    missionReports.set(missionId, report);
+  }
+}
+
+/**
  * GET /api/mission/report and GET /api/mission/:id/report — export the engagement
- * report (markdown) for the given mission id, or the active mission if none is
- * given. 404 when there is no mission / nothing to report.
+ * report (markdown) for the given mission id, or the active/latest mission if none
+ * is given. An explicit id that does not exist is a 404; the stored last report is
+ * only returned for that id when it belongs to it.
  */
 function handleMissionReport(req: Request, res: Response): void {
   const cmd = getTempestCommand();
@@ -8447,19 +8488,21 @@ function handleMissionReport(req: Request, res: Response): void {
   }
   if (cmd) {
     try {
-      const report = cmd.generateReport(missionId);
-      const usedId = missionId || (cmd.mission.getActiveMission()?.id) || 'last';
-      missionReports.set(usedId, report);
-      lastMissionReport = { missionId: usedId, report, generatedAt: Date.now() };
-      res.json({ success: true, missionId: usedId, report });
+      const generated = cmd.generateReportForMission(missionId);
+      cacheFinalMissionReport(generated.missionId, generated.status, generated.report);
+      lastMissionReport = { missionId: generated.missionId, report: generated.report, generatedAt: Date.now() };
+      res.json({ success: true, missionId: generated.missionId, report: generated.report });
       return;
     } catch (error: unknown) {
+      if (error instanceof MissionNotFoundError) {
+        res.status(404).json({ error: error.message });
+        return;
+      }
       // fall through to stored last
     }
   }
-  if (lastMissionReport) {
-    const useId = missionId || lastMissionReport.missionId;
-    res.json({ success: true, missionId: useId, report: lastMissionReport.report });
+  if (lastMissionReport && (!missionId || lastMissionReport.missionId === missionId)) {
+    res.json({ success: true, missionId: lastMissionReport.missionId, report: lastMissionReport.report });
     return;
   }
   res.status(404).json({ error: 'No mission found for reporting' });
@@ -8508,9 +8551,9 @@ app.post('/api/mission/stop', (req: Request, res: Response) => {
 
   if (mid) {
     try {
-      const rpt = cmd.generateReport(mid);
-      missionReports.set(mid, rpt);
-      lastMissionReport = { missionId: mid, report: rpt, generatedAt: Date.now() };
+      const stopped = cmd.generateReportForMission(mid);
+      cacheFinalMissionReport(stopped.missionId, stopped.status, stopped.report);
+      lastMissionReport = { missionId: mid, report: stopped.report, generatedAt: Date.now() };
       broadcastEvent('purple-run', { runId: mid, state: 'completed', reportAvailable: true, timestamp: Date.now() });
     } catch (e) {
       console.error('[purple-team] report gen on stop failed:', e instanceof Error ? e.message : e);

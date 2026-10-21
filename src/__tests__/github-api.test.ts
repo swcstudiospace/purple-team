@@ -340,4 +340,68 @@ describe('GitHub API client + classifier', () => {
     const f = fakeApiFetch(() => ({ ok: true, status: 200, body: { nope: true } }));
     await expect(listGitHubRepos({ token: TOKEN, fetchImpl: f })).rejects.toBeInstanceOf(GitHubApiError);
   });
+
+  describe('resolve: slash-branch ref', () => {
+    const OWNER = 'octo-org';
+    const REPO = 'purple-team';
+
+    // Answers the branch probe for the listed names (404 otherwise) and the repo record for every other URL.
+    function branchFetch(branches: string[]) {
+      return fakeApiFetch((url) => {
+        const probe = url.split('/branches/')[1];
+        if (probe === undefined) return { ok: true, status: 200, body: repoRecord() };
+        const name = decodeURIComponent(probe);
+        return branches.includes(name)
+          ? { ok: true, status: 200, body: { name } }
+          : { ok: false, status: 404, body: { message: 'Branch not found' } };
+      });
+    }
+
+    function probedBranches(f: { mock: { calls: unknown[][] } }): string[] {
+      return f.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes('/branches/'))
+        .map((url) => decodeURIComponent(url.split('/branches/')[1]));
+    }
+
+    it('/tree/feature/blue resolves to the slash branch when the split ref is not a branch', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/feature/blue`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'feature', subpath: 'blue' });
+
+      const f = branchFetch(['feature/blue']);
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'feature', subpath: 'blue', fetchImpl: f });
+      expect(r.ref).toBe('feature/blue');
+      expect(probedBranches(f)).toEqual(['feature', 'feature/blue']);
+    });
+
+    it('/tree/main/src keeps ref main when main is a branch, and main/src is never probed', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/main/src`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'main', subpath: 'src' });
+
+      const f = branchFetch(['main']);
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'main', subpath: 'src', fetchImpl: f });
+      expect(r.ref).toBe('main');
+      expect(probedBranches(f)).toEqual(['main']);
+    });
+
+    it('keeps the parsed ref when no candidate is a branch (a tag or commit)', async () => {
+      const f = branchFetch([]);
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'v1.2.3', subpath: 'docs', fetchImpl: f });
+      expect(r.ref).toBe('v1.2.3');
+      expect(probedBranches(f)).toEqual(['v1.2.3', 'v1.2.3/docs']);
+    });
+
+    it('an encoded slash ref without a subpath is taken as written and never probed', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/feature%2Fblue`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'feature/blue' });
+
+      const f = branchFetch([]);
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'feature/blue', fetchImpl: f });
+      expect(r.ref).toBe('feature/blue');
+      expect(probedBranches(f)).toEqual([]);
+    });
+  });
 });

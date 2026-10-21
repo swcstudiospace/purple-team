@@ -67,6 +67,7 @@ export default function MissionDrafts() {
   }, []);
 
   const startEdit = (draft: MissionDraft) => {
+    if (busy) return;
     setEditingId(draft.id);
     setTitle(draft.title);
     setObjective(draft.objective);
@@ -74,6 +75,7 @@ export default function MissionDrafts() {
   };
 
   const cancelEdit = () => {
+    if (busy) return;
     setEditingId(null);
     setTitle('');
     setObjective('');
@@ -84,7 +86,7 @@ export default function MissionDrafts() {
   // server trims and applies defaults, so no client-side validation here.
   const saveDraft = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (saving) return;
+    if (busy) return;
     setSaving(true);
     setError(null);
     const body = { title: title.trim(), objective: objective.trim() };
@@ -196,7 +198,7 @@ export default function MissionDrafts() {
             className="md-input"
             value={title}
             placeholder="Mission title"
-            disabled={saving}
+            disabled={busy}
             onChange={(event) => setTitle(event.target.value)}
           />
         </div>
@@ -209,16 +211,16 @@ export default function MissionDrafts() {
             className="md-input"
             value={objective}
             placeholder="Mission objective"
-            disabled={saving}
+            disabled={busy}
             onChange={(event) => setObjective(event.target.value)}
           />
         </div>
         <div className="md-form-actions">
-          <button type="submit" className="md-btn md-btn--primary" disabled={saving}>
+          <button type="submit" className="md-btn md-btn--primary" disabled={busy}>
             {saving ? 'Saving…' : editingId !== null ? 'Save changes' : 'Create draft'}
           </button>
           {editingId !== null && (
-            <button type="button" className="md-btn" onClick={cancelEdit} disabled={saving}>
+            <button type="button" className="md-btn" onClick={cancelEdit} disabled={busy}>
               Cancel edit
             </button>
           )}

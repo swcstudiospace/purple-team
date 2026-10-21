@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import type { UIMessage } from 'ai';
 import { ApiError, getConversation } from '../../api/client';
-import { useConversationsStore } from '../../stores/conversations';
+import { flushPendingSync, useConversationsStore } from '../../stores/conversations';
 import { useFocusTrap } from './focus';
 import { WorkbenchDialog } from './WorkbenchDialog';
 import './workbench.css';
@@ -39,8 +39,9 @@ function relativeTime(updatedAt: number, now: number): string {
 
 /** Turns a thread title into a safe download basename (falls back when empty). */
 function exportFileBase(title: string): string {
-  const safe = title
-    .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, ' ')
+  const safe = Array.from(title, ch => (ch.charCodeAt(0) < 0x20 ? ' ' : ch))
+    .join('')
+    .replace(/[<>:"/\\|?*]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/[. ]+$/g, '')
@@ -86,6 +87,9 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
   const activeId = useConversationsStore(state => state.activeId);
   const status = useConversationsStore(state => state.status);
   const error = useConversationsStore(state => state.error);
+  const streaming = useConversationsStore(
+    state => state.streamingThreadId !== null && state.streamingThreadId === state.activeId,
+  );
   const createAndActivate = useConversationsStore(state => state.createAndActivate);
   const switchTo = useConversationsStore(state => state.switchTo);
   const rename = useConversationsStore(state => state.rename);
@@ -163,6 +167,7 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
     setExporting(true);
     setExportError(null);
     try {
+      await flushPendingSync(id);
       const { messages } = await getConversation(id);
       const base = exportFileBase(title);
       downloadText(toMarkdown(title, messages), 'text/markdown', `${base}.md`);
@@ -280,7 +285,7 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
                       type="button"
                       className="apx-sidebar-action"
                       aria-label={`Export conversation ${title}`}
-                      disabled={exporting}
+                      disabled={exporting || streaming}
                       onClick={() => void exportConversation(meta.id, title)}
                     >
                       Export

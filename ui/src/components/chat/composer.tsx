@@ -249,6 +249,8 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
   const [caretAtEnd, setCaretAtEnd] = useState(true);
   // Escape stands the ghost down until the next draft edit.
   const [ghostDismissed, setGhostDismissed] = useState(false);
+  // Once the textarea scrolls, the unscrolled ghost mirror would sit outside the visible field: hide it.
+  const [fieldScrolled, setFieldScrolled] = useState(false);
 
   // `/name` with no whitespace yet is palette territory: the palette popover
   // completes command names there (Tab on the highlighted option), so the
@@ -259,7 +261,7 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
     () => (/^\/\S*$/.test(draft) ? null : suggestGhost(draft, COMMANDS)),
     [draft],
   );
-  const showGhost = ghost !== null && !ghostDismissed && caretAtEnd;
+  const showGhost = ghost !== null && !ghostDismissed && caretAtEnd && !fieldScrolled;
 
   function trackCaret(event: { currentTarget: HTMLTextAreaElement }): void {
     const element = event.currentTarget;
@@ -285,12 +287,12 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
       return;
     }
     const ghostNow = ghost;
-    if (ghostNow !== null && !ghostDismissed && caretAtEnd && event.key === 'Tab' && !event.shiftKey) {
+    if (ghostNow !== null && showGhost && event.key === 'Tab' && !event.shiftKey) {
       event.preventDefault();
       acceptGhost(ghostNow);
       return;
     }
-    if (ghostNow !== null && !ghostDismissed && event.key === 'ArrowRight') {
+    if (ghostNow !== null && showGhost && event.key === 'ArrowRight') {
       const element = event.currentTarget;
       if (element.selectionStart === element.selectionEnd && element.selectionEnd === element.value.length) {
         event.preventDefault();
@@ -312,6 +314,7 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
     const element = event.currentTarget;
     setGhostDismissed(false);
     setCaretAtEnd(element.selectionStart === element.selectionEnd && element.selectionEnd === element.value.length);
+    setFieldScrolled(element.scrollTop > 0);
     setDraft(element.value);
   }
 
@@ -365,6 +368,7 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
           aria-describedby={describedById}
           onChange={handleDraftChange}
           onSelect={trackCaret}
+          onScroll={event => setFieldScrolled(event.currentTarget.scrollTop > 0)}
           onKeyDown={handleKeyDown}
           onPaste={event => handleComposerPaste(event, threadId)}
         />
