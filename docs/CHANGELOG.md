@@ -13,12 +13,15 @@
 - Ledger path: `<stateRoot>/roe-ledger/<missionId>.jsonl`. In memory state mode the ledger is held in memory, as the old slot was.
 - A corrupt ledger line fails the mission closed: GET answers cannot-derive with `ledger: { status: 'corrupt', line, reason }`, PUT answers `409` and appends nothing, and the history routes answer `409`.
 - Hashes are computed over the redacted text and actions. Secret-free text keeps the same `textHash`; text that contained a secret now hashes differently.
+- `PUT /api/teams/white/roe` refuses an `actions` payload whose serialized JSON exceeds 64 KiB utf8 bytes with `413`, the same cap as the text. Earlier releases accepted any size.
 
 **Known limitations**
-- A corrupt or torn ledger line, such as a torn final line after a crash, blocks GET, PUT and history for that mission until a person repairs the file by hand. There is no automatic repair tool in this phase.
+- A corrupt or torn ledger line, such as a torn final line after a crash, blocks reads and writes for that mission until a person repairs the file by hand. No repair tool ships in v2.
 - Revisions are contiguous from the first line in each file. A migrated ledger starts at the legacy revision number; revisions 1 to N-1 are not reconstructed.
 - No cross-process lock: two server processes sharing one state directory are not protected against interleaved appends. `state.json` has the same limit.
 - No fsync: a power loss can drop the most recent append.
+- The ledger file is never pruned, so each GET and PUT re-reads the whole mission file; cost grows linearly with the number of revisions.
+- The redaction regex in `src/redact.ts` is slow on long unbroken `[a-z0-9+.-]` runs. This is pre-existing and tracked separately; a PUT whose text is one such run can block the server for seconds.
 
 ## 2026-10-20 — Chat Panel UX wave: autocomplete, 4 Hats tab, hardening
 

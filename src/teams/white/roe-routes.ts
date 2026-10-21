@@ -103,6 +103,10 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       res.status(413).json({ error: 'ROE text exceeds the 64 KiB cap' });
       return;
     }
+    if (Buffer.byteLength(JSON.stringify(actions), 'utf8') > ROE_BODY_CAP_BYTES) {
+      res.status(413).json({ error: 'ROE actions exceed the 64 KiB cap' });
+      return;
+    }
     let appended: LedgerAppendResult;
     try {
       appended = await store.append(missionId, (previous) =>

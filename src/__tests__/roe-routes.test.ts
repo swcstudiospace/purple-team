@@ -169,14 +169,14 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
   it('accepts a mission id, scopes ledgers per mission, and refuses ids that are not safe path segments (AC-39-04)', async () => {
     const { dir, ledgerDir, store } = setup();
     const m = await mount(store);
-    const named = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS, missionId: 'alpha-1_B' });
+    const named = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS, missionId: 'alpha-1_b' });
     expect(named.status).toBe(200);
-    expect(named.body.missionId).toBe('alpha-1_B');
-    expect(existsSync(join(ledgerDir, 'alpha-1_B.jsonl'))).toBe(true);
+    expect(named.body.missionId).toBe('alpha-1_b');
+    expect(existsSync(join(ledgerDir, 'alpha-1_b.jsonl'))).toBe(true);
     expect(existsSync(join(ledgerDir, 'latest.jsonl'))).toBe(false);
 
-    const scoped = await request(m.base, 'GET', '/api/teams/white/roe?missionId=alpha-1_B');
-    expect(scoped.body.missionId).toBe('alpha-1_B');
+    const scoped = await request(m.base, 'GET', '/api/teams/white/roe?missionId=alpha-1_b');
+    expect(scoped.body.missionId).toBe('alpha-1_b');
     expect(scoped.body.ok).toBe(true);
 
     for (const bad of ['../escape', '-leading', 'a'.repeat(65), 'has space']) {
@@ -357,6 +357,22 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
     expect((history.body.revisions as Array<Record<string, unknown>>).map((r) => r.revision)).toEqual([7]);
     const next = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
     expect(next.body.revision).toBe(8);
+  });
+
+  it('caps the serialized actions payload at 64 KiB: one byte over is 413, the cap itself is accepted (Security F1)', async () => {
+    const { ledgerDir, store } = setup();
+    const m = await mount(store);
+    // `[{"command":"<X>"}]` serializes to X plus 16 bytes, so X = cap - 16 lands exactly on the cap.
+    const atCapCommand = 'a '.repeat((ROE_BODY_CAP_BYTES - 16) / 2);
+    const atCap = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: [{ command: atCapCommand }] });
+    expect(atCap.status).toBe(200);
+    expect(ledgerLines(join(ledgerDir, 'latest.jsonl'))).toHaveLength(1);
+
+    const overCommand = `${atCapCommand}a`;
+    const over = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: [{ command: overCommand }] });
+    expect(over.status).toBe(413);
+    expect(over.body).toEqual({ error: 'ROE actions exceed the 64 KiB cap' });
+    expect(ledgerLines(join(ledgerDir, 'latest.jsonl'))).toHaveLength(1);
   });
 
   it('keeps every ROE route under /api/ and the legacy roeRecords slot out of the server (AC-39-08, AC-39-11)', () => {
