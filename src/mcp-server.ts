@@ -520,7 +520,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       return tempestPost('/api/teams/purple/synthesize', {
         findings: findings ?? [],
         detections: detections ?? [],
-        verdicts: verdicts ?? [],
+        ...(verdicts !== undefined ? { verdicts } : {}),
         ...(verdictsByFinding !== undefined ? { verdictsByFinding } : {}),
       });
     }

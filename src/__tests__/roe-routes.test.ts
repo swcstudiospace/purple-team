@@ -128,7 +128,7 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
     const lines = ledgerLines(file);
     expect(lines).toHaveLength(1);
     expect(Object.keys(lines[0]).sort()).toEqual(
-      ['actions', 'actionsHash', 'createdAt', 'missionId', 'parseOk', 'recordedAt', 'revision', 'schemaVersion', 'text', 'textHash', 'verdicts'].sort(),
+      ['actions', 'actionsHash', 'createdAt', 'missionId', 'parseOk', 'provenance', 'recordedAt', 'revision', 'schemaVersion', 'text', 'textHash', 'verdicts'].sort(),
     );
     expect(lines[0]).toMatchObject({ schemaVersion: 1, revision: 1, missionId: 'latest', parseOk: true });
     expect(lines[0].verdicts).toHaveLength(ACTIONS.length);

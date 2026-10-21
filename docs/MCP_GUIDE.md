@@ -82,7 +82,7 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_operator_task` | `POST /api/operators/:id/task` (`operatorId`, `taskName`, `taskDescription`) |
 | `tempest_findings` | `GET /api/findings` (optional `missionId` filter) |
 | `tempest_providers` | `GET /api/llm/status` + `GET /api/oauth/status` |
-| `tempest_purple_synthesize` | `GET /api/teams/purple/synthesize` when no inputs are supplied; otherwise `POST` with `findings`, `detections`, `verdicts`, and optional `verdictsByFinding` |
+| `tempest_purple_synthesize` | `GET /api/teams/purple/synthesize` when no inputs are supplied; otherwise `POST` with `findings`, `detections`, optional `verdicts`, and optional `verdictsByFinding`. When `verdicts` is omitted the verdicts are consumed from the latest ROE ledger revision of the `latest` mission (this tool does not pass a `missionId`). Responses carry `verdictSource` |
 | `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (read-only over the stored findings ledger) |
 | `tempest_blue_rules` | `GET /api/teams/blue/rules` (read-only over the stored findings ledger) |
 | `tempest_blue_hardening` | `GET /api/teams/blue/hardening` (read-only over the stored findings ledger) |
