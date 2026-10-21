@@ -7031,8 +7031,9 @@ app.get('/api/teams/tool-grants', (_req: Request, res: Response) => {
 /**
  * Purple synthesis (phase 40). Handlers live in teams/purple-synthesize-routes.ts.
  * POST body: { findings, detections, verdicts?, verdictsByFinding?, missionId? }. When
- * verdicts is absent, the verdicts are consumed from the latest ROE ledger revision for
- * missionId (default latest); an array is used as given. Every response carries
+ * verdicts is absent, the verdicts of the latest ROE ledger revision for missionId (default
+ * latest) are reported in verdictSource and join findings only through verdictsByFinding (the
+ * positional join input is empty); an array is the positional join input as given. Every response carries
  * verdictSource. The latest synthesis is held in the purpleSyntheses slot, which the
  * snapshot machinery persists.
  */

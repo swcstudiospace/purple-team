@@ -3,11 +3,13 @@
  * synthesis (teams/purple.ts synthesize). server.ts keeps the route literals and registers
  * these handlers; every emitted body is redactSecrets-wrapped.
  *
- * Verdict source: when a request omits `verdicts`, the verdicts are consumed from the latest
- * revision of the ROE ledger for `missionId` (default `latest`). When a request supplies an
- * array, that array is used unchanged. Every synthesis declares where its verdicts came from
- * (`verdictSource`). Nothing is fabricated: no revision, or an unparsed latest revision, gives
- * zero verdicts with kind `none`.
+ * Verdict source: when a request omits `verdicts`, the verdicts of the latest revision of the
+ * ROE ledger for `missionId` (default `latest`) are consumed. They are ordered by action index,
+ * while synthesize() joins by finding position, so consumed verdicts never enter the positional
+ * join. They join findings ONLY through `verdictsByFinding` (id-keyed). Without it the join input
+ * is empty and the consumed verdicts are reported in `verdictSource`. When a request supplies a
+ * `verdicts` array, that array is the positional join input, unchanged. Nothing is fabricated: no
+ * revision, or an unparsed latest revision, gives zero verdicts with kind `none`.
  */
 import type { Request, Response } from 'express';
 import { redactSecrets } from '../redact.js';
@@ -25,7 +27,7 @@ import type { RoeVerdict } from './white.js';
 
 /** Where the verdicts of one synthesis came from. */
 export type VerdictSource =
-  | { kind: 'ledger'; missionId: string; revision: number; textHash: string }
+  | { kind: 'ledger'; missionId: string; revision: number; textHash: string; verdicts: StampedVerdict[] }
   | { kind: 'request'; reason?: string }
   | { kind: 'none'; missionId: string; reason: 'no-ledger' | 'parse-not-ok' };
 
@@ -46,17 +48,17 @@ const LEGACY_VERDICT_SOURCE: VerdictSource = {
 };
 
 export type ConsumeResult =
-  | { ok: true; verdicts: StampedVerdict[]; verdictSource: VerdictSource }
+  | { ok: true; verdictSource: VerdictSource }
   | { ok: false; line: number; reason: string };
 
 function noVerdicts(missionId: MissionId, reason: 'no-ledger' | 'parse-not-ok'): ConsumeResult {
-  return { ok: true, verdicts: [], verdictSource: { kind: 'none', missionId, reason } };
+  return { ok: true, verdictSource: { kind: 'none', missionId, reason } };
 }
 
 /**
- * Verdicts of the latest ledger revision for a mission. `read` is the ledger store result: null
- * when no ledger file exists. A corrupt ledger is returned as a failure, never as verdicts.
- * Pure.
+ * The verdict source of the latest ledger revision for a mission: its verdicts, stamped with
+ * that revision, and the revision identity. `read` is the ledger store result: null when no
+ * ledger file exists. A corrupt ledger is a failure, never verdicts. Pure.
  */
 export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: MissionId): ConsumeResult {
   if (read === null) return noVerdicts(missionId, 'no-ledger');
@@ -66,12 +68,17 @@ export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: Missio
   if (!latest.parseOk) return noVerdicts(missionId, 'parse-not-ok');
   return {
     ok: true,
-    verdicts: latest.verdicts.map((verdict) => ({
-      ...verdict,
-      roeRevision: latest.revision,
-      roeTextHash: latest.textHash,
-    })),
-    verdictSource: { kind: 'ledger', missionId, revision: latest.revision, textHash: latest.textHash },
+    verdictSource: {
+      kind: 'ledger',
+      missionId,
+      revision: latest.revision,
+      textHash: latest.textHash,
+      verdicts: latest.verdicts.map((verdict) => ({
+        ...verdict,
+        roeRevision: latest.revision,
+        roeTextHash: latest.textHash,
+      })),
+    },
   };
 }
 
@@ -145,6 +152,7 @@ export function createPurpleSynthesizeHandlers(deps: PurpleSynthesizeDeps): Purp
     }
 
     const rawVerdicts = body.verdicts;
+    // The positional join input. Consumed ledger verdicts never enter it (see the module doc).
     let verdictInputs: RoeVerdict[];
     let verdictSource: VerdictSource;
     if (rawVerdicts === undefined) {
@@ -170,7 +178,7 @@ export function createPurpleSynthesizeHandlers(deps: PurpleSynthesizeDeps): Purp
         }));
         return;
       }
-      verdictInputs = consumed.verdicts;
+      verdictInputs = [];
       verdictSource = consumed.verdictSource;
     } else {
       if (!Array.isArray(rawVerdicts)) {
