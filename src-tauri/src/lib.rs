@@ -27,18 +27,22 @@ fn wait_for_sidecar(port: u16) -> bool {
     false
 }
 
-/// Installed externalBin name. The bundler strips the target triple; Windows
-/// keeps the `.exe` suffix.
+/// Sidecar file names. The .deb ships the sidecar next to the app binary
+/// (usr/bin). The AppImage ships it under usr/lib/t3mp3st-sidecar instead, so
+/// linuxdeploy never rewrites its RPATH (see docs/TAURI.md, phase 41).
+const SIDECAR_FILE: &str = "t3mp3st-server";
+const SIDECAR_FILE_EXE: &str = "t3mp3st-server.exe";
+const APPIMAGE_SIDECAR_DIR: &str = "t3mp3st-sidecar";
+
+/// Finds the bundled sidecar for an app binary living in `dir`: first next to
+/// the binary (deb layout), then under `../lib/t3mp3st-sidecar` (AppImage layout).
 fn sidecar_binary(dir: &Path) -> Option<PathBuf> {
-    let plain = dir.join("t3mp3st-server");
-    if plain.exists() {
-        return Some(plain);
-    }
-    let exe = dir.join("t3mp3st-server.exe");
-    if exe.exists() {
-        return Some(exe);
-    }
-    None
+    let lib_dir = dir.parent().map(|usr| usr.join("lib").join(APPIMAGE_SIDECAR_DIR));
+    [Some(dir.to_path_buf()), lib_dir]
+        .into_iter()
+        .flatten()
+        .flat_map(|candidate| [candidate.join(SIDECAR_FILE), candidate.join(SIDECAR_FILE_EXE)])
+        .find(|path| path.exists())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -193,16 +193,18 @@ artifact's sha256 and byte size, the container image reference, and one status
 per check. Claim boundary, verbatim: "headless install + ldd + sidecar /health
 only; no GUI window or desktop session was launched."
 
-Known failure (open, phase 41): the AppImage's `t3mp3st-server` sidecar does not
-answer `/health`. Tauri's AppImage script runs `linuxdeploy --appdir`, which
-rewrites the RPATH of every ELF in `usr/bin` with patchelf. patchelf inserts
-8 KiB before the ELF section headers, which shifts the pkg payload appended to
-the sidecar, so the copy fails with `Pkg: Error reading from file` or a
-`SyntaxError`. The deb copy of the same build passes. Stripping is not the
-cause: the bundled sidecar is not stripped, and `NO_STRIP` does not change the
-result. A packaging-only fix is not established; see the phase 41 report for
-the product-level options. The check stays fail-closed and AC-41-06 is not
-relaxed.
+AppImage sidecar layout (phase 41, owner decision). The AppImage used to carry
+the sidecar in `usr/bin`, where `linuxdeploy --appdir` rewrites the RPATH of
+every ELF with patchelf. patchelf inserts 8 KiB before the ELF section headers,
+which shifts the pkg payload appended to the sidecar, so the copy failed with
+`Pkg: Error reading from file` or a `SyntaxError`. The sidecar now ships outside
+`usr/bin` on Linux only: `src-tauri/tauri.linux.conf.json` sets
+`bundle.externalBin` to `null` and maps the sidecar with `bundle.linux.deb.files`
+(`usr/bin/t3mp3st-server`, the deb layout, unchanged) and
+`bundle.linux.appimage.files` (`usr/lib/t3mp3st-sidecar/t3mp3st-server`).
+`sidecar_binary` in `src-tauri/src/lib.rs` looks next to the app binary first,
+then under `../lib/t3mp3st-sidecar`. The pkg payload format is unchanged. The
+install-launch check stays fail-closed and AC-41-06 is not relaxed.
 
 ## 8. Bundle wiring manifest (verified 2026-10-09 against docs/IA.md)
 
