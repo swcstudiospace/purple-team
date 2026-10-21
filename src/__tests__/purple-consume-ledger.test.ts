@@ -106,14 +106,14 @@ async function request(base: string, method: string, path: string, body?: unknow
 
 describe('consumeLedgerVerdicts (phase 40)', () => {
   it('no ledger gives no verdicts with reason no-ledger (AC-40-05)', () => {
-    expect(consumeLedgerVerdicts(null, LATEST, false)).toEqual({
+    expect(consumeLedgerVerdicts(null, LATEST)).toEqual({
       ok: true,
       verdictSource: { kind: 'none', missionId: 'latest', reason: 'no-ledger' },
     });
   });
 
   it('an empty ledger file gives no verdicts with reason no-ledger (AC-40-05)', () => {
-    expect(consumeLedgerVerdicts({ ok: true, records: [] }, LATEST, false)).toEqual({
+    expect(consumeLedgerVerdicts({ ok: true, records: [] }, LATEST)).toEqual({
       ok: true,
       verdictSource: { kind: 'none', missionId: 'latest', reason: 'no-ledger' },
     });
@@ -121,7 +121,7 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
 
   it('a corrupt ledger is a failure and never yields verdicts (AC-40-05)', () => {
     const corrupt: LedgerRead = { ok: false, line: 3, reason: 'line is not valid JSON' };
-    expect(consumeLedgerVerdicts(corrupt, LATEST, false)).toEqual({ ok: false, line: 3, reason: 'line is not valid JSON' });
+    expect(consumeLedgerVerdicts(corrupt, LATEST)).toEqual({ ok: false, line: 3, reason: 'line is not valid JSON' });
   });
 
   it('an unparsed latest revision gives no verdicts with reason parse-not-ok (AC-40-05)', () => {
@@ -133,7 +133,7 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
       recordedAt: T,
     });
     expect(unparsed.parseOk).toBe(false);
-    expect(consumeLedgerVerdicts({ ok: true, records: [unparsed] }, LATEST, false)).toEqual({
+    expect(consumeLedgerVerdicts({ ok: true, records: [unparsed] }, LATEST)).toEqual({
       ok: true,
       verdictSource: { kind: 'none', missionId: 'latest', reason: 'parse-not-ok' },
     });
@@ -149,7 +149,7 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
       recordedAt: T,
     });
     expect(second.verdicts).toHaveLength(ACTIONS.length);
-    expect(consumeLedgerVerdicts({ ok: true, records: [first, second] }, LATEST, false)).toEqual({
+    expect(consumeLedgerVerdicts({ ok: true, records: [first, second] }, LATEST)).toEqual({
       ok: true,
       verdictSource: {
         kind: 'ledger',
@@ -159,16 +159,6 @@ describe('consumeLedgerVerdicts (phase 40)', () => {
         unjoinedVerdicts: second.verdicts.map((verdict) => ({ ...verdict, roeRevision: 2, roeTextHash: second.textHash })),
       },
     });
-  });
-
-  it('with verdictsByFinding the consumed verdicts are not reported at all (AC-40-04, AC-40-06)', () => {
-    const revision = buildRevision({ missionId: LATEST, text: OK_TEXT, actions: ACTIONS, previous: null, recordedAt: T });
-    const consumed = consumeLedgerVerdicts({ ok: true, records: [revision] }, LATEST, true);
-    expect(consumed).toEqual({
-      ok: true,
-      verdictSource: { kind: 'ledger', missionId: 'latest', revision: 1, textHash: revision.textHash },
-    });
-    expect(consumed).not.toHaveProperty('verdictSource.unjoinedVerdicts');
   });
 });
 
@@ -194,7 +184,7 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
     expect(get.body).toMatchObject({ verdictSource: { kind: 'ledger', revision: put.body.revision } });
   });
 
-  it('an explicit verdicts array keeps the request path and declares kind request (AC-40-04, AC-40-06)', async () => {
+  it('an explicit verdicts array keeps the request path and declares kind caller (AC-40-04, AC-40-06)', async () => {
     const { store } = setup();
     const { base } = await mount({ store });
     const post = await request(base, 'POST', SYNTH, {
@@ -204,7 +194,7 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
     });
     expect(post.status).toBe(201);
     expect(post.body).toMatchObject({
-      verdictSource: { kind: 'request' },
+      verdictSource: { kind: 'caller' },
       coverageMatrix: [{ findingId: 'F-1', verdict: 'compliant' }],
     });
   });
@@ -305,10 +295,10 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
     expect(post.body.error).toMatch(/missionId/);
   });
 
-  it('id-keyed verdictsByFinding keeps its correlation when verdicts are absent (AC-40-07)', async () => {
+  it('id-keyed verdictsByFinding joins by id and is declared kind caller (AC-40-07, AC-40-06)', async () => {
     const { store } = setup();
     const { base } = await mount({ store });
-    const put = await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
     const post = await request(base, 'POST', SYNTH, {
       findings: [{ id: 'F-1' }, { id: 'F-2' }],
       detections: [],
@@ -316,13 +306,12 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
     });
     expect(post.body).toMatchObject({
       correlation: 'id',
-      verdictSource: { kind: 'ledger', revision: put.body.revision },
+      verdictSource: { kind: 'caller' },
       coverageMatrix: [{ findingId: 'F-1' }, { findingId: 'F-2', verdict: 'compliant' }],
     });
-    expect(post.body.verdictSource).not.toHaveProperty('unjoinedVerdicts');
   });
 
-  it('a record written before verdictSource existed reads as request-supplied (AC-40-06)', async () => {
+  it('a record written before verdictSource existed reads as caller-supplied (AC-40-06)', async () => {
     const { store } = setup();
     const legacy: PurpleSynthesisRecord = {
       id: 'latest',
@@ -334,14 +323,101 @@ describe('POST /api/teams/purple/synthesize over the ROE ledger (phase 40)', () 
     const get = await request(base, 'GET', SYNTH);
     expect(get.body).toMatchObject({
       verdictSource: {
-        kind: 'request',
-        reason: 'recorded before verdictSource existed; verdicts were request-supplied',
+        kind: 'caller',
+        reason: 'recorded before verdictSource existed; verdicts were caller-supplied',
       },
     });
   });
 });
 
-describe('consumed verdicts join findings only through verdictsByFinding (amended AC-40-04)', () => {
+describe('verdictSource kinds (AC-40-06, amended)', () => {
+  it('caller: a verdictsByFinding map with a ledger present is kind caller and names no revision', async () => {
+    const { store } = setup();
+    const { base } = await mount({ store });
+    await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    const post = await request(base, 'POST', SYNTH, {
+      findings: [{ id: 'F-1' }, { id: 'F-2' }],
+      detections: [],
+      verdictsByFinding: { 'F-1': { verdict: 'violation' } },
+    });
+    expect(post.status).toBe(201);
+    expect(post.body.verdictSource).toEqual({ kind: 'caller' });
+    expect(post.body.coverageMatrix).toMatchObject([{ findingId: 'F-1', verdict: 'violation' }, { findingId: 'F-2' }]);
+    expect((post.body.coverageMatrix as Array<Record<string, unknown>>)[1]).not.toHaveProperty('verdict');
+  });
+
+  it('caller: a verdictsByFinding map with no ledger is kind caller, not none (Greptile P1)', async () => {
+    const { store } = setup();
+    const { base } = await mount({ store });
+    const post = await request(base, 'POST', SYNTH, {
+      findings: [{ id: 'F-1' }],
+      detections: [],
+      verdictsByFinding: { 'F-1': { verdict: 'compliant' } },
+    });
+    expect(post.status).toBe(201);
+    expect(post.body.verdictSource).toEqual({ kind: 'caller' });
+    expect(post.body.coverageMatrix).toMatchObject([{ findingId: 'F-1', verdict: 'compliant' }]);
+  });
+
+  it('caller: an explicit verdicts array with a ledger present is kind caller and names no revision', async () => {
+    const { store } = setup();
+    const { base } = await mount({ store });
+    await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    const post = await request(base, 'POST', SYNTH, {
+      findings: [{ id: 'F-1' }],
+      detections: [],
+      verdicts: [{ actionIndex: 0, verdict: 'compliant', rationale: 'approved window' }],
+    });
+    expect(post.status).toBe(201);
+    expect(post.body.verdictSource).toEqual({ kind: 'caller' });
+    expect(post.body.coverageMatrix).toMatchObject([{ findingId: 'F-1', verdict: 'compliant' }]);
+  });
+
+  it('caller: a verdictsByFinding request does not read the ledger, so a corrupt ledger cannot answer it', async () => {
+    const { store, ledgerDir, ledgerFile } = setup();
+    const { base } = await mount({ store });
+    mkdirSync(ledgerDir, { recursive: true });
+    writeFileSync(ledgerFile, 'not json\n');
+    const post = await request(base, 'POST', SYNTH, {
+      findings: [{ id: 'F-1' }],
+      detections: [],
+      verdictsByFinding: { 'F-1': { verdict: 'compliant' } },
+    });
+    expect(post.status).toBe(201);
+    expect(post.body.verdictSource).toEqual({ kind: 'caller' });
+  });
+
+  it('ledger: with no verdicts and no map, the latest revision is consumed as unjoinedVerdicts and joins no finding', async () => {
+    const { store } = setup();
+    const { base } = await mount({ store });
+    const put = await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+    const post = await request(base, 'POST', SYNTH, { findings: [{ id: 'F-1' }], detections: [], missionId: 'latest' });
+    expect(post.status).toBe(201);
+    expect(post.body.verdictSource).toEqual({
+      kind: 'ledger',
+      missionId: 'latest',
+      revision: put.body.revision,
+      textHash: put.body.textHash,
+      unjoinedVerdicts: [
+        expect.objectContaining({ actionIndex: 0, verdict: 'violation', roeRevision: put.body.revision, roeTextHash: put.body.textHash }),
+        expect.objectContaining({ actionIndex: 1, roeRevision: put.body.revision, roeTextHash: put.body.textHash }),
+      ],
+    });
+    expect((post.body.coverageMatrix as Array<Record<string, unknown>>)[0]).not.toHaveProperty('verdict');
+  });
+
+  it('none: with no verdicts, no map and no revision, no verdict is fabricated and no unjoinedVerdicts is declared', async () => {
+    const { store } = setup();
+    const { base } = await mount({ store });
+    const post = await request(base, 'POST', SYNTH, { findings: [{ id: 'F-1' }], detections: [] });
+    expect(post.status).toBe(201);
+    expect(post.body.verdictSource).toEqual({ kind: 'none', missionId: 'latest', reason: 'no-ledger' });
+    expect(post.body.verdictSource).not.toHaveProperty('unjoinedVerdicts');
+    expect((post.body.coverageMatrix as Array<Record<string, unknown>>)[0]).not.toHaveProperty('verdict');
+  });
+});
+
+describe('verdictsByFinding joins findings by id only (amended AC-40-04)', () => {
   it('a subset of findings joins only the ids named in verdictsByFinding', async () => {
     const { store } = setup();
     const { base } = await mount({ store });

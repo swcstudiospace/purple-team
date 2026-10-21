@@ -7028,12 +7028,12 @@ app.get('/api/teams/tool-grants', (_req: Request, res: Response) => {
 
 /**
  * Purple synthesis (phase 40). Handlers live in teams/purple-synthesize-routes.ts.
- * POST body: { findings, detections, verdicts?, verdictsByFinding?, missionId? }. When verdicts
- * is absent, the latest ROE ledger revision for missionId (default latest) is consumed. It joins
- * findings only through verdictsByFinding; without it the join input is empty and the verdicts
- * are reported in verdictSource.unjoinedVerdicts. An array verdicts is the positional join input
- * as given. Every response carries verdictSource. The latest synthesis is held in the
- * purpleSyntheses slot, which the snapshot machinery persists.
+ * POST body: { findings, detections, verdicts?, verdictsByFinding?, missionId? }. A request that
+ * sends verdicts or verdictsByFinding is verdictSource kind caller and never reads the ledger.
+ * Otherwise the latest ROE ledger revision for missionId (default latest) is consumed: its
+ * verdicts are reported in verdictSource.unjoinedVerdicts and join no finding. Every response
+ * carries verdictSource. The latest synthesis is held in the purpleSyntheses slot, which the
+ * snapshot machinery persists.
  */
 const purpleSynthesizeRoutes = createPurpleSynthesizeHandlers({
   store: roeStore,

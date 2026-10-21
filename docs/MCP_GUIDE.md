@@ -82,7 +82,7 @@ of throwing — an unreachable backend answers with a "start it with
 | `tempest_operator_task` | `POST /api/operators/:id/task` (`operatorId`, `taskName`, `taskDescription`) |
 | `tempest_findings` | `GET /api/findings` (optional `missionId` filter) |
 | `tempest_providers` | `GET /api/llm/status` + `GET /api/oauth/status` |
-| `tempest_purple_synthesize` | `GET /api/teams/purple/synthesize` when no inputs are supplied; otherwise `POST` with `findings`, `detections`, optional `verdicts`, and optional `verdictsByFinding`. When `verdicts` is omitted, the latest ROE ledger revision of the `latest` mission (this tool does not pass a `missionId`) is consumed. With `verdictsByFinding` it joins findings by id; without it the verdicts join no finding and are reported in `verdictSource.unjoinedVerdicts`. Responses carry `verdictSource` |
+| `tempest_purple_synthesize` | `GET /api/teams/purple/synthesize` when no inputs are supplied; otherwise `POST` with `findings`, `detections`, optional `verdicts`, and optional `verdictsByFinding`. When both are omitted, the latest ROE ledger revision of the `latest` mission (this tool does not pass a `missionId`) is consumed and reported in `verdictSource.unjoinedVerdicts` (kind `ledger`; it joins no finding). When either is sent, `verdictSource` is kind `caller`, the verdicts come from the caller, and the ledger is not read. Responses carry `verdictSource` |
 | `tempest_blue_gaps` | `GET /api/teams/blue/gaps` (read-only over the stored findings ledger) |
 | `tempest_blue_rules` | `GET /api/teams/blue/rules` (read-only over the stored findings ledger) |
 | `tempest_blue_hardening` | `GET /api/teams/blue/hardening` (read-only over the stored findings ledger) |

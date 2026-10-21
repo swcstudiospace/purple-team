@@ -3,14 +3,13 @@
  * synthesis (teams/purple.ts synthesize). server.ts keeps the route literals and registers
  * these handlers; every emitted body is redactSecrets-wrapped.
  *
- * Verdict source: when a request omits `verdicts`, the verdicts of the latest revision of the
- * ROE ledger for `missionId` (default `latest`) are consumed. They are ordered by action index,
- * while synthesize() joins by finding position, so consumed verdicts never enter the positional
- * join. They join findings ONLY through `verdictsByFinding` (id-keyed). Without it the join input
- * is empty and the consumed verdicts are reported as `verdictSource.unjoinedVerdicts`; with it,
- * `unjoinedVerdicts` is absent. When a request supplies a `verdicts` array, that array is the
- * positional join input, unchanged. Nothing is fabricated: no revision, or an unparsed latest
- * revision, gives zero verdicts with kind `none`.
+ * Verdict source (`verdictSource.kind`): `caller` when the request supplies `verdicts` or
+ * `verdictsByFinding`. The row verdicts then come from the caller, the ROE ledger is not read,
+ * and no ledger revision is named. `ledger` when neither is supplied and the latest revision of
+ * the ROE ledger for `missionId` (default `latest`) exists: its verdicts are reported as
+ * `unjoinedVerdicts`, stamped with that revision. They are ordered by action index while
+ * synthesize() joins by finding position, so they join no finding. `none` when neither is
+ * supplied and there is no revision, or its latest revision did not parse. Nothing is fabricated.
  */
 import type { Request, Response } from 'express';
 import { redactSecrets } from '../redact.js';
@@ -28,8 +27,8 @@ import type { RoeVerdict } from './white.js';
 
 /** Where the verdicts of one synthesis came from. */
 export type VerdictSource =
-  | { kind: 'ledger'; missionId: string; revision: number; textHash: string; unjoinedVerdicts?: StampedVerdict[] }
-  | { kind: 'request'; reason?: string }
+  | { kind: 'ledger'; missionId: string; revision: number; textHash: string; unjoinedVerdicts: StampedVerdict[] }
+  | { kind: 'caller'; reason?: string }
   | { kind: 'none'; missionId: string; reason: 'no-ledger' | 'parse-not-ok' };
 
 /** The latest synthesis, one slot, persisted through state.json. */
@@ -38,14 +37,14 @@ export interface PurpleSynthesisRecord {
   createdAt: string;
   correlation: DarkPurpleSynthesis['correlation'];
   synthesis: DarkPurpleSynthesis;
-  /** Absent on records written before phase 40; read as a request-supplied legacy source. */
+  /** Absent on records written before phase 40; read as a caller-supplied legacy source. */
   verdictSource?: VerdictSource;
 }
 
 /** Records written before verdictSource existed came from the explicit route, which required verdicts. */
 const LEGACY_VERDICT_SOURCE: VerdictSource = {
-  kind: 'request',
-  reason: 'recorded before verdictSource existed; verdicts were request-supplied',
+  kind: 'caller',
+  reason: 'recorded before verdictSource existed; verdicts were caller-supplied',
 };
 
 export type ConsumeResult =
@@ -57,23 +56,17 @@ function noVerdicts(missionId: MissionId, reason: 'no-ledger' | 'parse-not-ok'):
 }
 
 /**
- * The verdict source of the latest ledger revision for a mission: the revision identity and,
- * unless `idKeyed` is true, `unjoinedVerdicts`, the revision's verdicts stamped with it (AC-40-06).
- * `idKeyed` is true when the request sent `verdictsByFinding`, which joins by finding id; the
- * consumed verdicts are then not reported at all. `read` is the ledger store result: null when no
- * ledger file exists. A corrupt ledger is a failure, never verdicts. Pure.
+ * The ledger verdict source of a mission's latest revision, for a request that supplies no
+ * verdicts: the revision identity and `unjoinedVerdicts`, the revision's verdicts stamped with it
+ * (AC-40-06). `read` is the ledger store result: null when no ledger file exists. A corrupt
+ * ledger is a failure, never verdicts. Pure.
  */
-export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: MissionId, idKeyed: boolean): ConsumeResult {
+export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: MissionId): ConsumeResult {
   if (read === null) return noVerdicts(missionId, 'no-ledger');
   if (!read.ok) return { ok: false, line: read.line, reason: read.reason };
   const latest = latestRevision(read.records);
   if (latest === null) return noVerdicts(missionId, 'no-ledger');
   if (!latest.parseOk) return noVerdicts(missionId, 'parse-not-ok');
-  const unjoinedVerdicts = latest.verdicts.map((verdict) => ({
-    ...verdict,
-    roeRevision: latest.revision,
-    roeTextHash: latest.textHash,
-  }));
   return {
     ok: true,
     verdictSource: {
@@ -81,7 +74,11 @@ export function consumeLedgerVerdicts(read: LedgerRead | null, missionId: Missio
       missionId,
       revision: latest.revision,
       textHash: latest.textHash,
-      ...(idKeyed ? {} : { unjoinedVerdicts }),
+      unjoinedVerdicts: latest.verdicts.map((verdict) => ({
+        ...verdict,
+        roeRevision: latest.revision,
+        roeTextHash: latest.textHash,
+      })),
     },
   };
 }
@@ -157,9 +154,21 @@ export function createPurpleSynthesizeHandlers(deps: PurpleSynthesizeDeps): Purp
 
     const rawVerdicts = body.verdicts;
     // The positional join input. Consumed ledger verdicts never enter it (see the module doc).
-    let verdictInputs: RoeVerdict[];
+    let verdictInputs: RoeVerdict[] = [];
     let verdictSource: VerdictSource;
-    if (rawVerdicts === undefined) {
+    if (rawVerdicts !== undefined || verdictsByFinding !== undefined) {
+      // Caller verdicts: the ledger is neither read nor named (see the module doc).
+      if (rawVerdicts !== undefined) {
+        if (!Array.isArray(rawVerdicts)) {
+          res.status(400).json({ error: 'verdicts must be an array when present' });
+          return;
+        }
+        verdictInputs = (rawVerdicts as unknown[]).filter(
+          (raw): raw is RoeVerdict => Boolean(raw) && typeof raw === 'object',
+        );
+      }
+      verdictSource = { kind: 'caller' };
+    } else {
       const mission = parseMissionId(body.missionId);
       if (!mission.ok) {
         res.status(400).json({ error: mission.reason });
@@ -173,7 +182,7 @@ export function createPurpleSynthesizeHandlers(deps: PurpleSynthesizeDeps): Purp
         res.status(503).json(redactSecrets({ error: 'ROE ledger is unreadable; no synthesis recorded' }));
         return;
       }
-      const consumed = consumeLedgerVerdicts(read, mission.missionId, verdictsByFinding !== undefined);
+      const consumed = consumeLedgerVerdicts(read, mission.missionId);
       if (!consumed.ok) {
         res.status(409).json(redactSecrets({
           error: `ROE ledger is corrupt at line ${consumed.line}`,
@@ -182,17 +191,7 @@ export function createPurpleSynthesizeHandlers(deps: PurpleSynthesizeDeps): Purp
         }));
         return;
       }
-      verdictInputs = [];
       verdictSource = consumed.verdictSource;
-    } else {
-      if (!Array.isArray(rawVerdicts)) {
-        res.status(400).json({ error: 'verdicts must be an array when present' });
-        return;
-      }
-      verdictInputs = (rawVerdicts as unknown[]).filter(
-        (raw): raw is RoeVerdict => Boolean(raw) && typeof raw === 'object',
-      );
-      verdictSource = { kind: 'request' };
     }
 
     const correlated = (findingsInput as unknown[])
