@@ -483,22 +483,18 @@ describe('fail-closed on torn tails, malformed verdicts and prototype keys', () 
   });
 });
 
-describe('appending to a file that does not end in a newline', () => {
-  it('starts the new revision on its own line and keeps the existing bytes', async () => {
+describe('appending after a last line with no trailing newline', () => {
+  it('refuses the append as a torn tail and leaves the file bytes unchanged', async () => {
     const file = join(dir, 'latest.jsonl');
     const tail = serializeLine(first).slice(0, -1);
     writeFileSync(file, tail);
-    await fsBackend(dir).appendLine(LATEST, serializeLine(second));
-    const content = readFileSync(file, 'utf8');
-    expect(content).toBe(`${tail}\n${serializeLine(second)}`);
-    expect(parseLedger(LATEST, content.split('\n'))).toEqual({ ok: true, records: [first, second] });
-  });
-
-  it('adds no separator after a file that already ends in a newline, or into an empty file', async () => {
-    const backend = fsBackend(dir);
-    await backend.appendLine(LATEST, serializeLine(first));
-    await backend.appendLine(LATEST, serializeLine(second));
-    expect(readFileSync(join(dir, 'latest.jsonl'), 'utf8')).toBe(`${serializeLine(first)}${serializeLine(second)}`);
+    const store = createRoeLedgerStore(fsBackend(dir));
+    expect(await revise(store, LATEST, ROE_TEXT)).toEqual({
+      ok: false,
+      line: 1,
+      reason: expect.stringContaining('torn tail'),
+    });
+    expect(readFileSync(file, 'utf8')).toBe(tail);
   });
 });
 

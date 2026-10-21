@@ -14,7 +14,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdir, open, readFile, type FileHandle } from 'node:fs/promises';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { redactSecrets, redactString } from '../../redact.js';
 import { roeAudit, type AuditedAction, type RoeVerdict } from '../white.js';
@@ -400,13 +400,6 @@ export interface RoeLedgerBackend {
   appendLine(missionId: MissionId, line: string): Promise<void>;
 }
 
-/** Whether the last byte of an open, non-empty file is a newline. */
-async function endsWithNewline(handle: FileHandle, size: number): Promise<boolean> {
-  const last = Buffer.alloc(1);
-  await handle.read(last, 0, 1, size - 1);
-  return last[0] === 0x0a;
-}
-
 /** File-backed ledger under `dir`, one `<missionId>.jsonl` per mission. */
 export function fsBackend(dir: string): RoeLedgerBackend {
   return {
@@ -422,16 +415,7 @@ export function fsBackend(dir: string): RoeLedgerBackend {
     },
     async appendLine(missionId, line) {
       await mkdir(dir, { recursive: true });
-      const handle = await open(join(dir, `${missionId}.jsonl`), 'a+');
-      try {
-        const { size } = await handle.stat();
-        // A file whose last byte is not a newline would take the new line onto its last line.
-        // A separator keeps every earlier byte in place and starts the new line on its own.
-        const separator = size > 0 && !(await endsWithNewline(handle, size)) ? '\n' : '';
-        await handle.appendFile(`${separator}${line}`, 'utf8');
-      } finally {
-        await handle.close();
-      }
+      await appendFile(join(dir, `${missionId}.jsonl`), line, 'utf8');
     },
   };
 }
