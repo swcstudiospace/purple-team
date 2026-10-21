@@ -39,6 +39,7 @@ ARTIFACTS="$WORK/artifacts.ndjson"
 : >"$CHECKS"
 : >"$ARTIFACTS"
 RUN_COMPLETE=0
+RECORD_ERRORS=0
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -55,7 +56,7 @@ record_check() { # <id> <pass|fail|not-applicable> <detail> [exit_code]
   local exit_code="${4:-}"
   jq -cn --arg id "$1" --arg status "$2" --arg detail "$3" --arg exit_code "$exit_code" \
     '{id: $id, status: $status, detail: $detail}
-     + (if $exit_code == "" then {} else {exit_code: ($exit_code | tonumber)} end)' >>"$CHECKS"
+     + (if $exit_code == "" then {} else {exit_code: ($exit_code | tonumber)} end)' >>"$CHECKS" || RECORD_ERRORS=$((RECORD_ERRORS + 1))
   echo "[desktop-check] $1: $2 - $3"
 }
 
@@ -64,14 +65,14 @@ record_artifact() { # <kind> <path>
   sha="$(sha256sum "$2" | cut -d' ' -f1)"
   bytes="$(stat -c %s "$2")"
   jq -cn --arg kind "$1" --arg file "$(basename "$2")" --arg sha256 "$sha" --argjson bytes "$bytes" \
-    '{kind: $kind, file: $file, sha256: $sha256, bytes: $bytes}' >>"$ARTIFACTS"
+    '{kind: $kind, file: $file, sha256: $sha256, bytes: $bytes}' >>"$ARTIFACTS" || RECORD_ERRORS=$((RECORD_ERRORS + 1))
 }
 
 finish() {
   trap - EXIT
-  local overall=pass
-  if [ "$RUN_COMPLETE" != 1 ] || [ ! -s "$CHECKS" ] \
-    || jq -e -s 'any(.[]; .status == "fail")' "$CHECKS" >/dev/null; then
+  local overall=pass fails
+  fails="$(jq -s '[.[] | select(.status == "fail")] | length' "$CHECKS" 2>/dev/null || echo error)"
+  if [ "$RUN_COMPLETE" != 1 ] || [ "$RECORD_ERRORS" -ne 0 ] || [ ! -s "$CHECKS" ] || [ "$fails" != 0 ]; then
     overall=fail
   fi
   jq -n \
