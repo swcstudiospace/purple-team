@@ -1,5 +1,5 @@
 ---
-status: passed_with_open_validation
+status: human_needed
 phase: 36-fullscreen-agent-panel
 verified: 2026-10-21
 suite_observed: vitest src/__tests__ 127 files and 1553 tests passed; ui:typecheck clean; ui:build clean (main chunk 256.16 kB, Markdown split); browser check of the sandboxed GenUi frame under the tightened CSP passed; eslint clean on the changed TypeScript files

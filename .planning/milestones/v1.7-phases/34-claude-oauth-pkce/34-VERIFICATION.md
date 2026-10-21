@@ -1,5 +1,5 @@
 ---
-status: passed_with_open_validation
+status: human_needed
 phase: 34-claude-oauth-pkce
 verified: 2026-10-21
 score: 5 of 5 claimed deliverable groups confirmed in code; 1 manual gate open (R1)

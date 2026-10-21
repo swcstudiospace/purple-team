@@ -1,5 +1,5 @@
 ---
-status: passed_with_open_validation
+status: human_needed
 phase: 35-github-integration-repo-url
 verified: 2026-10-21
 suite_observed: vitest src/__tests__ 127 files and 1553 tests passed; ui:typecheck clean; ui:build clean; doctor exit 0; verify-claims 27 of 27; live ingest checks (5 cases) as recorded in 35-01-SUMMARY
