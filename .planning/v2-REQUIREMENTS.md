@@ -38,7 +38,7 @@ Status: planning. Owner decisions below are binding and resolve the grey-area no
 ## Phase 39: ROE verdict ledger and revision history
 
 - AC-39-01 PUT /api/teams/white/roe appends exactly one JSON line to `<stateRoot>/roe-ledger/<missionId>.jsonl`. Earlier lines are never rewritten, truncated or pruned.
-- AC-39-02 Revision numbers are contiguous per mission, starting at 1. Each new revision = last revision + 1.
+- AC-39-02 Revision numbers are contiguous per mission from the first line in the mission ledger file (amended by the orchestrator: a migrated ledger starts at the legacy revision N; revisions 1..N-1 are never fabricated). Each new revision = last revision + 1.
 - AC-39-03 Each line holds: schemaVersion, revision, missionId, textHash, actionsHash, text (redacted), actions, parseOk, verdicts (roeAudit snapshot at record time; [] when parse not ok), createdAt, recordedAt.
 - AC-39-04 PUT body may carry optional `missionId`; default `latest` (the existing single-slot scope). A supplied missionId must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`, otherwise 400. Never used unvalidated as a path segment.
 - AC-39-05 GET /api/teams/white/roe?missionId=<id> (default `latest`) returns the same response shape as today, derived from the newest revision. A missing ledger yields the cannot-derive report. A corrupt JSONL line is never skipped silently: the GET fails closed to cannot-derive and names the corrupt line number.
