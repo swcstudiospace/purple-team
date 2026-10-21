@@ -114,7 +114,8 @@ jobs:
         run: gh run download "$RUN_ID" --name desktop-linux --dir dist/linux
       - name: Install and launch check (headless ubuntu 22.04 container)
         env:
-          SOURCE_SHA: ${{ github.sha }}
+          # pull_request: the PR head commit that was built (github.sha is the merge ref). push: github.sha.
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           SOURCE_RUN_ID: ${{ github.run_id }}
           CI_ARTIFACT: desktop-linux
         run: |
