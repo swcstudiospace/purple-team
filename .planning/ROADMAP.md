@@ -20,7 +20,7 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 
 - [ ] Phase 37 (partly done): F-20-01 retargeted to shipped doctrine sources, 38/38 (33/38 measured 2026-10-21 before retargeting); stale v1.3 Nyquist prose refreshed; Phase 23 Tier-cell browser render observed and 23-VERIFICATION reconciled. Open: stray repo-root artifact (deletion not approved; left in place)
 - [x] Phase 38: Lint scope and gates — merged as PR #9 (b2671b4). F-25-01 closed: lint covers `src/**/*.ts` with 0 errors; per-rule budgets are blocking in doctor
-- [ ] Phase 39: ROE verdict ledger and revision history — owner decisions recorded: append-only JSONL ledger per mission (no SQLite, no migration framework); full ROE revision history kept, never pruned
+- [ ] Phase 39: ROE verdict ledger and revision history — merged in PR #13 (c704922); fix-forward follow-ups pending in a separate PR, not yet done. Owner decisions are in `.planning/v2-REQUIREMENTS.md`.
   - Requirements: .planning/v2-REQUIREMENTS.md
 - [ ] Phase 40: ROE text provenance and purple auto-consumption of recorded verdicts — owner decisions recorded: provenance on new ROE records only, no backfill (existing records marked unknown); purple auto-consumes recorded verdicts from the phase 39 ledger; depends on Phase 39
   - Requirements: .planning/v2-REQUIREMENTS.md
