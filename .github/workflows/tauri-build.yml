@@ -42,6 +42,8 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
+          # Build the PR head itself: pull_request checkouts default to the merge commit.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -63,6 +65,21 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           args: ${{ matrix.args }}
+      - name: Restore pre-linuxdeploy sidecar in AppImage
+        if: matrix.target == 'linux'
+        env:
+          # appimagetool 1.9.1 x86_64 release asset, pinned by sha256.
+          APPIMAGETOOL_SHA256: ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0
+        run: |
+          set -euo pipefail
+          tool="$RUNNER_TEMP/appimagetool"
+          curl -sfL -o "$tool" https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
+          echo "$APPIMAGETOOL_SHA256  $tool" | sha256sum -c -
+          chmod +x "$tool"
+          shopt -s nullglob
+          apps=(src-tauri/target/release/bundle/appimage/*.AppImage)
+          [ "${#apps[@]}" -eq 1 ] || { echo "expected one AppImage, found ${#apps[@]}"; exit 1; }
+          bash scripts/repack-linux-appimage.sh "${apps[0]}" src-tauri/binaries/t3mp3st-server-x86_64-unknown-linux-gnu "$tool"
       - name: Upload desktop bundles
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -75,6 +92,68 @@ jobs:
             src-tauri/target/release/bundle/**/*.msi
             src-tauri/target/release/bundle/**/*-setup.exe
             src-tauri/target/release/bundle/**/*.dmg
+
+  install-launch:
+    name: Install and launch (linux, headless container)
+    # Runs after the whole desktop matrix succeeds, so the linux .deb and AppImage exist.
+    needs: desktop
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+    env:
+      # Pinned by digest (ubuntu:22.04 index digest as pulled on 2026-10-21).
+      CONTAINER_IMAGE: ubuntu:22.04@sha256:0a9887931b0e38af2e3487ed39e29436b0535c4f3f52e57745baaf79d1898956
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Download Linux desktop bundles
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: gh run download "$RUN_ID" --name desktop-linux --dir dist/linux
+      - name: Install and launch check (headless ubuntu 22.04 container)
+        env:
+          # pull_request: the PR head commit that was built (github.sha is the merge ref). push: github.sha.
+          SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          SOURCE_RUN_ID: ${{ github.run_id }}
+          CI_ARTIFACT: desktop-linux
+        run: |
+          mkdir -p receipt
+          docker run --rm \
+            --env CONTAINER_IMAGE \
+            --env SOURCE_SHA \
+            --env SOURCE_RUN_ID \
+            --env CI_ARTIFACT \
+            --volume "$PWD/dist/linux:/artifacts:ro" \
+            --volume "$PWD/receipt:/receipt" \
+            --volume "$PWD/scripts/desktop-install-launch-check.sh:/check/desktop-install-launch-check.sh:ro" \
+            "$CONTAINER_IMAGE" \
+            bash /check/desktop-install-launch-check.sh /artifacts /receipt
+      - name: Job summary
+        if: always()
+        run: |
+          if [ -s receipt/summary.md ]; then
+            cat receipt/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Desktop install and launch (Linux, headless)"
+              echo ""
+              echo "No receipt was written: the container check stopped before completing."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload install-launch receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: desktop-install-launch-receipt
+          if-no-files-found: error
+          retention-days: 14
+          path: receipt/receipt.json
 
   ios:
     name: iOS init check (manual only)
