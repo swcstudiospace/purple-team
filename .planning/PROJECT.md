@@ -13,22 +13,12 @@ run authorized adversarial research with scope receipts, approval gates, and evi
 Every adversarial claim hardens into scoped, receipt-backed, retestable evidence — power without
 provenance is failure.
 
-## Current Milestone: v1.5 Four-Hat Runtime Parity
+## Current Milestone: v2 — Audit Follow-ups, Lint Gate & Deferred v2 Requirements
 
-**Goal:** Preserve Red functionality while making Blue, Black, and White comparably substantive and executable through tools, skills, prompts, mission/MCP integration, and the actual UI.
+**Goal:** Close the v1.4 audit tech debt, widen the lint gate to every file, and deliver the deferred v2 ROE and install-verification requirements.
 
-**Target features:**
-- Runtime-enforced role grants and complete mission support for all four hats and existing specialists.
-- Evidence-bound Blue detector/hardening validation, Black modeled tradecraft/route analysis, and White scope/provenance/dispute adjudication.
-- Substantive role-specific workflows and prompts, callable skills/tool contracts, and attributed runtime-connected UI states.
-- Four-hat parity matrix, Red regression, scope/authorization/error coverage, real localhost/API/browser proof, and audited milestone closure.
-
-**Approved:** User selected Full four-hat parity. Complexity means functional depth, not matching counts.
-**Boundaries:** Keep established analysis-first role doctrine; unrelated v1.4 audit/v2 debt below stays deferred.
-
-## Next Milestone: v2 (unplanned)
-
-**Candidates recorded at v1.4 close (audit 2026-10-13, owner-accepted):**
+**Approved:** Candidates recorded at v1.4 close (audit 2026-10-13, owner-accepted) and carried into v2 by the 2026-10-21 closeout. Phases 39–41 are grey areas and need owner decisions before execution.
+**Boundaries:** v1.5 gaps (Phase 29, FH-EXEC-4, the 72 pending AC/NFR rows) stay deferred until the owner schedules them. Keep the analysis-first role doctrine.
 
 Close-out follow-ups (v1.4 audit tech debt):
 - [ ] F-20-01 — `prompt:audit` red at the frozen v1.3 boundary (29/34; 5 UI-default-prompt checks), proven pre-existing; reconcile against the 39/39 claim's inputs

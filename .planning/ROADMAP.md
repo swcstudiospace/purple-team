@@ -8,26 +8,42 @@
 - ✅ **v1.3 Color Team Suites at Red Parity** — Phases 15-20 (shipped 2026-10-10)
 - ✅ **v1.4 Hardening & Validation** — Phases 21-25 (shipped 2026-10-13)
 - ✅ **v1.5 Four-Hat Runtime Parity** — Phases 26-29 (shipped 2026-10-15)
-- ✅ **v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization** — Phases 30-33 (completed 2026-10-15)
-- 🚀 **v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel** — Phases 34-36 (started 2026-10-19)
+- ✅ **v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization** — Phases 30-33 (completed 2026-10-15; archived 2026-10-21)
+- ✅ **v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel** — Phases 34-36 (shipped 2026-10-21 via PR #7; archived)
+- 🚀 **v2 Audit Follow-ups, Lint Gate & Deferred v2 Requirements** — Phases 37-41 (started 2026-10-21)
 
 Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREMENTS.md`, phase dirs in `v*-phases/`).
 
 ## Current Milestone
 
-🚀 **v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel (Phases 34-36)** — started 2026-10-19 (`SPE-15995`, `SPE-15994`, `SPE-15992`, `SPE-15993`)
+🚀 **v2 Audit Follow-ups, Lint Gate & Deferred v2 Requirements (Phases 37-41)** — started 2026-10-21. Scope is the candidate list recorded at v1.4 close in `.planning/PROJECT.md` (owner-accepted). Phases 39-41 are grey areas and need owner decisions before execution.
+
+- [ ] Phase 37: Audit follow-ups — F-20-01 `prompt:audit` red at 29/34; stale v1.3 Nyquist prose; Phase 23 manual remainder (operators.html Tier cell render; 23-VERIFICATION status reconciliation); stray repo-root artifact (owner approval before deletion)
+- [ ] Phase 38: Lint scope and gates — F-25-01 (18 never-linted files, 16 errors, 112 warnings); per-rule lint budgets; doctor-integrated lint gate
+- [ ] Phase 39: ROE verdict ledger and revision history — grey area, owner design decision needed
+- [ ] Phase 40: ROE text provenance and purple auto-consumption of recorded verdicts — grey area; depends on Phase 39
+- [ ] Phase 41: Install-and-launch verification of the built `.deb` / AppImage — environment-dependent
+
+<details>
+<summary>✅ v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel (Phases 34-36) — shipped 2026-10-21</summary>
 
 - [x] Phase 34: Claude Subscription OAuth (PKCE) — in-app Pro Max 20x login via Anthropic's public PKCE client, provider wiring, session tier UI (`SPE-15995`) — completed 2026-10-19 (manual live-login E2E pending, R1)
 - [x] Phase 35: GitHub Integration & Repository-URL Purple Team — account connection (private repos in scope), repo ingest pipeline, URL input replacing code snippets (`SPE-15994`, `SPE-15992`) — code shipped in 2c2feb5; verified + extended 2026-10-19 (zero-config device login, PAT connect, branch listing, repo-first Agent Panel entry; live E2E incl. real device-flow login and private/org repo listing)
 - [x] Phase 36: Full-screen Agent Panel & Generative UI Merge — viewport chat with conversation sidebar/history, inline run progress, sandboxed GenUi (`SPE-15993`) — code shipped in 2c2feb5; verified + repaired 2026-10-19 (GenUI sandbox boot fixed: opaque-origin CSP + anonymous CORS; single unified stream after 4-hat tab removal; Grok-style reskin)
 
+Archived: `.planning/milestones/v1.7-ROADMAP.md`, `.planning/milestones/v1.7-MILESTONE-AUDIT.md`, `.planning/milestones/v1.7-phases/`. Carried validation debt: R1 live Claude login; D2 mission-level run.
+
+</details>
+
 <details>
-<summary>✅ v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization (Phases 30-33) — completed 2026-10-15</summary>
+<summary>✅ v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization (Phases 30-33) — completed 2026-10-15; archived 2026-10-21</summary>
 
 - [x] Phase 30: Four-Hat Architecture Audit & Milestone Alignment (`SPE-14018`, `SPE-14023`) — completed 2026-10-15
 - [x] Phase 31: Unified 4-Hat Tool Registry, Blue/White/Black Tools, Extra Utilities & Composable Skills (`SPE-14019`, `SPE-14022`) — completed 2026-10-15
 - [x] Phase 32: Upgraded 4-Hat UI Shell, WCAG 2.1 AA Hat Theming, Command Palette & Interactive Workspace (`SPE-14020`) — completed 2026-10-15
 - [x] Phase 33: Desktop Multi-Pane & Native Mobile / PWA Ergonomics + Automated Verification (`SPE-14021`, `SPE-14024`) — completed 2026-10-15
+
+Archived: `.planning/milestones/v1.6-ROADMAP.md`, `.planning/milestones/v1.6-phases/` (phase 30 only). Phases 31-33 have no PLAN, SUMMARY or VERIFICATION file on any branch; completion is recorded here only.
 
 </details>
 
@@ -56,6 +72,6 @@ Known gaps carried forward: FH-EXEC-4 unmounted; all 72 AC/NFR rows still Pendin
 
 </details>
 
-## Deferred milestone candidates
+## Deferred (not in v2)
 
-The five v1.4 audit follow-ups, the deferred v2 requirements, FH-EXEC-4, and the still-Pending v1.5 requirement rows. Do not treat this archive as proof those rows passed.
+Owner-accepted gaps not scheduled into v2: Phase 29 (v1.5 integrated acceptance), FH-EXEC-4, and the 72 still-Pending v1.5 AC/NFR rows. Do not treat the v1.5 archive as proof those rows passed.
