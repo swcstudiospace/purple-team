@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { parseRepoTarget, type ParsedRepoTarget } from '../../../src/recon/repo-url';
 import { useSelectedRepo } from '../stores/github';
+import { startedRunIds, useConversationsStore } from '../stores/conversations';
 import './repo-run-config.css';
 /**
  * Hunt run configuration.
@@ -444,6 +445,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
         if ('runId' in record && typeof record.runId === 'string') summary.runId = record.runId;
         if ('missionName' in record && typeof record.missionName === 'string') summary.missionName = record.missionName;
       }
+      if (threadId !== undefined) useConversationsStore.getState().recordRunOwners(threadId, startedRunIds(body));
       setStarted(summary);
       onStarted?.(summary);
     } catch (err) {

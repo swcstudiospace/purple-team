@@ -8495,6 +8495,10 @@ function handleMissionReport(req: Request, res: Response): void {
       return;
     } catch (error: unknown) {
       if (error instanceof MissionNotFoundError) {
+        if (lastMissionReport && lastMissionReport.missionId === missionId) {
+          res.json({ success: true, missionId: lastMissionReport.missionId, report: lastMissionReport.report });
+          return;
+        }
         res.status(404).json({ error: error.message });
         return;
       }

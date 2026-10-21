@@ -25,7 +25,7 @@ import { ConversationSidebar } from './workbench/ConversationSidebar';
 import { SlashPalette } from './workbench/SlashPalette';
 import { AGENT_LABEL } from './workbench/agent-labels';
 import { readPrefs, savePrefs } from './workbench/prefs';
-import { useConversationsStore } from '../stores/conversations';
+import { startedRunIds, useConversationsStore } from '../stores/conversations';
 import { useSelectedRepo } from '../stores/github';
 import './agent-panel.css';
 import './workbench/workbench.css';
@@ -363,9 +363,9 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
     nextIdRef.current += 1;
     setTimelineOpen(true);
 
+    const thread = useConversationsStore.getState().activeId ?? 'unsynced';
     let finalArgs = args;
     if (spec.name === 'hunt' && !args.repoUrl) {
-      const thread = useConversationsStore.getState().activeId ?? 'unsynced';
       const { selected, isAttachedTo } = useSelectedRepo.getState();
       if (selected && isAttachedTo(thread)) {
         const repoUrl = `https://github.com/${selected.owner}/${selected.repo}${selected.ref && selected.ref !== 'HEAD' ? `/tree/${selected.ref}` : ''}`;
@@ -422,6 +422,9 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
           error: serverErrorMessage(bodyParsed, res),
         });
         return;
+      }
+      if (spec.name === 'hunt' && bodyParsed.ok) {
+        useConversationsStore.getState().recordRunOwners(thread, startedRunIds(bodyParsed.value));
       }
       let resultText: string | null = null;
       if (bodyParsed.ok && bodyParsed.value != null) {

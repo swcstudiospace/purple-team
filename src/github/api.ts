@@ -395,8 +395,7 @@ export async function resolveGitHubRepo(params: {
   onAuthFailure?: () => Promise<string | undefined>;
 }): Promise<GitHubRepoResolution> {
   const mode = params.token ? 'token' : 'anonymous';
-  const scope = params.subpath ? `/${params.subpath}` : '';
-  const cacheKey = `resolve:${mode}:${params.owner}/${params.repo}@${params.ref ?? ''}${scope}`;
+  const cacheKey = `resolve:${JSON.stringify([mode, params.owner, params.repo, params.ref ?? '', params.subpath ?? ''])}`;
   const cached = cacheGet(resolveCache, cacheKey);
   if (cached) return { ...cached };
 
@@ -411,22 +410,25 @@ export async function resolveGitHubRepo(params: {
       return call(fresh);
     }
   };
-  // Whether `branch` names a branch of this repo. A 404 means no; any other failure propagates.
-  const isBranch = async (branch: string): Promise<boolean> => {
+  // Whether the ref at `refPath` exists (a 404 means no; any other failure propagates).
+  const refExists = async (refPath: string): Promise<boolean> => {
     try {
-      await withAuthRetry((token) => ghApiGet(`${path}/branches/${encodeURIComponent(branch)}`, token, params.fetchImpl));
+      await withAuthRetry((token) => ghApiGet(refPath, token, params.fetchImpl));
       return true;
     } catch (e) {
       if (e instanceof GitHubApiError && e.httpStatus === 404) return false;
       throw e;
     }
   };
-  // The parser cannot tell where a slash branch ends, so probe the candidates in ingest order
-  // (shortest ref first) and keep the first that is a branch. No match keeps the parsed ref.
+  // The parser cannot tell where a slash ref ends, so probe the candidates in ingest order
+  // (shortest ref first). Each candidate checks a branch, then a tag, before a longer one is
+  // tried, mirroring the archive fetch, which accepts either. No match keeps the parsed ref.
   const resolveRef = async (ref: string, subpath: string): Promise<string> => {
     const canonical = `${params.owner}/${params.repo}@${ref}/${subpath}`;
     for (const candidate of slashBranchRefCandidates({ owner: params.owner, repo: params.repo, ref, subpath, canonical })) {
-      if (await isBranch(candidate.ref)) return candidate.ref;
+      const name = encodeURIComponent(candidate.ref);
+      if (await refExists(`${path}/branches/${name}`)) return candidate.ref;
+      if (await refExists(`${path}/git/ref/tags/${name}`)) return candidate.ref;
     }
     return ref;
   };

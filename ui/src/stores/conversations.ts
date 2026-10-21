@@ -32,6 +32,10 @@ interface ConversationsState {
   /** Thread whose reply is streaming right now (null when none); the sidebar gates export on it. */
   streamingThreadId: string | null;
   setStreaming: (threadId: string, streaming: boolean) => void;
+  /** Thread that started each run (runId or missionId → threadId). In memory only; not persisted across reloads. */
+  runOwners: Record<string, string>;
+  /** Records the thread that started these runs; the first owner of a runId is kept. */
+  recordRunOwners: (threadId: string, runIds: string[]) => void;
   /** Loads the list and guarantees an active conversation (creating one when empty). */
   load: (preferredId?: string | null) => Promise<void>;
   createAndActivate: () => Promise<void>;
@@ -110,6 +114,15 @@ export async function flushPendingSync(id: string): Promise<void> {
   await inFlightSyncs.get(id);
 }
 
+/** runId values a start response names: the run id and the mission id (mission ticks emit under the mission id). */
+export function startedRunIds(body: unknown): string[] {
+  if (body === null || typeof body !== 'object') return [];
+  const record: Record<string, unknown> = { ...body };
+  return ['runId', 'missionId']
+    .map(key => record[key])
+    .filter((value): value is string => typeof value === 'string' && value !== '');
+}
+
 export const useConversationsStore = create<ConversationsState>()((set, get) => ({
   metas: [],
   streamingThreadId: null,
@@ -119,6 +132,17 @@ export const useConversationsStore = create<ConversationsState>()((set, get) => 
     } else if (get().streamingThreadId === threadId) {
       set({ streamingThreadId: null });
     }
+  },
+  runOwners: {},
+  recordRunOwners: (threadId, runIds) => {
+    const owners = { ...get().runOwners };
+    let changed = false;
+    for (const runId of runIds) {
+      if (runId === '' || owners[runId] !== undefined) continue;
+      owners[runId] = threadId;
+      changed = true;
+    }
+    if (changed) set({ runOwners: owners });
   },
   activeId: null,
   status: 'idle',

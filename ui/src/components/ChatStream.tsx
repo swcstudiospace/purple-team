@@ -9,7 +9,7 @@ import {
   type Ref,
 } from 'react';
 import { DefaultChatTransport, type ChatStatus, type UIMessage } from 'ai';
-import { subscribePurpleRuns } from '../lib/events';
+import { subscribePurpleRuns, type PurpleRunEvent } from '../lib/events';
 import { AnnounceContext } from './chat/announce';
 import { Composer, getChatModelChoice, setChatModelChoice, type ChatModelChoice } from './chat/composer';
 import { MessageItem } from './chat/message';
@@ -277,14 +277,46 @@ function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNe
     [announce, setMessages],
   );
 
-  /** Inline run progress (§5): upsert data-purple-run parts from the shared SSE bus. */
-  useEffect(
-    () =>
-      subscribePurpleRuns(event => {
-        setMessages(prev => upsertPurpleRun(prev, event, Date.now()));
-      }),
-    [setMessages],
-  );
+  /**
+   * Inline run progress (§5): upsert data-purple-run parts for runs this thread started.
+   * Runs owned by another thread, or by no chat (Hats, direct API), never create cards.
+   * A start's events can arrive before its POST response records the owner, so events
+   * for a run with no owner yet wait here (bounded) and replay once the owner is recorded.
+   */
+  useEffect(() => {
+    const maxWaitingRuns = 50;
+    const maxWaitingEvents = 20;
+    const waiting = new Map<string, PurpleRunEvent[]>();
+    const apply = (event: PurpleRunEvent) => setMessages(prev => upsertPurpleRun(prev, event, Date.now()));
+    const unsubscribeEvents = subscribePurpleRuns(event => {
+      const owner = useConversationsStore.getState().runOwners[event.runId];
+      if (owner === threadId) {
+        apply(event);
+        return;
+      }
+      if (owner !== undefined) return;
+      const queue = waiting.get(event.runId) ?? [];
+      queue.push(event);
+      if (queue.length > maxWaitingEvents) queue.shift();
+      waiting.set(event.runId, queue);
+      if (waiting.size > maxWaitingRuns) {
+        const oldest = waiting.keys().next().value;
+        if (oldest !== undefined) waiting.delete(oldest);
+      }
+    });
+    const unsubscribeOwners = useConversationsStore.subscribe(state => {
+      for (const [runId, queue] of waiting) {
+        const owner = state.runOwners[runId];
+        if (owner === undefined) continue;
+        waiting.delete(runId);
+        if (owner === threadId) queue.forEach(apply);
+      }
+    });
+    return () => {
+      unsubscribeEvents();
+      unsubscribeOwners();
+    };
+  }, [threadId, setMessages]);
 
   /** Recomputes pinned state from the scroller's actual position. */
   const evaluatePin = useCallback(() => {
