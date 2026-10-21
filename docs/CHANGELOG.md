@@ -7,7 +7,7 @@
 - The out-of-scope `roeAudit` rationale names at most five allowed targets, each redacted and then cut at 64 characters, then `and N more`. The verdict, action index and conditions are unchanged. Redaction runs before the cut so a cut cannot strip the `@` that URL-credential redaction needs. A stored revision for a long allowed list was up to 47 times its request; it is now under twice.
 
 **Fixed**
-- A last line with no trailing newline stays a torn tail, and the store refuses it. Reads and `PUT` answer `409` with its line number, and the file is left unchanged. Restoring the trailing newline makes the ledger readable again, and the next `PUT` appends the next revision on its own line.
+- A last line with no trailing newline stays a torn tail, and the store refuses it. `PUT` and the history and single-revision reads answer `409` with its line number and leave the file unchanged. `GET /api/teams/white/roe` answers `200` with `ledger: { status: 'corrupt', line, reason }`. Restoring the trailing newline makes the ledger readable again, and the next `PUT` appends the next revision on its own line.
 - An existing but empty `latest.jsonl` is now treated as not yet migrated, so a legacy `latest` row is imported. A file holding only blank lines is not appended to.
 
 ## 2026-10-21 — Phase 39: ROE verdict ledger and revision history
