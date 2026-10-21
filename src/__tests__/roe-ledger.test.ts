@@ -20,6 +20,7 @@ import {
   provenanceOf,
   serializeLine,
   type LedgerAppendResult,
+  type LedgerRead,
   type MissionId,
   type RoeLedgerLine,
   type RoeLedgerStore,
@@ -215,30 +216,30 @@ describe('buildRevision', () => {
 describe('parseLedger', () => {
   it('reads an empty ledger and tolerates one trailing newline', () => {
     expect(parseLedger(LATEST, [])).toEqual({ ok: true, records: [] });
-    expect(parseLedger(LATEST, [serializeLine(first), ''])).toEqual({ ok: true, records: [first] });
+    expect(parseLedger(LATEST, [JSON.stringify(first), ''])).toEqual({ ok: true, records: [first] });
   });
 
   it.each([
-    ['a blank middle line', [serializeLine(first), '', serializeLine(second)], 2, 'blank line'],
-    ['a torn tail', [serializeLine(first), serializeLine(second).slice(0, 40)], 2, 'not valid JSON'],
-    ['a revision gap', [serializeLine(first), serializeLine(third)], 2, 'revision must be 2'],
+    ['a blank middle line', [JSON.stringify(first), '', JSON.stringify(second), ''], 2, 'blank line'],
+    ['a torn tail', [JSON.stringify(first), JSON.stringify(second).slice(0, 40)], 2, 'not valid JSON'],
+    ['a revision gap', [JSON.stringify(first), JSON.stringify(third), ''], 2, 'revision must be 2'],
     [
       'a tampered text',
-      [serializeLine(first), serializeLine({ ...second, text: 'scope: evil.com\nallow active: yes' })],
+      [JSON.stringify(first), JSON.stringify({ ...second, text: 'scope: evil.com\nallow active: yes' }), ''],
       2,
       'textHash',
     ],
-    ['a non-object line', [serializeLine(first), '[1,2]'], 2, 'not a JSON object'],
-    ['a foreign mission', [serializeLine({ ...first, missionId: 'other' })], 1, 'missionId'],
+    ['a non-object line', [JSON.stringify(first), '[1,2]', ''], 2, 'not a JSON object'],
+    ['a foreign mission', [JSON.stringify({ ...first, missionId: 'other' }), ''], 1, 'missionId'],
   ])('fails closed on %s and names line %i', (_label, lines, line, reason) => {
     expect(parseLedger(LATEST, lines)).toEqual({ ok: false, line, reason: expect.stringContaining(reason) });
   });
 
   it('accepts a provenance block only in the recorded shape', () => {
     const recorded = { ...first, provenance: { status: 'recorded', recordedAt: RECORDED_AT, source: 'api', recordedBy: null } };
-    expect(parseLedger(LATEST, [serializeLine(recorded as RoeLedgerLine)])).toMatchObject({ ok: true });
+    expect(parseLedger(LATEST, [JSON.stringify(recorded), ''])).toMatchObject({ ok: true });
     const malformed = { ...first, provenance: { status: 'unknown' } };
-    expect(parseLedger(LATEST, [serializeLine(malformed as RoeLedgerLine)])).toMatchObject({
+    expect(parseLedger(LATEST, [JSON.stringify(malformed), ''])).toMatchObject({
       ok: false,
       line: 1,
       reason: expect.stringContaining('provenance'),
@@ -398,5 +399,85 @@ describe('ledger views', () => {
     expect(getRevision([audited], 2)).toBeNull();
     expect(latestRevision([])).toBeNull();
     expect(latestRevision([first, audited])).toBe(audited);
+  });
+});
+
+describe('fail-closed on torn tails, malformed verdicts and prototype keys', () => {
+  const goodVerdict = {
+    actionIndex: 0,
+    verdict: 'compliant',
+    rationale: 'passive action within the allowed scope',
+    conditions: [],
+    roeRevision: 1,
+    roeTextHash: sha16(ROE_TEXT),
+    roeLines: [1],
+  };
+
+  it('treats a last line with no trailing newline as a torn tail named by its line number', () => {
+    expect(parseLedger(LATEST, [JSON.stringify(first)])).toEqual({
+      ok: false,
+      line: 1,
+      reason: expect.stringContaining('torn tail'),
+    });
+    expect(parseLedger(LATEST, [JSON.stringify(first), JSON.stringify(second)])).toEqual({
+      ok: false,
+      line: 2,
+      reason: expect.stringContaining('torn tail'),
+    });
+  });
+
+  it('fails a store read on a torn tail and leaves the file bytes unchanged', async () => {
+    const content = `${serializeLine(first)}${JSON.stringify(second)}`;
+    writeFileSync(join(dir, 'latest.jsonl'), content);
+    const store = createRoeLedgerStore(fsBackend(dir));
+    expect(await store.read(LATEST)).toEqual({
+      ok: false,
+      line: 2,
+      reason: expect.stringContaining('torn tail'),
+    });
+    expect(readFileSync(join(dir, 'latest.jsonl'), 'utf8')).toBe(content);
+  });
+
+  it('reports malformed stored verdicts as corrupt and never throws', () => {
+    const malformed: unknown[] = [
+      null,
+      'compliant',
+      { ...goodVerdict, verdict: 'constructor' },
+      { ...goodVerdict, verdict: 'approved' },
+      { ...goodVerdict, actionIndex: -1 },
+      { ...goodVerdict, conditions: [1] },
+      { ...goodVerdict, roeLines: [0] },
+      { ...goodVerdict, roeTextHash: undefined },
+    ];
+    for (const verdict of malformed) {
+      const raw = JSON.stringify({ ...first, verdicts: [verdict] });
+      let read: LedgerRead | undefined;
+      expect(() => {
+        read = parseLedger(LATEST, [raw, '']);
+      }).not.toThrow();
+      expect(read).toEqual({
+        ok: false,
+        line: 1,
+        reason: 'verdicts must be an array of stamped verdict objects',
+      });
+    }
+  });
+
+  it('accepts a line whose verdicts are well-formed stamped verdicts', () => {
+    const line = { ...first, verdicts: [goodVerdict] };
+    expect(parseLedger(LATEST, [JSON.stringify(line), ''])).toMatchObject({ ok: true, records: [{ revision: 1 }] });
+  });
+
+  it('refuses action objects with own __proto__, constructor or prototype keys', () => {
+    for (const key of ['__proto__', 'constructor', 'prototype']) {
+      const action = JSON.parse(`{"command":"ls","target":"example.com","${key}":{"x":1}}`);
+      expect(isValidRoeAction(action)).toBe(false);
+      const raw = JSON.stringify({ ...first, actions: [action] });
+      expect(parseLedger(LATEST, [raw, ''])).toEqual({
+        ok: false,
+        line: 1,
+        reason: 'actions must be an array of action objects',
+      });
+    }
   });
 });

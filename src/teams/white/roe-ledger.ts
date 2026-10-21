@@ -107,9 +107,18 @@ function hashHex16(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex').slice(0, 16);
 }
 
+/**
+ * Own keys that a plain-object copy (redaction, spread) does not reproduce faithfully. An action
+ * carrying one is refused so the saved action is exactly the redacted one that was hashed.
+ */
+const FORBIDDEN_ACTION_KEYS: readonly string[] = ['__proto__', 'constructor', 'prototype'];
+
 /** Validates one action object from a request or a stored line. Moved from server.ts. */
 export function isValidRoeAction(a: unknown): a is AuditedAction {
   if (!isPlainObject(a)) return false;
+  for (const key of FORBIDDEN_ACTION_KEYS) {
+    if (Object.hasOwn(a, key)) return false;
+  }
   if (a.command !== undefined && typeof a.command !== 'string') return false;
   if (a.target !== undefined && typeof a.target !== 'string') return false;
   if (a.approved !== undefined && typeof a.approved !== 'boolean') return false;
@@ -184,6 +193,30 @@ function isRecordedProvenance(value: unknown): value is RecordedProvenance {
   );
 }
 
+/** The verdict vocabulary roeAudit emits. listRevisions indexes its counts by this value. */
+const VERDICT_KINDS: readonly string[] = ['compliant', 'violation', 'needs_approval'];
+
+function isNonNegativeSafeInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+}
+
+/** Whether a stored verdict has the StampedVerdict shape. Anything else makes its line corrupt. */
+function isStampedVerdict(value: unknown): value is StampedVerdict {
+  return (
+    isPlainObject(value) &&
+    typeof value.verdict === 'string' &&
+    VERDICT_KINDS.includes(value.verdict) &&
+    isNonNegativeSafeInteger(value.actionIndex) &&
+    typeof value.rationale === 'string' &&
+    Array.isArray(value.conditions) &&
+    value.conditions.every((condition) => typeof condition === 'string') &&
+    isPositiveSafeInteger(value.roeRevision) &&
+    typeof value.roeTextHash === 'string' &&
+    Array.isArray(value.roeLines) &&
+    value.roeLines.every(isPositiveSafeInteger)
+  );
+}
+
 /** Applies validation rules 1 to 8 to one physical line. */
 function checkLine(missionId: string, raw: string, previousRevision: number | null): LineCheck {
   const fail = (reason: string): LineCheck => ({ ok: false, reason });
@@ -210,7 +243,9 @@ function checkLine(missionId: string, raw: string, previousRevision: number | nu
     return fail('actionsHash does not match the stored actions');
   }
   if (typeof value.parseOk !== 'boolean') return fail('parseOk must be a boolean');
-  if (!Array.isArray(value.verdicts)) return fail('verdicts must be an array');
+  if (!Array.isArray(value.verdicts) || !value.verdicts.every(isStampedVerdict)) {
+    return fail('verdicts must be an array of stamped verdict objects');
+  }
   if (typeof value.createdAt !== 'string' || typeof value.recordedAt !== 'string') {
     return fail('createdAt and recordedAt must be strings');
   }
@@ -223,16 +258,21 @@ function checkLine(missionId: string, raw: string, previousRevision: number | nu
 
 /**
  * Parse the physical lines of one mission ledger. The first failing rule wins and is reported
- * with its 1-based line number; no line after a corrupt one is returned. A single trailing
- * empty element (a final newline) is tolerated. Pure.
+ * with its 1-based line number; no line after a corrupt one is returned. Every line must end in a
+ * newline: a final element that is not empty is a torn tail and fails closed on its own line
+ * number, so no separator is added silently. Pure.
  */
 export function parseLedger(missionId: MissionId, lines: string[]): LedgerRead {
-  const body = lines.length > 0 && lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;
+  const terminated = lines.length === 0 || lines[lines.length - 1] === '';
+  const body = terminated ? lines.slice(0, -1) : lines;
   const records: RoeLedgerLine[] = [];
   for (let index = 0; index < body.length; index += 1) {
     const previousRevision = records.at(-1)?.revision ?? null;
     const check = checkLine(missionId, body[index], previousRevision);
     if (!check.ok) return { ok: false, line: index + 1, reason: check.reason };
+    if (!terminated && index === body.length - 1) {
+      return { ok: false, line: index + 1, reason: 'last line has no trailing newline (torn tail)' };
+    }
     records.push(check.line);
   }
   return { ok: true, records };
