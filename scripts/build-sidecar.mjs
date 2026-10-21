@@ -249,11 +249,6 @@ for (const input of parseArgs(process.argv.slice(2))) {
   if (rust) {
     const tauriPath = resolve(OUT_DIR, `${OUT_NAME}-${rust}${isWindows ? '.exe' : ''}`);
     copyFileSync(produced, tauriPath);
-    // Linux bundles map the sidecar by a triple-free path (src-tauri/tauri.linux.conf.json),
-    // so each Linux build also writes the bare name; with several Linux arches in one run, the last wins.
-    if (pkg.startsWith('linux-')) {
-      copyFileSync(produced, resolve(OUT_DIR, OUT_NAME));
-    }
     console.log(
       `[sidecar:build] ${pkg}: produced ${tauriPath} (Tauri externalBin name for this target)`,
     );
