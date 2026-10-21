@@ -17,6 +17,18 @@
 
 ---
 
+## v1.6 Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization (Completed: 2026-10-15; Archived: 2026-10-21)
+
+**Phases completed:** 4 phases (30–33). Only phase 30 has artifacts (1 plan, 1 summary). Phases 31–33 have no PLAN, SUMMARY or VERIFICATION file on any branch in git history.
+
+**Closeout:** Archived in the 2026-10-21 closeout run, after v1.7. The completion date is from ROADMAP.
+
+**Known gaps:** Artifacts for phases 31–33 are absent. v1.6 was never run through `milestone complete` at the time.
+
+**Archive:** `.planning/milestones/v1.6-ROADMAP.md`, `.planning/milestones/v1.6-phases/`.
+
+---
+
 ## v1.5 Four-Hat Runtime Parity (Archived: 2026-10-15)
 
 **Closeout:** `override_closeout`. Owner selected `Accept gaps and archive` on 2026-10-15. Phase 29 verification stays `human_needed`. Audit status `gaps_found`.

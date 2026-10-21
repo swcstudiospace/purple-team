@@ -1,43 +1,44 @@
 ---
 gsd_state_version: "1.0"
-milestone: v1.7
-status: Awaiting next milestone
-last_updated: "2026-10-21T02:47:29.209Z"
+milestone: v2
+milestone_name: Audit Follow-ups, Lint Gate & Deferred v2 Requirements
+status: Ready to plan phase 37
+last_updated: "2026-10-21T05:00:00.000Z"
 last_activity: 2026-10-21
-last_activity_desc: Milestone v1.7 completed and archived
-state_head: 892d287a70476ff1ef6acfcfd20263589864fbbb
+last_activity_desc: Closeout run — v1.6 archived, v1.7 closed (PR #7 merged), v2 bootstrapped
+state_head: 95c63331bce121c06d5bcb8c67567cd034db1231
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 3
-  completed_plans: 3
-milestone_name: GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel
-current_phase: 36
-current_phase_name: Full-screen Agent Panel & Generative UI Merge
-stopped_at: Milestone complete — pending R1 live-login validation note below
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
+current_phase: 37
+current_phase_name: Audit follow-ups
+stopped_at: v2 bootstrapped; phase 37 not yet planned
 ---
 
 # Project State
 
 ## Project Reference
 
-See: `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/v1.7-SURVEY.md`, `.planning/v1.7-EXECUTION-PLAN.md`, and `.planning/milestones/` for archived v1.0–v1.6 records.
+See: `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/milestones/` for archived v1.0–v1.7 records.
 
 **Core value:** Every adversarial claim hardens into scoped, receipt-backed, retestable evidence across all 4 Hats (Red, Blue, White, Black) with Purple synthesis.
-**Current focus:** Milestone v1.7 complete (phases 34-36) plus the 2026-10-19 login-first redesign on `v1.7-github-claude-agentpanel`.
+**Current focus:** Milestone v2 (phases 37-41). v1.6 and v1.7 are archived. PR #7 (v1.7) is merged to `main`.
 
 ## Current Position
 
-Phase: Milestone v1.7 complete
+Phase: 37 — Audit follow-ups (not started)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-10-21 — Milestone v1.7 completed and archived
+Status: Ready to plan phase 37
+Last activity: 2026-10-21 — v1.6 archived; v1.7 closed; v2 bootstrapped
 
 ## Completed Context (v1.7)
 
-- **Phase 34** (`SPE-15995`): `claude` OAuthVendor (S256 PKCE + state, pasted-callback, rotating refresh w/ single-flight, tier via profile, env-overridable endpoints), AnthropicAdapter Bearer+beta branch, OAuth-wins config hydration, `/api/oauth/claude/*` routes, settings session UI with tier badge. Artifacts: `.planning/phases/34-claude-oauth-pkce/`.
-- **Phase 35** (`SPE-15994`, `SPE-15992`): GitHub OAuth backend (web flow + token store + repo listing/resolve + tarball ingest + repoUrl mission start). Extended in the redesign wave: zero-config **device-flow login** (gh CLI public client id, `T3MP3ST_GITHUB_DEVICE_CLIENT_ID` override), PAT connect, branch listing; repo-first Agent Panel entry (account list w/ visibility filter + paste-URL resolve → configure → launch), conversation-scoped repo targets, composer paste capture. Live E2E: real device login, private+public org repos, anonymous resolve + mission ingest on expressjs/express.
-- **Phase 36** (`SPE-15993`): full-screen Agent Panel (sidebar/history/streaming/timeline). Redesign wave: 4-hat tab strip removed (single unified stream; tools/skills merged into the slash palette), Grok-style dark reskin, SPA Settings section (`#settings`) replacing the static-link nav, static Four Hats page removed. **GenUI sandbox boot repaired** — opaque-origin CSP self-block + anonymous-CORS fix; verified live render at auto-height.
+- **Phase 34** (`SPE-15995`): `claude` OAuthVendor (S256 PKCE + state, pasted-callback, rotating refresh w/ single-flight, tier via profile, env-overridable endpoints), AnthropicAdapter Bearer+beta branch, OAuth-wins config hydration, `/api/oauth/claude/*` routes, settings session UI with tier badge. Artifacts: `.planning/milestones/v1.7-phases/34-claude-oauth-pkce/`.
+- **Phase 35** (`SPE-15994`, `SPE-15992`): GitHub OAuth backend (web flow + token store + repo listing/resolve + tarball ingest + repoUrl mission start). Extended in the redesign wave: zero-config **device-flow login** (gh CLI public client id, `T3MP3ST_GITHUB_DEVICE_CLIENT_ID` override), PAT connect, branch listing; repo-first Agent Panel entry (account list w/ visibility filter + paste-URL resolve → configure → launch), conversation-scoped repo targets, composer paste capture. Live E2E: real device login, private+public org repos, anonymous resolve + mission ingest on expressjs/express. Artifacts: `.planning/milestones/v1.7-phases/35-github-integration-repo-url/`.
+- **Phase 36** (`SPE-15993`): full-screen Agent Panel (sidebar/history/streaming/timeline). Redesign wave: 4-hat tab strip removed (single unified stream; tools/skills merged into the slash palette), Grok-style dark reskin, SPA Settings section (`#settings`) replacing the static-link nav, static Four Hats page removed. **GenUI sandbox boot repaired** — opaque-origin CSP self-block + anonymous-CORS fix; verified live render at auto-height. Artifacts: `.planning/milestones/v1.7-phases/36-fullscreen-agent-panel/`.
 
 ## Redesign wave fixes (root causes of the "constant errors")
 
@@ -52,7 +53,8 @@ Last activity: 2026-10-21 — Milestone v1.7 completed and archived
 
 ## Operator Next Steps
 
-- R1 live Claude Pro/Max login: carried validation debt, accepted 2026-10-21. Run it through the Claude card. See `.planning/milestones/v1.7-phases/34-claude-oauth-pkce/34-VERIFICATION.md`.
-- D2 gate: mission-level public-URL run with saved artifacts, before the legacy snippet inputs are removed. See `.planning/milestones/v1.7-phases/35-github-integration-repo-url/35-VERIFICATION.md`.
-- Not shipped: `ultrathink-ship` (PR, Greptile review, merge) waits for an explicit go.
-- Start the next milestone with /gsd-new-milestone
+- Phase 37: the stray repo-root directory `Heads-up: while wiring GET ` needs your approval before deletion.
+- Phases 39–41 need owner design decisions before execution (ledger shape, provenance fields, install-verification environment).
+- PR #4 (`feat/purple-team-rebrand`) is stale (base is the v1.4-era main) and conflicts with main: decide merge, close or hold.
+- `feat/purple-team-platform` has 21 unmerged commits and no PR: decide whether to open one.
+- R1 live Claude Pro/Max login and the D2 mission-level run remain user-run validations.
