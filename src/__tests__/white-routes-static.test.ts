@@ -114,7 +114,10 @@ describe('white adjudication routes (source pins)', () => {
     const getBlock = roeHandler('getRoe');
     const corruptAt = getBlock.indexOf("status: 'corrupt'");
     expect(corruptAt, 'the GET block must name the corrupt ledger state').toBeGreaterThanOrEqual(0);
-    const corruptBranch = getBlock.slice(corruptAt, getBlock.indexOf('return;', corruptAt));
+    // The branch opens at its `if (!read.ok)` guard; `cannotDerive(` sits on the same emitted line as `status: 'corrupt'`.
+    const branchAt = getBlock.lastIndexOf('if (!read.ok)', corruptAt);
+    expect(branchAt, 'the corrupt branch must be guarded by !read.ok').toBeGreaterThanOrEqual(0);
+    const corruptBranch = getBlock.slice(branchAt, getBlock.indexOf('return;', corruptAt));
     expect(corruptBranch, 'the corrupt branch must answer the cannot-derive report').toContain('cannotDerive(');
     expect(corruptBranch, 'the corrupt branch must never yield verdicts').not.toContain('verdicts');
   });

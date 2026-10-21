@@ -306,10 +306,12 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
     expect((await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT })).status).toBe(400);
     expect((await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ['nope'] })).status).toBe(400);
 
-    const atCap = await request(m.base, 'PUT', '/api/teams/white/roe', { text: 'a'.repeat(ROE_BODY_CAP_BYTES), actions: [] });
+    // Word-separated filler: an unbroken 64 KiB token makes redactString's URL-userinfo rule quadratic (see the commit body).
+    const capText = 'a '.repeat(ROE_BODY_CAP_BYTES / 2);
+    const atCap = await request(m.base, 'PUT', '/api/teams/white/roe', { text: capText, actions: [] });
     expect(atCap.status).toBe(200);
     expect(atCap.body.ok).toBe(false);
-    const over = await request(m.base, 'PUT', '/api/teams/white/roe', { text: 'a'.repeat(ROE_BODY_CAP_BYTES + 1), actions: [] });
+    const over = await request(m.base, 'PUT', '/api/teams/white/roe', { text: `${capText}a`, actions: [] });
     expect(over.status).toBe(413);
     expect(over.body).toEqual({ error: 'ROE text exceeds the 64 KiB cap' });
     expect(ledgerLines(join(ledgerDir, 'latest.jsonl'))).toHaveLength(1);
@@ -367,7 +369,11 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
       expect(serverSource, route).toContain(route);
     }
     expect(serverSource.match(/['"`]\/teams\/white\/roe/g), 'no ROE route outside /api/').toBeNull();
-    expect(serverSource, 'the roeRecords slot is removed (ledger is the only ROE store)').not.toContain('roeRecords');
+    expect(serverSource, 'the in-memory roeRecords Map is removed (ledger is the only ROE store)').not.toContain('new Map<string, RoeRecord>');
+    const snapshotStart = serverSource.indexOf('function buildStateSnapshot(');
+    expect(snapshotStart, 'buildStateSnapshot must exist').toBeGreaterThanOrEqual(0);
+    const snapshotBody = serverSource.slice(snapshotStart, serverSource.indexOf('\n}\n', snapshotStart));
+    expect(snapshotBody, 'state.json snapshot must not carry a roeRecords key').not.toContain('roeRecords: [');
     expect(serverSource, 'startup imports the legacy row once').toContain('migrateLegacyLatest(roeLedgerBackend, legacyRoeRows)');
   });
 });
