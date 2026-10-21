@@ -82,6 +82,7 @@ describe('aggregateEslintResults', () => {
     });
 
     const passingBudgets = {
+      scope: 'src/**/*.ts',
       maxErrors: 0,
       rules: {
         '@typescript-eslint/no-explicit-any': { maxErrors: 1, maxWarnings: 1 },
@@ -92,6 +93,7 @@ describe('aggregateEslintResults', () => {
     expect(evaluateLintBudget(counts, passingBudgets)).toEqual({ ok: true, violations: [] });
 
     const failingBudgets = {
+      scope: 'src/**/*.ts',
       maxErrors: 0,
       rules: {
         '@typescript-eslint/no-explicit-any': { maxErrors: 0, maxWarnings: 0 },
