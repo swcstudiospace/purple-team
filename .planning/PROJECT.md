@@ -21,10 +21,10 @@ provenance is failure.
 **Boundaries:** v1.5 gaps (Phase 29, FH-EXEC-4, the 72 pending AC/NFR rows) stay deferred until the owner schedules them. Keep the analysis-first role doctrine.
 
 Close-out follow-ups (v1.4 audit tech debt):
-- [ ] F-20-01 — `prompt:audit` red at the frozen v1.3 boundary (29/34; 5 UI-default-prompt checks), proven pre-existing; reconcile against the 39/39 claim's inputs
-- [ ] Stale v1.3 audit Nyquist prose (`v1.3-MILESTONE-AUDIT.md` lines 66–70 still read "no VALIDATION.md") — refresh via normal planning
-- [ ] Phase 23 manual remainder — browser render of the operators.html Tier cell against a live server; reconcile the 23-VERIFICATION frontmatter/body status mismatch
-- [ ] F-25-01 (v2-lint-scope) — 18 never-linted files holding 16 errors + 112 warnings outside the measured 176/0 scope
+- [x] F-20-01 — `prompt:audit` red at the frozen v1.3 boundary (29/34; 5 UI-default-prompt checks), proven pre-existing; reconcile against the 39/39 claim's inputs. Reproducible baseline: 33/38 measured 2026-10-21 before retargeting; 38/38 after retargeting
+- [x] Stale v1.3 audit Nyquist prose (`v1.3-MILESTONE-AUDIT.md` lines 66–70 still read "no VALIDATION.md") — refreshed to cite the Phase 21 validation records
+- [x] Phase 23 manual remainder — browser render of the operators.html Tier cell observed against a live server (text `high`); 23-VERIFICATION reconciled
+- [x] F-25-01 (v2-lint-scope) — resolved in PR #9 (b2671b4): lint covers `src/**/*.ts`; 0 errors; per-rule budgets blocking in doctor
 - [ ] Stray repo-root artifact file `Heads-up: while wiring GET '` — delete or move on next touch
 
 Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
@@ -32,7 +32,7 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 - [ ] Purple auto-consumption of recorded verdicts
 - [ ] Text provenance (who/when/source) on ROE records
 - [ ] Install-and-launch verification of the built `.deb`/AppImage
-- [ ] Per-rule lint budgets and doctor-integrated lint gate
+- [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9)
 
 ## Requirements
 
@@ -67,7 +67,7 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 - [ ] Purple auto-consumption of recorded verdicts.
 - [ ] Text provenance (who/when/source) on ROE records.
 - [ ] Install-and-launch verification of the built `.deb`/AppImage.
-- [ ] Per-rule lint budgets and doctor-integrated lint gate.
+- [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9).
 
 ### Deferred (not in v2)
 

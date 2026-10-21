@@ -18,8 +18,8 @@ Archives: `.planning/milestones/` (per-milestone `v*-ROADMAP.md` / `v*-REQUIREME
 
 🚀 **v2 Audit Follow-ups, Lint Gate & Deferred v2 Requirements (Phases 37-41)** — started 2026-10-21. Scope is the candidate list recorded at v1.4 close in `.planning/PROJECT.md` (owner-accepted). Phases 39-41 are grey areas and need owner decisions before execution.
 
-- [ ] Phase 37: Audit follow-ups — F-20-01 `prompt:audit` red at 29/34; stale v1.3 Nyquist prose; Phase 23 manual remainder (operators.html Tier cell render; 23-VERIFICATION status reconciliation); stray repo-root artifact (owner approval before deletion)
-- [ ] Phase 38: Lint scope and gates — F-25-01 (18 never-linted files, 16 errors, 112 warnings); per-rule lint budgets; doctor-integrated lint gate
+- [ ] Phase 37 (partly done): F-20-01 retargeted to shipped doctrine sources, 38/38 (33/38 measured 2026-10-21 before retargeting); stale v1.3 Nyquist prose refreshed; Phase 23 Tier-cell browser render observed and 23-VERIFICATION reconciled. Open: stray repo-root artifact (deletion not approved; left in place)
+- [x] Phase 38: Lint scope and gates — merged as PR #9 (b2671b4). F-25-01 closed: lint covers `src/**/*.ts` with 0 errors; per-rule budgets are blocking in doctor
 - [ ] Phase 39: ROE verdict ledger and revision history — grey area, owner design decision needed
 - [ ] Phase 40: ROE text provenance and purple auto-consumption of recorded verdicts — grey area; depends on Phase 39
 - [ ] Phase 41: Install-and-launch verification of the built `.deb` / AppImage — environment-dependent
