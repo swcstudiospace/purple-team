@@ -105,8 +105,8 @@ import { opsecReview } from './teams/black/checklist.js';
 import { exfilCostModel, type RouteEvidence } from './teams/black/exfil.js';
 import { structuredNoiseBudget } from './teams/black/noise.js';
 import { runBlackWorkflow, type BlackWorkflowInput } from './teams/black/workflow.js';
-import { createRoeHandlers } from './teams/white/roe-routes.js';
-import { ROE_LEDGER_DIR, createRoeLedgerStore, fsBackend, memoryBackend, migrateLegacyLatest } from './teams/white/roe-ledger.js';
+import { createRoeHandlers, roeLedgerBackendFor } from './teams/white/roe-routes.js';
+import { createRoeLedgerStore, migrateLegacyLatest } from './teams/white/roe-ledger.js';
 import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
 import { type RoeVerdict } from './teams/white.js';
@@ -1007,9 +1007,7 @@ const purpleSyntheses = new Map<string, PurpleSynthesisRecord>();
  * <stateRoot>/roe-ledger, held in memory in the memory state mode. It is the only
  * ROE store; state.json carries no roeRecords slot.
  */
-const roeLedgerBackend = stateRoot() === 'memory'
-  ? memoryBackend()
-  : fsBackend(join(stateRoot(), ROE_LEDGER_DIR));
+const roeLedgerBackend = roeLedgerBackendFor(stateRoot());
 const roeStore = createRoeLedgerStore(roeLedgerBackend);
 /** Legacy state.json roeRecords rows, held only until the startup migration consumes them. */
 let legacyRoeRows: unknown;

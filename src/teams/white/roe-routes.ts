@@ -13,21 +13,34 @@ import type { Request, Response } from 'express';
 import { redactSecrets } from '../../redact.js';
 import { roeAudit, type AuditedAction } from '../white.js';
 import { parseRoe } from './roe-parser.js';
+import { join } from 'node:path';
 import {
+  ROE_LEDGER_DIR,
   buildRevision,
+  fsBackend,
   getRevision,
   isValidRoeAction,
   latestRevision,
   listRevisions,
+  memoryBackend,
   parseMissionId,
   type LedgerAppendResult,
   type LedgerRead,
   type MissionId,
+  type RoeLedgerBackend,
   type RoeLedgerStore,
 } from './roe-ledger.js';
 
 /** Body cap for ROE text, in utf8 bytes. */
 export const ROE_BODY_CAP_BYTES = 64 * 1024;
+
+/**
+ * The ledger backend for a state root: in-process memory for the memory state
+ * mode (root `memory`, no state directory), otherwise `<root>/roe-ledger`.
+ */
+export function roeLedgerBackendFor(root: string): RoeLedgerBackend {
+  return root === 'memory' ? memoryBackend() : fsBackend(join(root, ROE_LEDGER_DIR));
+}
 
 /** A positive decimal integer with no sign, leading zeros or exponent. */
 const REVISION_PARAM_RE = /^[1-9][0-9]*$/;

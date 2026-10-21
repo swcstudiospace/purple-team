@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import express from 'express';
 import { redactSecrets } from '../redact.js';
-import { createRoeHandlers, ROE_BODY_CAP_BYTES } from '../teams/white/roe-routes.js';
+import { createRoeHandlers, ROE_BODY_CAP_BYTES, roeLedgerBackendFor } from '../teams/white/roe-routes.js';
 import {
   createRoeLedgerStore,
   fsBackend,
@@ -357,6 +357,27 @@ describe('ROE routes over the verdict ledger (phase 39)', () => {
     expect((history.body.revisions as Array<Record<string, unknown>>).map((r) => r.revision)).toEqual([7]);
     const next = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
     expect(next.body.revision).toBe(8);
+  });
+
+  it('memory mode (T3MP3ST_STATE_DIR unset): PUT succeeds, writes no file under a memory directory, GET reads the revision from memory (AC-39-01)', async () => {
+    const savedStateDir = process.env.T3MP3ST_STATE_DIR;
+    delete process.env.T3MP3ST_STATE_DIR;
+    try {
+      // Mirrors server.ts stateRoot(): with the env unset the root is `memory`.
+      const root = process.env.T3MP3ST_STATE_DIR ? process.env.T3MP3ST_STATE_DIR : 'memory';
+      const m = await mount(createRoeLedgerStore(roeLedgerBackendFor(root)));
+      const put = await request(m.base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS });
+      expect(put.status).toBe(200);
+      expect(put.body.revision).toBe(1);
+      const get = await request(m.base, 'GET', '/api/teams/white/roe');
+      expect(get.body).toMatchObject({ ok: true, provenance: { revision: 1, textHash: put.body.textHash } });
+      expect(existsSync(join(process.cwd(), 'memory')), 'no memory directory is created on disk').toBe(false);
+    } finally {
+      if (savedStateDir === undefined) delete process.env.T3MP3ST_STATE_DIR;
+      else process.env.T3MP3ST_STATE_DIR = savedStateDir;
+    }
+    expect(serverSource, 'the server selects the ledger backend through the shared helper').toContain('roeLedgerBackendFor(stateRoot())');
+    expect(serverSource, 'stateRoot() keeps its memory fallback when the env is unset').toContain(": 'memory')");
   });
 
   it('caps the serialized actions payload at 64 KiB: one byte over is 413, the cap itself is accepted (Security F1)', async () => {
