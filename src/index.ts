@@ -759,7 +759,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
         cvss: finding.cvss,
         cve: finding.cve,
         cwe: finding.cwe,
-        exploitAvailable: finding.exploitedAt != null,
+        exploitAvailable: finding.exploitedAt !== null && finding.exploitedAt !== undefined,
         references: finding.references,
       });
     }
@@ -1054,7 +1054,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     const DEFAULT_TASK_TIMEOUT_MS = 300000; // 5 minutes — generous backstop, not a deadline
     const LOCAL_AGENT_TASK_TIMEOUT_MS = 1800000; // local CLI agents can need multiple slow turns
     const raw = process.env.T3MP3ST_TASK_TIMEOUT_MS;
-    if (raw != null && raw.trim() !== '') {
+    if (raw !== null && raw !== undefined && raw.trim() !== '') {
       const parsed = Number(raw);
       if (Number.isFinite(parsed) && parsed > 0) return parsed;
     }
@@ -1188,7 +1188,9 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
           const report = this.generateReport(mission.id);
           this.emit('scan:progress', { kind: 'report_ready', missionId: mission.id, reportLen: report.length });
           this.emit('tick', this.tickCount);
-        } catch {}
+        } catch {
+          // Best-effort: the mission is already completed, so a report or listener failure must not abort the tick loop; generateReport() stays callable on demand.
+        }
         return;
       }
     }
@@ -1315,16 +1317,16 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
       const startedAt = this.dispatchStartTimes.get(taskId);
       const operator = this.dispatchOperators.get(taskId);
 
-      const elapsed = startedAt != null ? now - startedAt : Number.POSITIVE_INFINITY;
+      const elapsed = startedAt !== null && startedAt !== undefined ? now - startedAt : Number.POSITIVE_INFINITY;
       const overTime = elapsed >= this.taskTimeoutMs;
 
       // Wedge symptom: operator claims to be working (executing/tasked) but has no
       // current task — the promise silently dropped it. Only treat this as a wedge
       // once the backstop window has elapsed, so a normal in-between-status tick
       // (e.g. the brief gap before currentTask is set) is never misread as hung.
-      const wedged = operator != null &&
+      const wedged = operator !== null && operator !== undefined &&
         (operator.status === 'executing' || operator.status === 'tasked') &&
-        operator.state.currentTask == null &&
+        (operator.state.currentTask === null || operator.state.currentTask === undefined) &&
         overTime;
 
       if (!overTime && !wedged) continue;
