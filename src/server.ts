@@ -105,10 +105,11 @@ import { opsecReview } from './teams/black/checklist.js';
 import { exfilCostModel, type RouteEvidence } from './teams/black/exfil.js';
 import { structuredNoiseBudget } from './teams/black/noise.js';
 import { runBlackWorkflow, type BlackWorkflowInput } from './teams/black/workflow.js';
-import { parseRoe } from './teams/white/roe-parser.js';
+import { createRoeHandlers, roeLedgerBackendFor } from './teams/white/roe-routes.js';
+import { createRoeLedgerStore, migrateLegacyLatest } from './teams/white/roe-ledger.js';
 import { auditEvidenceChain } from './teams/white/evidence-chain.js';
 import { auditReport } from './teams/white/report-auditor.js';
-import { roeAudit, type AuditedAction, type RoeVerdict } from './teams/white.js';
+import { type RoeVerdict } from './teams/white.js';
 import { stageRoeAudit, type ApprovalBearingAction, type RoeStageMeta } from './teams/white/workflow.js';
 import {
   listRegisteredHatTools,
@@ -1001,18 +1002,15 @@ interface PurpleSynthesisRecord {
 }
 const purpleSyntheses = new Map<string, PurpleSynthesisRecord>();
 
-/** Sanctioned ROE text on record — one slot, overwritten per PUT (mirrors purpleSyntheses). */
-interface RoeRecord {
-  id: string;
-  revision: number;
-  textHash: string;
-  actionsHash: string;
-  text: string;
-  actions: AuditedAction[];
-  createdAt: string;
-  updatedAt: string;
-}
-const roeRecords = new Map<string, RoeRecord>();
+/**
+ * ROE verdict ledger (phase 39): append-only JSONL per mission under
+ * <stateRoot>/roe-ledger, held in memory in the memory state mode. It is the only
+ * ROE store; state.json carries no roeRecords slot.
+ */
+const roeLedgerBackend = roeLedgerBackendFor(stateRoot());
+const roeStore = createRoeLedgerStore(roeLedgerBackend);
+/** Legacy state.json roeRecords rows, held only until the startup migration consumes them. */
+let legacyRoeRows: unknown;
 
 /** Reports now via missionReports map + lastMissionReport (set on generate at end/stop and on /report calls). */
 /**
@@ -1477,7 +1475,6 @@ function buildStateSnapshot(): Record<string, unknown> {
     memoryCapsule: [...memoryCapsule.values()],
     memoryProposals: [...memoryProposals.values()],
     purpleSyntheses: [...purpleSyntheses.values()],
-    roeRecords: [...roeRecords.values()],
     observedReceipts: [...observedReceipts.values()],
     operatorTaskRuns: [...operatorTaskRuns.values()],
   };
@@ -1574,7 +1571,7 @@ async function loadPersistedState(): Promise<void> {
     replaceMapContents(memoryCapsule, state.memoryCapsule);
     replaceMapContents(memoryProposals, state.memoryProposals);
     replaceMapContents(purpleSyntheses, state.purpleSyntheses);
-    replaceMapContents(roeRecords, state.roeRecords);
+    legacyRoeRows = state.roeRecords;
     // Observed receipts: drop any forged origin:observed row lacking its full
     // observation binding (tool, stage, inputSha256, runId, missionId). Absent
     // slot restores as empty — the replace is absent-tolerant.
@@ -7225,133 +7222,16 @@ app.get('/api/teams/black/noise', (_req: Request, res: Response): void => {
 // Responses reuse the ledger read-time serialization (redactSecrets).
 // =============================================================================
 
-// PUT /api/teams/white/roe — record sanctioned ROE text plus the actions to
-// adjudicate (locked decision: actions stored WITH the record; verdicts are
-// computed on read). Single-slot replace-latest semantics mirroring
-// purpleSyntheses: every PUT overwrites the 'latest' record with
-// revision = previous + 1 and createdAt preserved across overwrites.
-// revision/textHash are stamped at PUT and emitted from stored fields only —
-// persistState redactSecrets-wraps the snapshot, so the text on disk is the
-// redacted text and a GET-time recompute would drift from the stamp.
-// The 64 KiB cap is an explicit in-handler utf8 byte check on the text field
-// (the global 10mb parser already consumed the stream, so a route-scoped
-// parser would be a no-op). Mounts under /api/* so the early-mounted
-// createRemoteGuard bearer check covers it on non-loopback with zero new
-// security code; PUT is in STATE_CHANGING_METHODS so the loopback
-// CSRF/Origin guard covers it too.
-const ROE_BODY_CAP_BYTES = 64 * 1024;
-function isValidRoeAction(a: unknown): a is AuditedAction {
-  if (!a || typeof a !== 'object' || Array.isArray(a)) return false;
-  const rec = a as Record<string, unknown>;
-  if (rec.command !== undefined && typeof rec.command !== 'string') return false;
-  if (rec.target !== undefined && typeof rec.target !== 'string') return false;
-  if (rec.approved !== undefined && typeof rec.approved !== 'boolean') return false;
-  if (rec.scope !== undefined && (!Array.isArray(rec.scope) || rec.scope.some((s) => typeof s !== 'string'))) return false;
-  return true;
-}
-app.put('/api/teams/white/roe', (req: Request, res: Response): void => {
-  const body = (req.body ?? {}) as Record<string, unknown>;
-  const text = body.text;
-  const actions = body.actions;
-  if (typeof text !== 'string' || text.length === 0) {
-    res.status(400).json({ error: 'text must be a non-empty string' });
-    return;
-  }
-  if (!Array.isArray(actions) || actions.some((a) => !a || typeof a !== 'object' || Array.isArray(a) || !isValidRoeAction(a))) {
-    res.status(400).json({ error: 'actions must be an array of action objects' });
-    return;
-  }
-  if (Buffer.byteLength(text, 'utf8') > ROE_BODY_CAP_BYTES) {
-    res.status(413).json({ error: 'ROE text exceeds the 64 KiB cap' });
-    return;
-  }
-  const previous = roeRecords.get('latest');
-  const prevRevision =
-    typeof previous?.revision === 'number' && Number.isFinite(previous.revision)
-      ? Math.floor(previous.revision)
-      : 0;
-  const record: RoeRecord = {
-    id: 'latest',
-    revision: prevRevision + 1,
-    textHash: createHash('sha256').update(text, 'utf8').digest('hex').slice(0, 16),
-    actionsHash: createHash('sha256').update(JSON.stringify(actions), 'utf8').digest('hex').slice(0, 16),
-    text,
-    actions: actions as AuditedAction[],
-    createdAt: typeof previous?.createdAt === 'string' ? previous.createdAt : nowIso(),
-    updatedAt: nowIso(),
-  };
-  roeRecords.set('latest', record);
-  emitContractEvent('white.roe.on-record', {
-    revision: record.revision,
-    textHash: record.textHash,
-    actions: record.actions.length,
-  });
-  const putParse = parseRoe(record.text);
-  // First honest observed-receipt hook (Phase 26, D-receipts): a successful
-  // parseRoe IS a real computation returning, so it mints one observed
-  // receipt bound to the parsed text. Parse failure mints nothing; GET
-  // handlers never mint.
-  if (putParse.ok) {
-    recordReceipt({
-      runId: `roe-rev-${record.revision}`,
-      missionId: 'roe-record',
-      stage: 'parse',
-      tool: 'parseRoe',
-      inputSha256: record.textHash,
-      itemId: record.id,
-    });
-  }
-  res.json(redactSecrets({ revision: record.revision, textHash: record.textHash, ok: putParse.ok, summary: putParse.summary }));
-});
-
-// GET /api/teams/white/roe — structured parse of the on-record ROE text
-// (teams/white/roe-parser.ts parseRoe) plus roeAudit verdicts over the stored
-// actions when and only when the parse is ok:true. Fail-closed ladder, always
-// 200: no record or a shapeless record (text not a string, actions not an
-// element-valid array of objects, revision/timestamps not finite scalars —
-// the replaceMapContents restore silently drops id-less rows into this same
-// state) returns the honest zeroed parse; a record whose stored
-// textHash no longer matches the stored text (write-time-redaction drift)
-// returns the same cannot-derive report with no verdicts member; an ok:false
-// parse returns parse plus provenance with no verdicts member; only an
-// ok:true parse returns parse plus provenance plus verdicts, each stamped
-// with the stored revision, the stored textHash, and parse.resolved line
-// refs. Never continue with an empty spec: ok:false never yields verdicts.
-app.get('/api/teams/white/roe', (_req: Request, res: Response): void => {
-  const record = roeRecords.get('latest');
-  const storedActions: unknown = record?.actions;
-  const actionsOk =
-    Array.isArray(storedActions) &&
-    !(storedActions as unknown[]).some((a) => !a || typeof a !== 'object' || Array.isArray(a)) &&
-    (storedActions as unknown[]).every(isValidRoeAction);
-  const revisionOk = typeof record?.revision === 'number' && Number.isFinite(record.revision);
-  const timestampsOk = typeof record?.createdAt === 'string' && typeof record?.updatedAt === 'string';
-  if (!record || typeof record.text !== 'string' || !actionsOk || !revisionOk || !timestampsOk) {
-    const parse = { ...parseRoe(''), summary: 'no ROE text on record' };
-    res.json(redactSecrets(parse));
-    return;
-  }
-  const recomputed = createHash('sha256').update(record.text, 'utf8').digest('hex').slice(0, 16);
-  const recomputedActions = createHash('sha256').update(JSON.stringify(record.actions), 'utf8').digest('hex').slice(0, 16);
-  if (recomputed !== record.textHash || recomputedActions !== record.actionsHash) {
-    const parse = { ...parseRoe(''), summary: 'no ROE text on record' };
-    res.json(redactSecrets(parse));
-    return;
-  }
-  const parse = parseRoe(record.text);
-  const provenance = { revision: record.revision, textHash: record.textHash, recordedAt: record.updatedAt };
-  if (!parse.ok) {
-    res.json(redactSecrets({ ...parse, provenance }));
-    return;
-  }
-  const verdicts = roeAudit(record.actions, parse.roe).map((v) => ({
-    ...v,
-    roeRevision: record.revision,
-    roeTextHash: record.textHash,
-    roeLines: parse.resolved.map((r) => r.line),
-  }));
-  res.json(redactSecrets({ ...parse, provenance, verdicts }));
-});
+// ROE routes (phase 39). Handlers live in teams/white/roe-routes.ts over the
+// append-only verdict ledger (teams/white/roe-ledger.ts): one JSONL file per
+// mission at <stateRoot>/roe-ledger/<missionId>.jsonl. Every route stays under
+// /api/*, so createRemoteGuard (bearer) and the CSRF/Origin guard cover them with
+// no exemption. PUT appends one revision; GET derives the report from the newest.
+const roeRoutes = createRoeHandlers({ store: roeStore, emitContractEvent, recordReceipt });
+app.put('/api/teams/white/roe', roeRoutes.putRoe);
+app.get('/api/teams/white/roe', roeRoutes.getRoe);
+app.get('/api/teams/white/roe/revisions', roeRoutes.getRoeRevisions);
+app.get('/api/teams/white/roe/revisions/:revision', roeRoutes.getRoeRevision);
 
 // GET /api/teams/white/evidence — replay-chain audit over the receipt ledger
 // (teams/white/evidence-chain.ts auditEvidenceChain): every entry must carry
@@ -10177,6 +10057,13 @@ async function startServer() {
   console.log('');
 
   await loadPersistedState();
+  // Import the legacy state.json roeRecords row into the ledger once (no-op when the
+  // mission ledger already exists). The legacy rows are dropped from memory after this.
+  if (legacyRoeRows !== undefined) {
+    const migration = await migrateLegacyLatest(roeLedgerBackend, legacyRoeRows);
+    legacyRoeRows = undefined;
+    if (migration === 'imported') schedulePersist('roe.ledger.migrated');
+  }
 
   // Install the outbound SOCKS5 proxy (if TEMPEST_PROXY_URL / saved settings define one)
   // BEFORE anything makes outbound calls, so all test/attack fetch() egress is covered.

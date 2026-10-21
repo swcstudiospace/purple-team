@@ -3,11 +3,13 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const serverSource = readFileSync(join(process.cwd(), 'src/server.ts'), 'utf8');
+// Phase 39: server.ts keeps the ROE route literals and delegates; the handler
+// bodies live in roe-routes.ts over the append-only ledger (roe-ledger.ts).
+const roeRoutesSource = readFileSync(join(process.cwd(), 'src/teams/white/roe-routes.ts'), 'utf8');
 
 const WHITE_ROUTES = ['/api/teams/white/roe', '/api/teams/white/evidence', '/api/teams/white/report-audit'];
-// /roe reads the sanctioned single-slot roeRecords store (written by PUT,
-// read by GET). /evidence and /report-audit read the ledgers. No other
-// store may source a white audit.
+// /roe reads and appends the per-mission ROE ledger through roe-routes.ts.
+// /evidence and /report-audit read the ledgers. No other store may source a white audit.
 const LEDGER_SOURCED_ROUTES = ['/api/teams/white/evidence', '/api/teams/white/report-audit'];
 
 function quotedPathCount(path: string): number {
@@ -25,6 +27,16 @@ function routeBlock(path: string, verb = 'get'): string {
   const end = serverSource.indexOf('\n});', start);
   expect(end, `unterminated route block for ${path}`).toBeGreaterThan(start);
   return serverSource.slice(start, end);
+}
+
+/** One ROE handler body in roe-routes.ts, from its declaration to the next handler or the return. */
+function roeHandler(name: string): string {
+  const start = roeRoutesSource.indexOf(`async function ${name}(`);
+  expect(start, `missing ROE handler ${name}`).toBeGreaterThanOrEqual(0);
+  const tail = roeRoutesSource.slice(start + 1);
+  const ends = ['\n  async function ', '\n  return {'].map((marker) => tail.indexOf(marker)).filter((at) => at >= 0);
+  const end = ends.length > 0 ? start + 1 + Math.min(...ends) : roeRoutesSource.length;
+  return roeRoutesSource.slice(start, end);
 }
 
 describe('white adjudication routes (source pins)', () => {
@@ -45,15 +57,17 @@ describe('white adjudication routes (source pins)', () => {
   });
 
   it('never answers 500 from a white route block (empty state stays a 200 honest report)', () => {
-    for (const route of WHITE_ROUTES) {
+    for (const route of LEDGER_SOURCED_ROUTES) {
       expect(routeBlock(route), `${route} must not answer 500`).not.toContain('res.status(500');
     }
-    expect(routeBlock('/api/teams/white/roe', 'put'), 'roe PUT must not answer 500').not.toContain('res.status(500');
+    for (const handler of ['putRoe', 'getRoe', 'getRoeRevisions', 'getRoeRevision']) {
+      expect(roeHandler(handler), `roe ${handler} must not answer 500`).not.toContain('res.status(500');
+    }
   });
 
   it('white route blocks consume the landed white v2 engine exports', () => {
-    expect(routeBlock('/api/teams/white/roe')).toContain('parseRoe(');
-    expect(routeBlock('/api/teams/white/roe'), 'roe GET derives verdicts through roeAudit').toContain('roeAudit(');
+    expect(roeHandler('getRoe')).toContain('parseRoe(');
+    expect(roeHandler('getRoe'), 'roe GET derives verdicts through roeAudit').toContain('roeAudit(');
     expect(routeBlock('/api/teams/white/evidence')).toContain('auditEvidenceChain(');
     expect(routeBlock('/api/teams/white/report-audit')).toContain('auditReport(');
   });
@@ -70,47 +84,51 @@ describe('white adjudication routes (source pins)', () => {
     }
   });
 
-  it('the roe PUT owns the sanctioned store and the roe GET never mutates it', () => {
-    expect(serverSource, 'the sanctioned ROE store must exist').toContain('roeRecords');
-    const putBlock = routeBlock('/api/teams/white/roe', 'put');
-    const getBlock = routeBlock('/api/teams/white/roe');
-    expect(putBlock, 'only the PUT block may write the sanctioned store').toContain('roeRecords.set');
-    expect(getBlock, 'a read-only audit must never write the store').not.toContain('roeRecords.set');
-    expect(getBlock, 'no second ROE store may be invented').not.toContain('roeLedger');
+  it('only the ROE PUT appends to the ROE ledger, and the roe GET never writes', () => {
+    expect(roeRoutesSource.split('store.append(').length - 1, 'exactly one append site in the ROE routes').toBe(1);
+    expect(roeHandler('putRoe'), 'the PUT is the append site').toContain('store.append(');
+    const getBlock = roeHandler('getRoe');
+    expect(getBlock, 'a read-only audit must never append').not.toContain('append(');
     expect(getBlock, 'no store mutation from a read-only audit').not.toContain('missionDrafts.set');
-    expect(getBlock, 'the empty state must be named, not hidden').toContain('no ROE text on record');
+    expect(roeRoutesSource, 'the empty state must be named, not hidden').toContain('no ROE text on record');
   });
 
-  it('the stored record carries revision identity', () => {
-    expect(routeBlock('/api/teams/white/roe', 'put'), 'the record construction must stamp revision').toContain('revision:');
+  it('the PUT response stamps revision identity', () => {
+    expect(roeHandler('putRoe'), 'the PUT response must carry the stamped revision').toContain('revision: line.revision');
   });
 
   it('the roe GET gates verdicts behind the ok check', () => {
-    const getBlock = routeBlock('/api/teams/white/roe');
+    const getBlock = roeHandler('getRoe');
     expect(getBlock, 'the ok gate must precede verdict construction').toContain('parse.ok');
     expect(getBlock.slice(getBlock.indexOf('parse.ok')), 'verdicts are built only after the ok gate').toContain('roeAudit(');
   });
 
   it('the roe PUT refuses an empty-string text body with 400 and caps oversize text with 413', () => {
-    const putBlock = routeBlock('/api/teams/white/roe', 'put');
+    const putBlock = roeHandler('putRoe');
     expect(putBlock, 'empty-string text must be refused').toContain('text must be a non-empty string');
     expect(putBlock, 'empty-string text answers 400').toContain('res.status(400)');
     expect(putBlock, 'oversize text answers 413').toContain('res.status(413)');
   });
 
-  it('a hash-mismatched record falls to the cannot-derive report with no verdicts member', () => {
-    const getBlock = routeBlock('/api/teams/white/roe');
-    const mismatchAt = getBlock.indexOf('recomputed !== record.textHash');
-    expect(mismatchAt, 'the GET block must recompute-and-compare the text hash').toBeGreaterThanOrEqual(0);
-    const mismatchBranch = getBlock.slice(mismatchAt, getBlock.indexOf('return;', mismatchAt));
-    expect(mismatchBranch, 'the mismatch branch must name the empty state').toContain('no ROE text on record');
-    expect(mismatchBranch, 'the mismatch branch must never yield verdicts').not.toContain('verdicts');
+  it('a corrupt ledger falls to the cannot-derive report with no verdicts member', () => {
+    const getBlock = roeHandler('getRoe');
+    const corruptAt = getBlock.indexOf("status: 'corrupt'");
+    expect(corruptAt, 'the GET block must name the corrupt ledger state').toBeGreaterThanOrEqual(0);
+    // The branch opens at its `if (!read.ok)` guard; `cannotDerive(` sits on the same emitted line as `status: 'corrupt'`.
+    const branchAt = getBlock.lastIndexOf('if (!read.ok)', corruptAt);
+    expect(branchAt, 'the corrupt branch must be guarded by !read.ok').toBeGreaterThanOrEqual(0);
+    const corruptBranch = getBlock.slice(branchAt, getBlock.indexOf('return;', corruptAt));
+    expect(corruptBranch, 'the corrupt branch must answer the cannot-derive report').toContain('cannotDerive(');
+    expect(corruptBranch, 'the corrupt branch must never yield verdicts').not.toContain('verdicts');
   });
 
   it('every roe emission path is redaction-wrapped', () => {
-    const putEmissions = routeBlock('/api/teams/white/roe', 'put').split('redactSecrets(').length - 1;
-    expect(putEmissions, 'the PUT success emission must be redaction-wrapped').toBe(1);
-    const getEmissions = routeBlock('/api/teams/white/roe').split('redactSecrets(').length - 1;
-    expect(getEmissions, 'all four GET emission paths must be redaction-wrapped').toBe(4);
+    const putBlock = roeHandler('putRoe');
+    expect(putBlock, 'the PUT success emission must be redaction-wrapped').toContain('res.json(redactSecrets({');
+    const getBlock = roeHandler('getRoe');
+    const emitted = getBlock.split('.json(').length - 1;
+    const wrapped = getBlock.split('.json(redactSecrets(').length - 1;
+    expect(wrapped, 'every GET emission path must be redaction-wrapped').toBe(emitted);
+    expect(emitted, 'the GET must have emission paths to wrap').toBeGreaterThan(0);
   });
 });

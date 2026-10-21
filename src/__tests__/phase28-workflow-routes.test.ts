@@ -89,7 +89,9 @@ describe('phase 28 workflow routes (source pins)', () => {
     for (const route of POST_ROUTES) {
       expect(routeBlock(route), `${route} must not mint receipts`).not.toContain('recordReceipt');
     }
-    expect(serverSource.split('recordReceipt(').length - 1, 'no new recordReceipt call sites (definition + ROE PUT writer only)').toBe(2);
+    const roeRoutesSource = readFileSync(join(process.cwd(), 'src/teams/white/roe-routes.ts'), 'utf8');
+    const receiptCallSites = (serverSource + roeRoutesSource).split('recordReceipt(').length - 1;
+    expect(receiptCallSites, 'no new recordReceipt call sites (definition in server.ts + ROE PUT writer in roe-routes.ts only)').toBe(2);
   });
 });
 

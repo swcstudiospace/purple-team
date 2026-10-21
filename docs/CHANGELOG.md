@@ -1,5 +1,30 @@
 # Purple Team Changelog
 
+## 2026-10-21 — Phase 39: ROE verdict ledger and revision history
+
+**New**
+- ROE text is an append-only verdict ledger. Each `PUT /api/teams/white/roe` appends one JSONL line to `<stateRoot>/roe-ledger/<missionId>.jsonl`. Earlier lines are never rewritten, truncated or pruned. Each line stores the redacted text and actions, the hashes, the `parseRoe` outcome, and the `roeAudit` verdicts at record time.
+- `missionId` (query on GET, body field on PUT) selects a mission ledger. It defaults to `latest` and must match `^[a-z0-9][a-z0-9_-]{0,63}$` (lowercase only); Windows device names (`con`, `prn`, `aux`, `nul`, `com1`-`com9`, `lpt1`-`lpt9`) are refused in any letter case. Anything else answers `400`.
+- `GET /api/teams/white/roe/revisions` lists the full revision history (per-revision hashes, timestamps, parse outcome and verdict counts). `GET /api/teams/white/roe/revisions/:revision` returns one full revision; an unknown revision answers `404`.
+- `PUT /api/teams/white/roe` also answers `missionId` next to `revision` and `textHash`.
+
+**Changed (breaking)**
+- `roeRecords` is removed from `state.json`; the ledger is the only ROE store. At startup a legacy `latest` row is imported once as its existing revision number, with its `textHash`, `actionsHash` and `createdAt` preserved. A legacy row whose stored hashes do not match its text is not imported: the migration logs a warning with the reason, and `GET /api/teams/white/roe` reports cannot-derive as it did before.
+- Ledger path: `<stateRoot>/roe-ledger/<missionId>.jsonl`. In memory state mode the ledger is held in memory, as the old slot was.
+- A corrupt ledger line fails the mission closed: GET answers cannot-derive with `ledger: { status: 'corrupt', line, reason }`, PUT answers `409` and appends nothing, and the history routes answer `409`.
+- Hashes are computed over the redacted text and actions. Secret-free text keeps the same `textHash`; text that contained a secret now hashes differently.
+- `PUT /api/teams/white/roe` refuses an `actions` payload whose serialized JSON exceeds 64 KiB utf8 bytes with `413`, the same cap as the text. Earlier releases accepted any size.
+- `PUT /api/teams/white/roe` refuses an action object with an own `__proto__`, `constructor` or `prototype` key with `400`. An unexpected handler error answers `500` JSON instead of leaving the request open.
+- Each verdict's `roeLines` is now its own array. Before, every verdict shared one array, and redaction printed every verdict after the first as `[circular]`.
+
+**Known limitations**
+- A corrupt or torn ledger line, such as a torn final line after a crash, blocks reads and writes for that mission until a person repairs the file by hand. No repair tool ships in v2.
+- Revisions are contiguous from the first line in each file. A migrated ledger starts at the legacy revision number; revisions 1 to N-1 are not reconstructed.
+- No cross-process lock: two server processes sharing one state directory are not protected against interleaved appends. `state.json` has the same limit.
+- No fsync: a power loss can drop the most recent append.
+- The ledger file is never pruned, so each GET and PUT re-reads the whole mission file; cost grows linearly with the number of revisions.
+- The redaction regex in `src/redact.ts` is slow on long unbroken `[a-z0-9+.-]` runs. This is pre-existing and tracked separately; a PUT whose text is one such run can block the server for seconds.
+
 ## 2026-10-20 — Chat Panel UX wave: autocomplete, 4 Hats tab, hardening
 
 **New**
