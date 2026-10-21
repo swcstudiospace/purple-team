@@ -12,6 +12,7 @@ import {
   type StatusKey,
 } from '../reports/charts';
 import '../reports/report.css';
+import MissionDrafts from '../components/MissionDrafts';
 
 // Shape of one entry in GET /api/findings → { findings: FindingRecord[] } (src/server.ts).
 export interface Finding {
@@ -333,6 +334,8 @@ export default function Reports() {
           </section>
         </>
       )}
+
+      <MissionDrafts />
     </div>
   );
 }

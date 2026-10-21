@@ -13,8 +13,8 @@
  *  - MAX_STORED_MESSAGES: keep the newest 200 messages per conversation.
  *  - MAX_MESSAGE_TEXT_CHARS: clip each message's text to 8000 characters
  *    (same ceiling the client enforces in ChatStream).
- *  - MAX_STORE_BYTES: evict conversations LRU until the serialized file is
- *    under ~5 MB (never evicts the last remaining conversation).
+ *  - MAX_STORE_BYTES: evict conversations LRU until the serialized file's
+ *    UTF-8 size is under ~5 MB (never evicts the last remaining conversation).
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
@@ -149,7 +149,7 @@ function enforceCaps(file: StoreFile): string[] {
     const doomedIds = new Set(evicted);
     file.conversations = file.conversations.filter(record => !doomedIds.has(record.meta.id));
   }
-  while (JSON.stringify(file).length > MAX_STORE_BYTES && file.conversations.length > 1) {
+  while (Buffer.byteLength(JSON.stringify(file), 'utf8') > MAX_STORE_BYTES && file.conversations.length > 1) {
     const sorted = [...file.conversations].sort(byLru);
     const victim = sorted[0];
     evicted.push(victim.meta.id);

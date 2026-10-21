@@ -1,6 +1,8 @@
-import { useEffect, useId, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
+import { useEffect, useId, useMemo, useState, type ClipboardEvent, type KeyboardEvent } from 'react';
 import { useDraft } from './drafts';
+import { suggestGhost, type GhostSuggestion } from './ghost';
 import { useSelectedRepo } from '../../stores/github';
+import { COMMANDS } from '../../../../src/ui-commands/registry';
 
 /** Provider/model the picker persists. Omitted fields are not sent. */
 export interface ChatModelChoice {
@@ -243,6 +245,33 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
   const resolution = useSelectedRepo(state => state.resolution);
   const repoThreadId = useSelectedRepo(state => state.threadId);
   const clearRepo = useSelectedRepo(state => state.clear);
+  // Ghost text only makes sense with the caret at the end of the draft.
+  const [caretAtEnd, setCaretAtEnd] = useState(true);
+  // Escape stands the ghost down until the next draft edit.
+  const [ghostDismissed, setGhostDismissed] = useState(false);
+
+  // `/name` with no whitespace yet is palette territory: the palette popover
+  // completes command names there (Tab on the highlighted option), so the
+  // ghost stands down for it. Every `enum`/`example` ghost draft carries a
+  // space after the command name, so suppressing whitespace-free slash drafts
+  // is exactly palette suppression — and 'command' ghosts never double up.
+  const ghost = useMemo(
+    () => (/^\/\S*$/.test(draft) ? null : suggestGhost(draft, COMMANDS)),
+    [draft],
+  );
+  const showGhost = ghost !== null && !ghostDismissed && caretAtEnd;
+
+  function trackCaret(event: { currentTarget: HTMLTextAreaElement }): void {
+    const element = event.currentTarget;
+    setCaretAtEnd(element.selectionStart === element.selectionEnd && element.selectionEnd === element.value.length);
+  }
+
+  function acceptGhost(suggestion: GhostSuggestion): void {
+    // 'example' ghosts end with a trailing space so the next argument starts clean.
+    setDraft(draft + suggestion.ghost + (suggestion.kind === 'example' ? ' ' : ''));
+    setGhostDismissed(false);
+    setCaretAtEnd(true);
+  }
 
   function submit(): void {
     const trimmed = draft.trim();
@@ -251,10 +280,39 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>): void {
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+    if (event.nativeEvent.isComposing) {
+      // IME composition owns Tab, Escape, and the arrows until it settles.
+      return;
+    }
+    const ghostNow = ghost;
+    if (ghostNow !== null && !ghostDismissed && caretAtEnd && event.key === 'Tab' && !event.shiftKey) {
+      event.preventDefault();
+      acceptGhost(ghostNow);
+      return;
+    }
+    if (ghostNow !== null && !ghostDismissed && event.key === 'ArrowRight') {
+      const element = event.currentTarget;
+      if (element.selectionStart === element.selectionEnd && element.selectionEnd === element.value.length) {
+        event.preventDefault();
+        acceptGhost(ghostNow);
+        return;
+      }
+    }
+    if (event.key === 'Escape' && showGhost) {
+      setGhostDismissed(true);
+      return;
+    }
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       submit();
     }
+  }
+
+  function handleDraftChange(event: { currentTarget: HTMLTextAreaElement }): void {
+    const element = event.currentTarget;
+    setGhostDismissed(false);
+    setCaretAtEnd(element.selectionStart === element.selectionEnd && element.selectionEnd === element.value.length);
+    setDraft(element.value);
   }
 
   const attached = repo !== null && (repoThreadId === threadId || repoThreadId === null);
@@ -289,19 +347,28 @@ export function Composer({ threadId, busy, describedById, onSend, onStop, onChan
         </div>
       )}
       <ModelPicker />
-      <textarea
-        id={inputId}
-        className="chat-composer-textarea"
-        rows={3}
-        value={draft}
-        spellCheck={false}
-        autoComplete="off"
-        placeholder="Message the model. Enter sends; Shift+Enter adds a line."
-        aria-describedby={describedById}
-        onChange={event => setDraft(event.target.value)}
-        onKeyDown={handleKeyDown}
-        onPaste={event => handleComposerPaste(event, threadId)}
-      />
+      <div className="chat-composer-field">
+        {showGhost && ghost !== null && (
+          <div className="chat-composer-ghost" aria-hidden="true">
+            <span className="chat-composer-ghost-base">{draft}</span>
+            <span className="chat-composer-ghost-hint">{ghost.ghost}</span>
+          </div>
+        )}
+        <textarea
+          id={inputId}
+          className="chat-composer-textarea"
+          rows={3}
+          value={draft}
+          spellCheck={false}
+          autoComplete="off"
+          placeholder="Message the model. Enter sends; Shift+Enter adds a line."
+          aria-describedby={describedById}
+          onChange={handleDraftChange}
+          onSelect={trackCaret}
+          onKeyDown={handleKeyDown}
+          onPaste={event => handleComposerPaste(event, threadId)}
+        />
+      </div>
       <div className="chat-composer-actions">
         {busy && (
           <button type="button" className="chat-composer-stop" onClick={onStop}>

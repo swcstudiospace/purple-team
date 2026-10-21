@@ -1,6 +1,6 @@
 /* RepoRunConfig — phase 35 run-config form. Mirrors agent-panel.css conventions:
    component-local vars on the root class, global design tokens everywhere else
-   (--surface/--border/--brand/--text-*/--font-* from ui/src/styles.css). */
+   (--surface/--border/--brand/--text-* and --font-* tokens from ui/src/styles.css). */
 
 .repo-run-config {
   --rrc-error: #B42318;

@@ -16,7 +16,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { MIN_FRAME_HEIGHT_PX, OPAQUE_ORIGIN, clampFrameHeight, parseFrameMessage } from './frameProtocol';
+import { MIN_FRAME_HEIGHT_PX, OPAQUE_ORIGIN, clampFrameHeight, parseFrameMessage } from '../../../src/genui/frameProtocol';
 import './genui-inline.css';
 
 const READY_TIMEOUT_MS = 3000;

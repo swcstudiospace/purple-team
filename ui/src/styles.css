@@ -421,3 +421,33 @@ textarea:focus-visible {
     border-top: 0;
   }
 }
+
+/* Dark theme — explicit override. Same token set as the system block below;
+ * brand keeps the violet hue and lifts lightness so text pairs stay AA. */
+:root[data-theme='dark'] {
+  --bg: #141118;
+  --surface: #1B1823;
+  --surface-alt: #241F30;
+  --border: #3A3350;
+  --brand: #B79DFB;
+  --brand-hover: #A78BFA;
+  --text-primary: #F2EFF7;
+  --text-secondary: #A9A1BC;
+  color-scheme: dark;
+}
+
+/* Dark theme — system default. Applies only when no explicit override is set;
+ * token set must stay identical to :root[data-theme='dark'] above. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141118;
+    --surface: #1B1823;
+    --surface-alt: #241F30;
+    --border: #3A3350;
+    --brand: #B79DFB;
+    --brand-hover: #A78BFA;
+    --text-primary: #F2EFF7;
+    --text-secondary: #A9A1BC;
+    color-scheme: dark;
+  }
+}

@@ -58,6 +58,15 @@ export function SlashPalette({ threadId, onRunCommand, children }: SlashPaletteP
   const activeSpec = activeIndex >= 0 ? options[activeIndex] : undefined;
   const hintSpec: CommandSpec | null = parsed.kind === 'command' ? parsed.spec : (activeSpec ?? null);
   const argValues: Record<string, string> = parsed.kind === 'command' ? parsed.args : {};
+  // First argument still waiting for a value — the one being typed. Its
+  // example surfaces as `e.g. …` in the hint list below.
+  const exampleArgName =
+    parsed.kind === 'command'
+      ? (parsed.spec.args.find(arg => {
+          const value = parsed.args[arg.name];
+          return (value === undefined || value.trim() === '') && arg.example !== undefined;
+        })?.name ?? null)
+      : null;
   const activeOptionId = activeSpec !== undefined ? `${listboxId}-opt-${activeSpec.name}` : null;
 
   // Draft edits reset the transient palette state (the old updateDraft behavior).
@@ -120,7 +129,10 @@ export function SlashPalette({ threadId, onRunCommand, children }: SlashPaletteP
   }
 
   function handleKeyDown(event: React.KeyboardEvent): void {
-    if (event.nativeEvent.isComposing) return;
+    // The document-level capture listener forwards the RAW native event (cast),
+    // so nativeEvent is undefined on that path — read composing from the event
+    // itself when the synthetic wrapper is absent.
+    if ((event.nativeEvent ?? event).isComposing) return;
     const consume = () => {
       event.preventDefault();
       event.stopPropagation();
@@ -194,14 +206,19 @@ export function SlashPalette({ threadId, onRunCommand, children }: SlashPaletteP
     handlerRef.current = handleKeyDown;
   });
   useEffect(() => {
-    const wrap = wrapRef.current;
-    if (wrap === null) return undefined;
+    // Key capture lives on document (capture phase) instead of the wrap node:
+    // a mount-only listener on the wrap dies when AgentPanel remounts the
+    // chat subtree and React replaces the div. Filtering by
+    // closest('.apx-chat-wrap') keeps the same effective scope and survives
+    // remounts.
     const listener = (event: globalThis.KeyboardEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest('.apx-chat-wrap') === null) return;
       const reactEvent = event as unknown as React.KeyboardEvent;
       handlerRef.current(reactEvent);
     };
-    wrap.addEventListener('keydown', listener, true);
-    return () => wrap.removeEventListener('keydown', listener, true);
+    document.addEventListener('keydown', listener, true);
+    return () => document.removeEventListener('keydown', listener, true);
   }, []);
 
   let statusMessage: string | null = null;
@@ -276,6 +293,9 @@ export function SlashPalette({ threadId, onRunCommand, children }: SlashPaletteP
                       {' — '}
                       <span>{arg.hint}</span>
                       {fill !== '' && <span className="apx-palette-hint-fill">{fill}</span>}
+                      {exampleArgName === arg.name && (
+                        <span className="apx-palette-hint-example"> · e.g. {arg.example}</span>
+                      )}
                     </li>
                   );
                 })}

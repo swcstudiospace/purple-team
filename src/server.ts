@@ -51,6 +51,7 @@ import { AI_REDTEAM_PLAYBOOK, AI_REDTEAM_TECHNIQUE_IDS, aiRedTeamBriefing } from
 import { OPERATOR_SYSTEM_PROMPTS, PLINIAN_OPERATOR_DOCTRINE, THE_FIXER_SYSTEM_PROMPT } from './prompts/index.js';
 import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
 import { createChatHandler } from './chat/chat-route.js';
+import { createAuditLog, createRateLimiter, clientKey } from './server-hardening.js';
 import { createConversationRoutes } from './chat/conversation-routes.js';
 import { createGenUiHandler } from './genui/generate-route.js';
 import { listLlmOptions, resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
@@ -495,6 +496,7 @@ function createTempestCommandInstance(missionName: string, apiKey: string | unde
   });
 
   tempestCommand.on('scan:progress', (event) => {
+    if (!event.taskId && event.kind === 'report_ready') return;
     if (!event.taskId) return;
     const activeMissionId = tempestCommand?.mission.getActiveMission()?.id || 'active';
     if (event.kind === 'task_started') {
@@ -520,6 +522,8 @@ function createTempestCommandInstance(missionName: string, apiKey: string | unde
       });
     }
   });
+
+  // report stored on mission end/stop; no invalid 'mission:report' listener.
 
   return tempestCommand;
 }
@@ -984,7 +988,11 @@ const watchCycleLedger = new Map<string, WatchCycleRecord>();
 const memoryCapsule = new Map<string, MemoryEntry>();
 const memoryProposals = new Map<string, MemoryProposal>();
 
-/** Latest dark-purple synthesis result — one slot, overwritten per synthesis. */
+/** Stored engagement reports (markdown) generated at mission end or stop. Survives active=null. Keyed by mission id. */
+const missionReports = new Map<string, string>();
+let lastMissionReport: { missionId: string; report: string; generatedAt: number } | null = null;
+ 
+ /** Latest dark-purple synthesis result — one slot, overwritten per synthesis. */
 interface PurpleSynthesisRecord {
   id: string;
   createdAt: string;
@@ -1006,6 +1014,7 @@ interface RoeRecord {
 }
 const roeRecords = new Map<string, RoeRecord>();
 
+/** Reports now via missionReports map + lastMissionReport (set on generate at end/stop and on /report calls). */
 /**
  * Observed receipts (Phase 26, D-receipts): written ONLY by the private
  * recordReceipt writer below, after a real computation returns — never by an
@@ -6623,6 +6632,22 @@ app.post('/api/llm/default', (req: Request, res: Response): void => {
   res.json({ ok: true, provider: active.provider, model: active.model });
 });
 
+// --- Production hardening: rate limiting + audit event log -----------------
+// Token-bucket limiter shared by the mutation-heavy API surfaces (one budget
+// per client IP across oauth / chat / mission / general). T3MP3ST_RATE_LIMIT=off
+// disables enforcement. The audit log is an in-memory ring buffer of
+// security-relevant events — summaries only, never message bodies or tokens.
+const mutationLimiter = createRateLimiter({ windowMs: 60_000, limit: 60 });
+const auditLog = createAuditLog();
+
+app.use('/api/oauth', mutationLimiter);
+
+app.get('/api/audit/recent', (req: Request, res: Response) => {
+  const parsed = Number(req.query.limit);
+  const limit = Math.min(500, Math.max(1, Number.isFinite(parsed) ? Math.floor(parsed) : 100));
+  res.json({ events: auditLog.recent(limit) });
+});
+
 // Subscription OAuth (Super Grok Heavy + ChatGPT Plan). Tokens never leave the server.
 app.get('/api/oauth/status', (_req: Request, res: Response) => {
   res.json(oauthStatus());
@@ -6883,9 +6908,9 @@ app.get('/api/github/repositories', async (req: Request, res: Response): Promise
 app.get('/api/github/resolve', async (req: Request, res: Response): Promise<void> => {
   const raw = typeof req.query.url === 'string' ? req.query.url : '';
   const parsed = parseGitHubRepoUrl(raw);
-  if (!parsed) {
+  if (!parsed.ok) {
     res.status(400).json({
-      error: 'Not a GitHub repository URL — expected github.com/owner/repo (optionally /tree/<ref>)',
+      error: parsed.message,
       code: 'invalid-url',
     });
     return;
@@ -6893,9 +6918,9 @@ app.get('/api/github/resolve', async (req: Request, res: Response): Promise<void
   try {
     const token = await ensureGitHubAccessToken();
     const resolution = await resolveGitHubRepo({
-      owner: parsed.owner,
-      repo: parsed.repo,
-      ref: parsed.ref,
+      owner: parsed.value.owner,
+      repo: parsed.value.repo,
+      ref: parsed.value.ref,
       token,
       onAuthFailure: () => forceGitHubTokenRefresh(),
     });
@@ -6941,6 +6966,12 @@ app.post('/api/oauth/github/token', async (req: Request, res: Response): Promise
   }
   try {
     const github = await connectGitHubPat(token);
+    auditLog.appendEvent({
+      kind: 'oauth.github.connect',
+      actor: clientKey(req),
+      summary: typeof github.login === 'string' ? 'GitHub token connected for ' + github.login : 'GitHub token connected',
+      meta: { tokenChars: token.length },
+    });
     res.json({ ok: true, github });
   } catch (e) {
     sendGitHubError(res, e);
@@ -7717,7 +7748,24 @@ app.get('/api/tools', (_req: Request, res: Response) => {
   });
 });
 
-app.post('/api/chat', createChatHandler({ getConfig: resolveStreamingConfig }));
+app.use('/api/chat', mutationLimiter);
+const chatHandler = createChatHandler({ getConfig: resolveStreamingConfig });
+app.post('/api/chat', (req: Request, res: Response): void => {
+  // Audit summary only — message bodies are never logged, just counts and lengths.
+  const body = (req.body ?? {}) as { messages?: unknown };
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const totalChars = messages.reduce((sum: number, m) => {
+    const content = (m as { content?: unknown } | null)?.content;
+    return sum + (typeof content === 'string' ? content.length : 0);
+  }, 0);
+  auditLog.appendEvent({
+    kind: 'chat.send',
+    actor: clientKey(req),
+    summary: 'chat request (' + messages.length + ' messages)',
+    meta: { messages: messages.length, totalChars },
+  });
+  void chatHandler(req, res);
+});
 app.use('/api/conversations', createConversationRoutes());
 app.post('/api/genui/generate', createGenUiHandler({ getConfig: resolveStreamingConfig }));
 
@@ -7750,7 +7798,6 @@ const inFlightRepoIngests = new Map<string, AbortController>();
  * clients (35-CONTEXT §5.1). In-memory only; deliberately not persisted.
  */
 let lastRepoIngestSummary: Record<string, unknown> | null = null;
-
 /** purple-run progress throttle: ≤1 event / 250 ms / 100 files (64-client SSE fan-out). */
 const PURPLE_RUN_PROGRESS_MIN_INTERVAL_MS = 250;
 const PURPLE_RUN_PROGRESS_MIN_FILES = 100;
@@ -7907,6 +7954,8 @@ async function runRepoUrlIngestPhase(
   }
 }
 
+
+app.use('/api/mission', mutationLimiter);
 
 /**
  * POST /api/mission/start — Start a mission with real backend operators
@@ -8149,6 +8198,8 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       }
 
       cmd.start();
+      const missionForId = cmd.mission.getActiveMission();
+      const missionId = missionForId ? missionForId.id : start.runId;
       broadcastEvent('mission:started', {
         name,
         runId: start.runId,
@@ -8160,6 +8211,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       res.json({
         success: true,
         runId: start.runId,
+        missionId,
         missionName: name,
         objective: start.objective,
         operators: spawnedOps,
@@ -8307,6 +8359,8 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
 
     // Start the command loop (auto-creates mission, auto-dispatches tasks)
     cmd.start();
+    const missionForId = cmd.mission.getActiveMission();
+    const missionId = missionForId ? missionForId.id : undefined;
 
     broadcastEvent('mission:started', {
       name,
@@ -8315,9 +8369,17 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       timestamp: Date.now(),
     });
 
+    auditLog.appendEvent({
+      kind: 'mission.start',
+      actor: clientKey(req),
+      summary: 'mission "' + String(name).slice(0, 80) + '" started',
+      meta: { operators: spawnedOps.length, targets: Array.isArray(targets) ? targets.length : 0 },
+    });
+
     res.json({
       success: true,
       missionName: name,
+      missionId,
       ...(repoUrlPack !== undefined ? { runId: repoUrlRunId } : {}),
       operators: spawnedOps,
       ...(stagedArtifact ? { artifact: stagedArtifact } : {}),
@@ -8325,9 +8387,10 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       status: cmd.getStatus(),
       ...(whitebox ? { whitebox } : {}),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[purple-team] Mission start failed:', error);
-    res.status(500).json({ error: error.message || 'Failed to start mission' });
+    const msg = error instanceof Error ? error.message : 'Failed to start mission';
+    res.status(500).json({ error: msg });
   } finally {
     repoSource?.cleanup();
   }
@@ -8377,18 +8440,29 @@ app.post('/api/whitebox/analyze', async (req: Request, res: Response): Promise<v
  */
 function handleMissionReport(req: Request, res: Response): void {
   const cmd = getTempestCommand();
-  if (!cmd) {
-    res.status(404).json({ error: 'No active mission' });
+  const missionId = typeof req.params.id === 'string' && req.params.id ? req.params.id : undefined;
+  if (missionId && missionReports.has(missionId)) {
+    res.json({ success: true, missionId, report: missionReports.get(missionId) });
     return;
   }
-  const missionId = typeof req.params.id === 'string' && req.params.id ? req.params.id : undefined;
-  try {
-    const report = cmd.generateReport(missionId);
-    res.json({ success: true, missionId: missionId || null, report });
-  } catch (error: any) {
-    // generateReport throws when no mission is found for reporting.
-    res.status(404).json({ error: error?.message || 'No mission found for reporting' });
+  if (cmd) {
+    try {
+      const report = cmd.generateReport(missionId);
+      const usedId = missionId || (cmd.mission.getActiveMission()?.id) || 'last';
+      missionReports.set(usedId, report);
+      lastMissionReport = { missionId: usedId, report, generatedAt: Date.now() };
+      res.json({ success: true, missionId: usedId, report });
+      return;
+    } catch (error: unknown) {
+      // fall through to stored last
+    }
   }
+  if (lastMissionReport) {
+    const useId = missionId || lastMissionReport.missionId;
+    res.json({ success: true, missionId: useId, report: lastMissionReport.report });
+    return;
+  }
+  res.status(404).json({ error: 'No mission found for reporting' });
 }
 app.get('/api/mission/report', (req: Request, res: Response) => handleMissionReport(req, res));
 app.get('/api/mission/:id/report', (req: Request, res: Response) => handleMissionReport(req, res));
@@ -8423,7 +8497,26 @@ app.post('/api/mission/stop', (req: Request, res: Response) => {
     return;
   }
 
+  // capture id before stop/complete may clear active
+  let mid: string | undefined = cmd.mission.getActiveMission()?.id;
+  if (!mid) {
+    const alls = cmd.mission.getAllMissions ? cmd.mission.getAllMissions() : [];
+    if (alls.length) mid = alls[alls.length-1].id;
+  }
+
   cmd.stop();
+
+  if (mid) {
+    try {
+      const rpt = cmd.generateReport(mid);
+      missionReports.set(mid, rpt);
+      lastMissionReport = { missionId: mid, report: rpt, generatedAt: Date.now() };
+      broadcastEvent('purple-run', { runId: mid, state: 'completed', reportAvailable: true, timestamp: Date.now() });
+    } catch (e) {
+      console.error('[purple-team] report gen on stop failed:', e instanceof Error ? e.message : e);
+    }
+  }
+
   for (const row of operatorTaskRuns.values()) {
     if (row.status === 'pending') {
       row.status = 'interrupted';
@@ -8443,6 +8536,12 @@ app.post('/api/mission/stop', (req: Request, res: Response) => {
   // Honest cancellation (Phase 26, AC-FH-020): a transport stop halts the
   // tick loop — it is never an acknowledged cancel or resume. No cancel
   // route exists; in-flight work is left interrupted, not acknowledged.
+  auditLog.appendEvent({
+    kind: 'mission.stop',
+    actor: clientKey(req),
+    summary: typeof mid === 'string' && mid ? 'mission ' + mid + ' stopped' : 'mission stopped',
+    meta: { cancelledIngestRuns: cancelledRunIds.length },
+  });
   res.json({
     success: true,
     message: 'Mission stopped',
@@ -9113,6 +9212,8 @@ app.post('/api/llm/local', async (req: Request, res: Response): Promise<void> =>
     if (!res.headersSent) res.status(502).json({ error: error?.message || 'Local LLM request failed' });
   }
 });
+
+app.use('/api/general', mutationLimiter);
 
 /**
  * POST /api/general/plan — Give the General a directive, get back an OpPlan

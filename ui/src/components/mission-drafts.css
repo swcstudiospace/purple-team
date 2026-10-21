@@ -1,0 +1,209 @@
+/* MissionDrafts — mission-draft CRUD card for the Reports page. Mirrors
+   repo-run-config.css conventions: component-local vars on the root class,
+   global design tokens everywhere else (--surface/--border/--brand/--text-*
+   and --font-* tokens from ui/src/styles.css). No animations. */
+
+.mission-drafts {
+  --md-error: #B42318;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mission-drafts :focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.md-heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.md-muted {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.md-alert {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 3px solid var(--md-error);
+  background: var(--surface-alt);
+  border-radius: 4px;
+  color: var(--md-error);
+  font-size: 13px;
+}
+
+.md-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.md-item {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.md-item--editing {
+  border-color: var(--brand);
+}
+
+.md-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.md-item-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.md-item-objective {
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.md-item-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.md-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.md-btn:hover:not(:disabled) {
+  background: var(--surface-alt);
+}
+
+.md-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.md-btn--sm {
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+/* Red only for danger, using the same token fallback as github.css. */
+.md-btn--danger {
+  border-color: var(--danger, #B91C1C);
+  color: var(--danger, #B91C1C);
+}
+
+.md-btn--danger:hover:not(:disabled) {
+  background: var(--danger-surface, #FDF2F2);
+}
+
+.md-btn--primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #FFFFFF;
+}
+
+.md-btn--primary:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.md-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.md-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.md-label {
+  font-weight: 600;
+}
+
+.md-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.md-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 1;
+}
+
+.md-input:disabled {
+  background: var(--surface-alt);
+  color: var(--text-secondary);
+  cursor: not-allowed;
+}
+
+.md-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .md-item {
+    flex-direction: column;
+  }
+
+  .md-item-actions {
+    width: 100%;
+  }
+}

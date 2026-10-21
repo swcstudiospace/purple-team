@@ -22,6 +22,7 @@ import {
   type OAuthStatusResponse,
   type OAuthVendor,
 } from '../api/client';
+import ThemeToggle from '../components/ThemeToggle';
 import './settings.css';
 
 /**
@@ -1596,11 +1597,24 @@ function ConfigSection({ oauth }: { oauth: { state: OAuthState } }) {
 
 export default function Settings() {
   const oauth = useOAuthStatus();
+  const themeId = useId();
   return (
     <div className="settings">
       <GitHubCard />
       <LlmSection oauth={oauth} />
       <ConfigSection oauth={oauth} />
+      <section className="settings-card" aria-labelledby={themeId}>
+        <h2 id={themeId} className="settings-card__title">
+          Theme
+        </h2>
+        <p className="settings-hint">
+          Light or dark, stored in this browser. Without a choice the app follows the system
+          preference.
+        </p>
+        <div className="settings-form__row">
+          <ThemeToggle />
+        </div>
+      </section>
     </div>
   );
 }

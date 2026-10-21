@@ -753,6 +753,59 @@ async function purpleTeamTarget(): Promise<void> {
   showSuccess(`Run id: ${runId}`);
   showInfo(`Operators spawned: ${spawned.join(', ')}`);
   showInfo(`Watch ${chalk.cyan(`http://127.0.0.1:${port}/app/#chat`)}`);
+
+  // Poll status until mission completes so the CLI command runs for the full duration
+  // (visible phases + progress), then fetch and print the report (ensures after run
+  // it calls generateReport-equivalent on server and prints). Matches UI launch flow.
+  const statusUrl = `http://127.0.0.1:${port}/api/mission/status`;
+  const reportUrl = `http://127.0.0.1:${port}/api/mission/report`;
+  const maxWaitMs = 10 * 60 * 1000;
+  const pollIntervalMs = 2000;
+  const started = Date.now();
+  let done = false;
+  while (!done && Date.now() - started < maxWaitMs) {
+    try {
+      const sres = await fetch(statusUrl);
+      if (sres.ok) {
+        const sbodyRaw: unknown = await sres.json();
+        const sbody = sbodyRaw as { active?: boolean; mission?: { currentPhase?: string; progress?: number } | null; progress?: unknown };
+        const active = !!sbody.active;
+        const m = sbody.mission;
+        if (m) {
+          showInfo(`Phase: ${m.currentPhase || 'unknown'}  progress: ${m.progress ?? 0}%`);
+        } else if (sbody.progress) {
+          showInfo(`Progress: ${JSON.stringify(sbody.progress)}`);
+        }
+        if (!active) {
+          done = true;
+        }
+      }
+    } catch {
+      // server may still be starting
+    }
+    if (!done) {
+      await new Promise(r => setTimeout(r, pollIntervalMs));
+    }
+  }
+
+  // Now call report (server side generateReport) and print
+  try {
+    const rres = await fetch(reportUrl);
+    if (rres.ok) {
+      const rbodyRaw: unknown = await rres.json();
+      const rbody = rbodyRaw as { report?: string };
+      if (rbody.report) {
+        console.log('');
+        console.log(chalk.bold.cyan('═══ ENGAGEMENT REPORT ═══'));
+        console.log('');
+        console.log(rbody.report);
+      }
+    } else {
+      showWarning('Report not yet available (mission may have no findings).');
+    }
+  } catch {
+    showWarning('Could not retrieve final report.');
+  }
 }
 
 // =============================================================================

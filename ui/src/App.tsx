@@ -4,14 +4,19 @@ import GitHub from './pages/GitHub';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import AgentPanel from './components/AgentPanel';
+import CommandPalette from './components/CommandPalette';
+import PanelErrorBoundary from './components/PanelErrorBoundary';
+import ThemeToggle from './components/ThemeToggle';
+import Hats from './pages/Hats';
 import { escapeGuard } from './components/workbench/focus';
 import { readPrefs, savePrefs, type RailState } from './components/workbench/prefs';
 
-type SectionId = 'overview' | 'github' | 'chat' | 'reports' | 'settings';
+type SectionId = 'overview' | 'github' | 'hats' | 'chat' | 'reports' | 'settings';
 
 const NAV_ITEMS: ReadonlyArray<{ id: SectionId; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'github', label: 'GitHub' },
+  { id: 'hats', label: '4 Hats' },
   { id: 'chat', label: 'Chat Panel' },
   { id: 'reports', label: 'Reports' },
   { id: 'settings', label: 'Settings' },
@@ -175,6 +180,9 @@ export default function App() {
       >
         <div className="brand">{collapsed ? 'PT' : 'Purple Team'}</div>
         {railLinks}
+        <div className="rail-theme" style={{ padding: collapsed ? '0.5rem 0' : '0.75rem 1rem 0' }}>
+          <ThemeToggle />
+        </div>
         {isWorkbench && !railHidden && (
           <div className="rail-foot">
             <button
@@ -210,12 +218,39 @@ export default function App() {
           {current.label}
         </h1>
 
-        {active === 'overview' && <Overview />}
-        {active === 'github' && <GitHub />}
-        {active === 'chat' && <AgentPanel focusMode={railHidden} onExitFocusMode={exitFocusMode} />}
-        {active === 'reports' && <Reports />}
-        {active === 'settings' && <Settings />}
+        {active === 'overview' && (
+          <PanelErrorBoundary section="Overview">
+            <Overview />
+          </PanelErrorBoundary>
+        )}
+        {active === 'github' && (
+          <PanelErrorBoundary section="GitHub">
+            <GitHub />
+          </PanelErrorBoundary>
+        )}
+        {active === 'hats' && (
+          <PanelErrorBoundary section="4 Hats">
+            <Hats />
+          </PanelErrorBoundary>
+        )}
+        {active === 'chat' && (
+          <PanelErrorBoundary section="Chat Panel">
+            <AgentPanel focusMode={railHidden} onExitFocusMode={exitFocusMode} />
+          </PanelErrorBoundary>
+        )}
+        {active === 'reports' && (
+          <PanelErrorBoundary section="Reports">
+            <Reports />
+          </PanelErrorBoundary>
+        )}
+        {active === 'settings' && (
+          <PanelErrorBoundary section="Settings">
+            <Settings />
+          </PanelErrorBoundary>
+        )}
       </main>
+
+      <CommandPalette />
     </div>
   );
 }

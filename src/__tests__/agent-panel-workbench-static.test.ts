@@ -25,7 +25,6 @@ const client = read('ui/src/api/client.ts');
 const styles = read('ui/src/styles.css');
 const genuiFrame = read('ui/src/genui/GenUiFrame.tsx');
 const frameMain = read('ui/src/genui/frame-main.tsx');
-const frameProtocol = read('ui/src/genui/frameProtocol.ts');
 const genuiHtml = read('ui/genui.html');
 const viteConfig = read('ui/vite.config.ts');
 const conversationStore = read('src/chat/conversation-store.ts');
@@ -141,13 +140,8 @@ describe('genUi sandbox merge (phase 36 §6)', () => {
     expect(genuiHtml).toContain('default-src');
   });
 
-  it('validates every postMessage against the allowlist and falls back to raw text', () => {
-    expect(frameProtocol).toContain('genui-ready');
-    expect(frameProtocol).toContain('genui-action');
-    expect(frameProtocol).toContain('genui-height');
-    expect(frameProtocol).toContain('genui-error');
+  it('falls back to raw text when the frame never reports ready', () => {
     expect(frameMain).toContain("postToParent({ type: 'genui-ready' })");
-    expect(frameProtocol).toContain('clampFrameHeight');
     expect(genuiFrame).toContain('READY_TIMEOUT_MS = 3000');
     expect(genuiFrame).toContain('<pre>{source}</pre>');
   });

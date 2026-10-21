@@ -424,3 +424,62 @@ describe('parseRepoTarget canonical form', () => {
     expect(value.canonical).toBe('OctoCat/hello-WORLD@HEAD');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Percent-encoding: segments decode after the raw split on '/'
+// ---------------------------------------------------------------------------
+
+describe('parseRepoTarget percent-encoding', () => {
+  it('decodes %20 in a subpath; the canonical form carries the decoded space', () => {
+    const value = parseOk('https://github.com/octocat/Hello-World/tree/main/my%20dir/src');
+    expect(value.subpath).toBe('my dir/src');
+    expect(value.canonical).toBe('octocat/Hello-World@main/my dir/src');
+  });
+
+  it('decodes %2F in a ref to a slash while keeping the ref one segment', () => {
+    const value = parseOk('https://github.com/octocat/Hello-World/tree/feature%2Fx/src');
+    expect(value.ref).toBe('feature/x');
+    expect(value.subpath).toBe('src');
+    expect(value.canonical).toBe('octocat/Hello-World@feature/x/src');
+  });
+
+  it('decodes %2F in a ref with no subpath', () => {
+    expect(parseOk('https://github.com/octocat/Hello-World/tree/feature%2Fx').ref).toBe('feature/x');
+  });
+
+  it('rejects a malformed escape in a subpath as bad-path-shape, naming the segment', () => {
+    const { fault, message } = parseFault('https://github.com/octocat/Hello-World/tree/main/src%zz');
+    expect(fault).toBe('bad-path-shape');
+    expect(message).toContain('subpath');
+    expect(message).toContain('%zz');
+  });
+
+  it('rejects a malformed escape in the owner as bad-path-shape, naming the segment', () => {
+    const { fault, message } = parseFault('https://github.com/oc%zz/Hello-World');
+    expect(fault).toBe('bad-path-shape');
+    expect(message).toContain('owner');
+    expect(message).toContain('%zz');
+  });
+
+  it('treats %2e%2e in a subpath as subpath-traversal', () => {
+    const { fault, message } = parseFault('https://github.com/octocat/Hello-World/tree/main/%2e%2e/etc');
+    expect(fault).toBe('subpath-traversal');
+    expect(message).toContain('..');
+  });
+
+  it('treats an encoded slash forming ".." (..%2Fetc) as subpath-traversal', () => {
+    const { fault, message } = parseFault('https://github.com/octocat/Hello-World/tree/main/..%2Fetc');
+    expect(fault).toBe('subpath-traversal');
+    expect(message).toContain('..');
+  });
+
+  it('rejects a percent-encoded control character in a subpath (%0A) as bad-path-shape', () => {
+    const { fault, message } = parseFault('https://github.com/octocat/Hello-World/tree/main/src%0Aevil');
+    expect(fault).toBe('bad-path-shape');
+    expect(message).toContain('control characters');
+  });
+
+  it('applies the ref rules to the decoded ref (%2e%2e decodes to "..": bad-ref)', () => {
+    expect(parseFault('https://github.com/octocat/Hello-World/tree/%2e%2e').fault).toBe('bad-ref');
+  });
+});

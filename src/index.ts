@@ -215,6 +215,7 @@ import type {
   Finding,
   ScanProgressEvent,
   Task,
+  Mission,
 } from './types/index.js';
 
 // Re-export commonly used types
@@ -816,6 +817,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
 
     this.running = true;
     this.paused = false;
+    this.minExecutionStart = Date.now();
     this.emit('command:started');
 
     // Start tick loop (1 second interval). Catch any tick error so a single bad tick
@@ -858,6 +860,8 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     this.taskSeeded = false;
     this.structuredRun = false;
     this.structuredArtifactOnly = false;
+    this.structuredRoles = [];
+    this.minExecutionStart = 0;
     if (this.tickInterval) {
       clearInterval(this.tickInterval);
       this.tickInterval = null;
@@ -881,6 +885,7 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
   }): Array<{ id: string; role: OperatorArchetype; description: string }> {
     this.structuredRun = true;
     this.structuredArtifactOnly = options.artifactOnly;
+    this.structuredRoles = options.roles || [];
 
     let activeMission = this.mission.getActiveMission();
     if (!activeMission) {
@@ -1024,6 +1029,11 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
   private structuredRun: boolean = false;
   private structuredArtifactOnly: boolean = false;
 
+  /** Roles captured from configureStructuredRun so we can reseed equivalent real tasks on each phase advance for full kill-chain progression (scope, execution, reporting). */
+  private structuredRoles: OperatorArchetype[] = [];
+  /** Timestamp when start() armed ticks; defer final completeMission until elapsed >10s so /status shows running >10s and progress events emit. */
+  private minExecutionStart: number = 0;
+
   /** Human-readable reason a mission was paused because required work failed. */
   private stallReason: string | null = null;
   /**
@@ -1093,34 +1103,54 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
         return;
       }
 
-      if (this.structuredRun) {
-        this.mission.completeMission(mission.id);
-        return;
-      }
-
+      // Removed early structured complete (was skipping phases after initial role tasks). Now full progression.
+      // Reseed roles for new phases; hold final complete until min runtime for status>10s + events.
       const phaseIndex = mission.phases.indexOf(mission.currentPhase);
       if (phaseIndex === -1) return; // Guard: phase not found (race condition)
       if (phaseIndex < mission.phases.length - 1) {
-        // Advance to next phase and generate tasks
         this.mission.advancePhase(mission.id);
         this.stallReason = null;
         const targets = this.targetEnv.getAllTargets();
-        for (const target of targets) {
-          this.mission.generateNextPhaseTasks(target.address);
+        if (this.structuredRun && this.structuredRoles.length > 0) {
+          const tq = this.mission.getTaskQueue();
+          const curMission = this.mission.getActiveMission()!;
+          for (const role of this.structuredRoles) {
+            const task: Task = {
+              id: randomUUID(),
+              missionId: curMission.id,
+              phase: curMission.currentPhase,
+              name: `${role.toUpperCase()} — ${curMission.currentPhase}`,
+              description: `[Structured Run] Role: ${role} Phase: ${curMission.currentPhase}\nObjective continues.`,
+              operatorType: role,
+              status: 'pending',
+              priority: 10,
+              dependencies: [],
+              createdAt: Date.now(),
+            };
+            tq.add(task);
+          }
+          this.taskSeeded = true;
+        } else {
+          for (const target of targets) {
+            this.mission.generateNextPhaseTasks(target.address);
+          }
         }
-
-        // Local-agent operators are pre-spawned once and reused for the whole mission (see
-        // autoSpawnForPhase below), so a resumed CLI session (Claude Code --resume) would
-        // otherwise span every phase. Drop it here so each phase starts a fresh session instead
-        // of one unbounded session for the entire kill chain.
         for (const op of this.cell.getAllOperators()) op.resetLLMSession();
-
-        // Auto-spawn operators for the new phase
         const nextPhase = mission.currentPhase;
         this.autoSpawnForPhase(nextPhase);
       } else {
-        // All phases complete — finish the mission
+        const elapsed = Date.now() - (this.minExecutionStart || Date.now());
+        const MIN_VISIBLE_RUN_MS = 12000;
+        if (elapsed < MIN_VISIBLE_RUN_MS) {
+          this.emit('scan:progress', { kind: 'phase_hold_for_runtime', phase: mission.currentPhase, elapsedMs: elapsed, minRequired: MIN_VISIBLE_RUN_MS });
+          return;
+        }
         this.mission.completeMission(mission.id);
+        try {
+          const report = this.generateReport(mission.id);
+          this.emit('scan:progress', { kind: 'report_ready', missionId: mission.id, reportLen: report.length });
+          this.emit('tick', this.tickCount);
+        } catch {}
         return;
       }
     }
@@ -1334,9 +1364,23 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
     this.on('approval:decision', (data) => broadcast('arsenal.approval', data));
     this.on('scan:progress', (data) => broadcast('scan:progress', data));
     this.on('tick', (count) => {
-      // Broadcast status every 5 ticks to avoid flooding
-      if (typeof count === 'number' && count % 5 === 0) {
-        broadcast('status', this.getStatus());
+      if (typeof count === 'number') {
+        // Emit purple-run progress frequently (even ticks) so UI sees sustained running + phases during the mission.
+        if (count % 2 === 0) {
+          const m = this.mission.getActiveMission();
+          broadcast('purple-run', {
+            runId: m?.id || 'active',
+            state: this.running ? (this.paused ? 'paused' : 'executing') : 'stopped',
+            tick: count,
+            phase: m?.currentPhase,
+            progress: m?.progress || 0,
+            timestamp: Date.now(),
+          });
+        }
+        // Broadcast status every 5 ticks to avoid flooding
+        if (count % 5 === 0) {
+          broadcast('status', this.getStatus());
+        }
       }
     });
   }
@@ -1507,9 +1551,12 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
    * Generate engagement report
    */
   public generateReport(missionId?: string): string {
-    const mission = missionId
+    let mission = missionId
       ? this.mission.getMission(missionId)
       : this.mission.getActiveMission();
+    if (!mission) {
+      mission = this.getLastMission();
+    }
 
     if (!mission) {
       throw new Error('No mission found for reporting');
@@ -1517,6 +1564,20 @@ export class TempestCommand extends EventEmitter<CommandEvents> {
 
     const report = this.analysis.generateReport(mission.id, 'full_report');
     return this.analysis.exportToMarkdown(report);
+  }
+
+  /**
+   * Fallback for post-completion / post-stop report access. Missions map keeps history; active cleared on complete.
+   * Shape cast via unknown as per ts-no-any rule (internal, MissionControl impl known from src/mission).
+   */
+  private getLastMission(): Mission | undefined {
+    const active = this.mission.getActiveMission();
+    if (active) return active;
+    const mc = this.mission as unknown as { getAllMissions?: () => Mission[] };
+    const all = mc.getAllMissions ? mc.getAllMissions() : [];
+    if (all.length === 0) return undefined;
+    // last by completion; shape matches Mission from map
+    return [...all].sort((a, b) => ((b.completedAt || b.startedAt || 0) - (a.completedAt || a.startedAt || 0)) )[0] as Mission | undefined;
   }
 }
 

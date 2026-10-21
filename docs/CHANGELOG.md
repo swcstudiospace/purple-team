@@ -1,5 +1,19 @@
 # Purple Team Changelog
 
+## 2026-10-20 — Chat Panel UX wave: autocomplete, 4 Hats tab, hardening
+
+**New**
+- OMP-style inline autocomplete in the chat composer: ghost suggestions while typing with `Tab` (or `ArrowRight` at end of line) to accept, `Escape` to dismiss. Suggests command names, enum argument values (for example `hat=red`), and per-argument examples. Slash commands gained `example` hints shown in the palette (`e.g. …` for the next empty argument).
+- Example text across the mission run form: placeholders for repository URL, local path, ref, subpath, objective and mission name, an operators datalist, and an objective tip line.
+- The **4 Hats tab is back** as a first-class section (`#hats`): one card per hat with doctrine, operator pills, an editable objective, and Run buttons that launch `POST /api/mission/start` against the repository attached in the GitHub tab. Without an attached repository the cards link to GitHub and disable Run.
+- Eight production-hardening and quality-of-life enhancements: mission drafts UI on the existing `/api/mission-drafts` CRUD routes (Reports page), dark theme with system default and a persisted toggle (`t3mp3st_theme`, toggle in the rail and Settings), global `Ctrl/Cmd+K` command palette (navigation + dark-mode action), conversation export to Markdown and JSON, conversation search in the sidebar, token-bucket rate limiting on `/api/chat`, `/api/mission`, `/api/general` and `/api/oauth` (kill switch `T3MP3ST_RATE_LIMIT=off`), an in-memory audit log with `GET /api/audit/recent` (mission start/stop, GitHub connect, chat send — counts and lengths only, never bodies or tokens), and per-section error boundaries so one broken panel no longer blanks the app.
+
+**Fixed**
+- Slash palette keyboard handling was dead since the phase 36 rebuild: the capture listener forwarded raw native events cast as React events, and the handler crashed on `event.nativeEvent.isComposing`, so `Tab`/`Enter`/`Escape`/arrows in the palette silently threw. Keyboard completion now works (verified: `/hu` + `Tab` → `/hunt `), and the listener survives chat-subtree remounts by living on `document` scoped with `closest('.apx-chat-wrap')`.
+- Chat Panel text overlap with long threads: `.chat-log-wrap` had no flex chain, so the thread overflowed its box and the composer hint painted over the last message. The log now scrolls inside the stream and the composer stays pinned below it (verified with a 16-message thread at 1280px and 390px).
+- Composer textarea collapsed at narrow widths (0px at 390px, 90px at 1280px) because the provider/model selects starved it; the composer row now wraps and the textarea keeps a bounded basis (`min-width: 0`). Chat column width at 1280px grew from 468px to 734px.
+- The `repo-run-config.css` header comment contained `--text-*/`, closing the comment early; the CSS parser dropped the whole `.repo-run-config` root rule (build warning `Unexpected "*"`). Reworded; the warning is gone.
+
 ## 2026-10-19 — Chat Panel upgrade: Claude login, hats, providers, CLI
 
 **Fixed**

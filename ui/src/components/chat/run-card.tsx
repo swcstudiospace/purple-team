@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type { PurpleRunCounters, PurpleRunEvent, PurpleRunEventState } from '../../lib/events';
-
+const Markdown = lazy(() => import('./markdown'));
 /**
  * Inline Purple Team run progress (`data-purple-run` DataUIPart renderer).
  *
@@ -79,6 +79,41 @@ const RESOLVE_ERROR_CODES: Record<string, true> = {
   private_inaccessible: true,
   not_connected: true,
   invalid_url: true,
+};
+
+/** Copy and retry text per ingest error code (phase 35 §5.3). Unknown codes show the raw code only. */
+const ERROR_GUIDANCE: Record<string, { copy: string; retry?: string }> = {
+  invalid_url: {
+    copy: 'The URL is not valid.',
+    retry: 'Fix the URL. The message above names the exact problem.',
+  },
+  repo_not_found: {
+    copy: 'Repository not found on github.com.',
+    retry: 'Check the spelling. If the repository is private, connect GitHub with the repo scope in Settings.',
+  },
+  private_inaccessible: {
+    copy: 'The repository is private, or it does not exist for this connection.',
+    retry: 'Connect GitHub with the repo scope in Settings, then retry.',
+  },
+  not_connected: {
+    copy: 'No GitHub connection is available for this repository.',
+    retry: 'Connect GitHub with the repo scope, set T3MP3ST_GITHUB_TOKEN, or pick a public repository.',
+  },
+  rate_limited: {
+    copy: 'GitHub rate limit reached.',
+    retry: 'Wait for the reset time, then retry. Do not retry in a loop.',
+  },
+  oversized: {
+    copy: 'The repository exceeds an ingest cap.',
+    retry: 'Narrow the URL to a /tree/<ref>/<subpath> scope, or raise the named T3MP3ST_REPO_* limit.',
+  },
+  network: {
+    copy: 'Could not fetch the repository from GitHub.',
+    retry: 'Check connectivity. Retrying is safe.',
+  },
+  cancelled: {
+    copy: 'Ingest cancelled.',
+  },
 };
 
 const PHASE_ORDER: readonly PurpleRunPhaseId[] = ['resolve', 'fetch', 'analyze'];
@@ -297,11 +332,27 @@ export function formatElapsed(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** Guidance line under a failed run's error text, keyed by the server's errorCode. */
+function RunErrorGuidance({ code }: { code: string }) {
+  const mapped = Object.prototype.hasOwnProperty.call(ERROR_GUIDANCE, code) ? ERROR_GUIDANCE[code] : undefined;
+  const retry = mapped?.retry;
+  return (
+    <p className="apx-run-error-guidance">
+      {mapped !== undefined ? <span className="apx-run-error-copy">{mapped.copy}</span> : <code>{code}</code>}
+      {retry !== undefined && <span className="apx-run-error-retry"> {retry}</span>}
+    </p>
+  );
+}
+
 export function RunCard({ data, onCancelRun }: { data: PurpleRunData; onCancelRun: (runId: string) => void }) {
   const active = data.state === 'ingesting';
   const [confirming, setConfirming] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const resetTimerRef = useRef<number | null>(null);
+
+  const [reportMd, setReportMd] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportErr, setReportErr] = useState<string | null>(null);
 
   useEffect(
     () => () => {
@@ -319,6 +370,37 @@ export function RunCard({ data, onCancelRun }: { data: PurpleRunData; onCancelRu
   }, [active]);
 
   const elapsedMs = (data.endedAt ?? (active ? nowTick : data.startedAt)) - data.startedAt;
+
+  async function handleViewReport() {
+    setReportLoading(true);
+    setReportErr(null);
+    try {
+      const res = await fetch('/api/mission/report', { headers: { Accept: 'application/json' } });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        let errText = `HTTP ${res.status}`;
+        if (body && typeof body === 'object' && 'error' in body) {
+          const e = body.error;
+          if (typeof e === 'string') errText = e;
+        }
+        throw new Error(errText);
+      }
+      const body = await res.json();
+      let rpt = '';
+      if (body && typeof body === 'object' && 'report' in body) {
+        const v = body.report;
+        if (typeof v === 'string') rpt = v;
+      }
+      const md = rpt.trim() !== '' ? rpt : 'Run completed, no findings yet or generate.';
+      setReportMd(md);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch report';
+      setReportErr(msg);
+      setReportMd('Run completed, no findings yet or generate.');
+    } finally {
+      setReportLoading(false);
+    }
+  }
 
   function requestCancel(): void {
     if (!confirming) {
@@ -388,8 +470,27 @@ export function RunCard({ data, onCancelRun }: { data: PurpleRunData; onCancelRu
           {data.errorCode !== undefined && <span className="apx-run-error-code"> · {data.errorCode}</span>}
         </p>
       )}
+      {data.state === 'error' && data.errorCode !== undefined && (
+        <RunErrorGuidance code={data.errorCode} />
+      )}
       {data.state === 'done' && data.summary !== undefined && <p className="apx-run-summary">{data.summary}</p>}
       {data.state === 'cancelled' && <p className="apx-run-summary">Run cancelled by the operator.</p>}
+      {data.state === 'done' && (
+        <div>
+          <button type="button" onClick={() => { void handleViewReport(); }} disabled={reportLoading} className="apx-run-report-btn">
+            {reportLoading ? 'Loading report…' : 'View Report'}
+          </button>
+          {reportErr ? <span style={{color:'red', marginLeft: '0.5em'}}>{reportErr}</span> : null}
+        </div>
+      )}
+      {reportMd !== null && (
+        <div style={{marginTop: '0.5em', border: '1px solid #ddd', padding: '0.5em', maxHeight: '12em', overflow: 'auto', fontSize: '0.85em', background: '#fafafa'}}>
+          <Suspense fallback={<span>Loading report…</span>}>
+            <Markdown text={reportMd} />
+          </Suspense>
+          <button type="button" onClick={() => setReportMd(null)} style={{fontSize:'0.7em', marginTop:'0.3em'}}>Close report</button>
+        </div>
+      )}
     </div>
   );
 }
