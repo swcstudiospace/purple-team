@@ -36,7 +36,7 @@
 ### Key Lessons
 1. Validate against a frozen boundary before code changes touch those surfaces; validation-after-drift proves nothing.
 2. Digest-based staleness means any later file touch invalidates an earlier verification — budget for close-out cross-verification or re-runs when phases share files.
-3. A milestone audit's value is adversarial: it caught a 39/39 claim that was really 29/34 and forced the divergence into the record (F-20-01) instead of the changelog.
+3. A milestone audit's value is adversarial: it caught a 39/39 claim that was really 29/34 and forced the divergence into the record (F-20-01) instead of the changelog. [Reconciled under F-20-01: neither the 39/39 nor the 29/34 figure reproduces on the current tree; 33/38 before retargeting, 38/38 after. See PROJECT.md.]
 
 ### Cost Observations
 - Plan durations: Phase 21 P21-03 2min · Phase 22 P22-01 9min · Phase 23 P23-01 8min · Phase 24 P24-01 19min · Phase 25 P25-01 12min
