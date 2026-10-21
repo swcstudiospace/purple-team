@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md`, `.planning/ROADMAP.md`, and `.planning/milestones/`
 
 Phase: 37 — Audit follow-ups (partly done)
 Plan: —
-Status: Phase 37 partly done. F-20-01 retargeted (38/38); Nyquist and Phase 23 complete. Open: stray repo-root directory.
+Status: Phase 37 partly done; phase 38 merged (PR #9, b2671b4). F-20-01 retargeted (38/38); Nyquist and Phase 23 complete. Open: stray repo-root directory.
 Last activity: 2026-10-21 — v1.6 archived; v1.7 closed; v2 bootstrapped
 
 ## Completed Context (v1.7)
