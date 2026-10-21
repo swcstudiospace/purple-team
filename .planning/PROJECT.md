@@ -28,10 +28,10 @@ Close-out follow-ups (v1.4 audit tech debt):
 - [ ] Stray repo-root artifact file `Heads-up: while wiring GET '` — delete or move on next touch
 
 Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
-- [ ] Persisted verdict ledger slot and ROE revision history
-- [ ] Purple auto-consumption of recorded verdicts
-- [ ] Text provenance (who/when/source) on ROE records
-- [ ] Install-and-launch verification of the built `.deb`/AppImage
+- [ ] Persisted verdict ledger slot and ROE revision history — scheduled: Phase 39 (see `.planning/v2-REQUIREMENTS.md`)
+- [ ] Purple auto-consumption of recorded verdicts — scheduled: Phase 40 (see `.planning/v2-REQUIREMENTS.md`)
+- [ ] Text provenance (who/when/source) on ROE records — scheduled: Phase 40 (see `.planning/v2-REQUIREMENTS.md`)
+- [ ] Install-and-launch verification of the built `.deb`/AppImage — scheduled: Phase 41 (see `.planning/v2-REQUIREMENTS.md`)
 - [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9)
 
 ## Requirements
