@@ -186,6 +186,16 @@ async function main() {
   }
   check('Lint hygiene: eslint config not loosened', missingAnchors.length === 0, missingAnchors.length ? `missing/weakened: ${missingAnchors.join(' | ')}` : 'all rule + ignores anchors intact', 'block');
 
+  try {
+    const { evaluateLintBudget, loadLintBudgets, runEslintCensus } = await import('./lint-budget.mjs');
+    const budgets = await loadLintBudgets();
+    const counts = await runEslintCensus(budgets.scope);
+    const verdict = evaluateLintBudget(counts, budgets);
+    check('Lint hygiene: per-rule lint budgets', verdict.ok, verdict.ok ? `${budgets.scope}: ${Object.keys(budgets.rules).length} rule budgets hold` : verdict.violations.join(' | '), 'block');
+  } catch (err) {
+    check('Lint hygiene: per-rule lint budgets', false, `lint census failed: ${err && err.message ? err.message : String(err)}`, 'block');
+  }
+
   const blocks = checks.filter(item => !item.passed && item.severity === 'block');
   const warnings = checks.filter(item => !item.passed && item.severity === 'warn');
   const result = {

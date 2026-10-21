@@ -19,6 +19,7 @@ import { promisify } from 'util';
 import { createHash, randomUUID } from 'crypto';
 import { config, LLM_PROVIDER_IDS } from './config/index.js';
 import { resolveProviderModels } from './config/provider-models.js';
+import { readPositiveTimeoutEnv } from './config/env-timeouts.js';
 import {
   clearOAuth,
   completeClaudePkceFlow,
@@ -51,7 +52,7 @@ import { AI_REDTEAM_PLAYBOOK, AI_REDTEAM_TECHNIQUE_IDS, aiRedTeamBriefing } from
 import { OPERATOR_SYSTEM_PROMPTS, PLINIAN_OPERATOR_DOCTRINE, THE_FIXER_SYSTEM_PROMPT } from './prompts/index.js';
 import { createTargetFromUrl, createTargetFromIP } from './target/index.js';
 import { createChatHandler } from './chat/chat-route.js';
-import { createAuditLog, createRateLimiter, clientKey } from './server-hardening.js';
+import { createAuditLog, createRateLimiter, clientKey, hasControlCharacter } from './server-hardening.js';
 import { createConversationRoutes } from './chat/conversation-routes.js';
 import { createGenUiHandler } from './genui/generate-route.js';
 import { listLlmOptions, resolveStreamingConfig, selectServerLLMConfig } from './chat/streaming-config.js';
@@ -545,7 +546,6 @@ interface ParsedCommand {
 }
 
 const SHELL_META = /[|&;$<>`\\]/;
-const COMMAND_CONTROL = /[\x00-\x1F\x7F-\x9F\u2028\u2029]/;
 const CURL_TRANSPORT_OVERRIDE_FLAGS = new Set([
   '--resolve',
   '--connect-to',
@@ -621,7 +621,7 @@ function countCurlUrlOperands(args: string[]): number {
 }
 
 function parseCommand(command: string): ParsedCommand | { error: string } {
-  if (SHELL_META.test(command) || COMMAND_CONTROL.test(command)) return { error: 'Shell control characters are not allowed; use direct argv-style commands only.' };
+  if (SHELL_META.test(command) || hasControlCharacter(command)) return { error: 'Shell control characters are not allowed; use direct argv-style commands only.' };
   const parts = command.match(/"[^"]*"|'[^']*'|\S+/g)?.map(part => part.replace(/^["']|["']$/g, '')) || [];
   if (!parts.length) return { error: 'Command required' };
   const [bin, ...args] = parts;
@@ -8950,13 +8950,6 @@ function providerNeedsApiKey(provider: string): boolean {
 
 function providerRunsKeyless(provider: string): boolean {
   return !providerNeedsApiKey(provider);
-}
-
-function readPositiveTimeoutEnv(name: string): number | undefined {
-  const raw = process.env[name];
-  if (raw == null || raw.trim() === '') return undefined;
-  const parsed = Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function readGeneralTimeoutEnv(): number | undefined {

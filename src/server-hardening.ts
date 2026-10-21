@@ -146,3 +146,15 @@ export function createAuditLog(options: AuditLogOptions = {}): AuditLog {
     },
   };
 }
+
+/**
+ * True when `value` holds a C0 or C1 control character, DEL, or U+2028/U+2029.
+ * Command strings carrying these are rejected before argv parsing.
+ */
+export function hasControlCharacter(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i);
+    if (code <= 0x1F || (code >= 0x7F && code <= 0x9F) || code === 0x2028 || code === 0x2029) return true;
+  }
+  return false;
+}
