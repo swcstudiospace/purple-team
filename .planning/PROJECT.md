@@ -32,7 +32,7 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 - [ ] Purple auto-consumption of recorded verdicts
 - [ ] Text provenance (who/when/source) on ROE records
 - [ ] Install-and-launch verification of the built `.deb`/AppImage
-- [ ] Per-rule lint budgets and doctor-integrated lint gate
+- [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9)
 
 ## Requirements
 
@@ -67,7 +67,7 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 - [ ] Purple auto-consumption of recorded verdicts.
 - [ ] Text provenance (who/when/source) on ROE records.
 - [ ] Install-and-launch verification of the built `.deb`/AppImage.
-- [ ] Per-rule lint budgets and doctor-integrated lint gate.
+- [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9).
 
 ### Deferred (not in v2)
 

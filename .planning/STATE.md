@@ -9,13 +9,13 @@ last_activity_desc: Closeout run — v1.6 archived, v1.7 closed (PR #7 merged), 
 state_head: 95c63331bce121c06d5bcb8c67567cd034db1231
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 0
   completed_plans: 0
-  percent: 0
+  percent: 20
 current_phase: 37
 current_phase_name: Audit follow-ups
-stopped_at: v2 bootstrapped; phase 37 not yet planned
+stopped_at: phase 38 merged (PR #9); phase 37 partly done
 ---
 
 # Project State
