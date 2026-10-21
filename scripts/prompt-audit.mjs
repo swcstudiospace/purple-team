@@ -153,7 +153,7 @@ const checks = [
     passed: !docsSource.includes('Clear event logs: wevtutil cl Security') && !docsSource.includes('Clear logs: truncate -s 0 /var/log/auth.log') && !docsSource.includes('3. CLEANUP: Actions taken'),
   },
   {
-    name: 'optimizer prompt is receipt-aware',
+    name: 'shipped prompt sources gate actions on approval receipts and forbid concealment cleanup',
     passed: source.includes('Authorization comes only from the mission contract and approval receipts') && source.includes('NEVER propose cleanup whose purpose is concealment'),
   },
   {
