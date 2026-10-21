@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { clientKey, createAuditLog, createRateLimiter } from '../server-hardening.js';
+import { clientKey, createAuditLog, createRateLimiter, hasControlCharacter } from '../server-hardening.js';
 
 interface MockResponse {
   statusCode: number | undefined;
@@ -205,5 +205,23 @@ describe('createAuditLog', () => {
       log.appendEvent({ ts, kind: 'oauth.github.connect', summary: 'connect ' + ts });
     }
     expect(log.recent()).toHaveLength(4);
+  });
+});
+
+describe('hasControlCharacter', () => {
+  it('accepts printable ASCII and ordinary non-ASCII text', () => {
+    expect(hasControlCharacter('nmap -sV 10.0.0.1 café')).toBe(false);
+  });
+
+  it('rejects C0 controls, DEL, C1 controls and the Unicode line separators', () => {
+    for (const code of [0x00, 0x07, 0x1F, 0x7F, 0x80, 0x9F, 0x2028, 0x2029]) {
+      expect(hasControlCharacter(`ls${String.fromCharCode(code)}x`)).toBe(true);
+    }
+  });
+
+  it('accepts the characters just outside each control range', () => {
+    for (const code of [0x20, 0x7E, 0xA0]) {
+      expect(hasControlCharacter(String.fromCharCode(code))).toBe(false);
+    }
   });
 });
