@@ -10,7 +10,7 @@
  * or a silent append.
  */
 import type { Request, Response } from 'express';
-import { redactSecrets } from '../../redact.js';
+import { redactSecrets, redactString } from '../../redact.js';
 import { roeAudit, type AuditedAction } from '../white.js';
 import { parseRoe } from './roe-parser.js';
 import {
@@ -20,9 +20,11 @@ import {
   latestRevision,
   listRevisions,
   parseMissionId,
+  provenanceOf,
   type LedgerAppendResult,
   type LedgerRead,
   type MissionId,
+  type RecordedProvenance,
   type RoeLedgerStore,
 } from './roe-ledger.js';
 
@@ -62,6 +64,27 @@ function corruptBody(read: { line: number; reason: string }): Record<string, unk
   return { error: `ROE ledger is corrupt at line ${read.line}`, line: read.line, reason: read.reason };
 }
 
+/** Longest caller-asserted author, in characters after trimming. */
+const RECORDED_BY_MAX_CHARS = 128;
+
+/**
+ * Parse the optional PUT `author`. It is caller-asserted: the server records it as given and
+ * verifies nothing. Absent, null or blank after trimming gives null; any other non-string is
+ * refused; more than 128 characters is refused.
+ */
+export function parseRecordedAuthor(
+  raw: unknown,
+): { ok: true; recordedBy: string | null } | { ok: false; reason: string } {
+  if (raw === undefined || raw === null) return { ok: true, recordedBy: null };
+  if (typeof raw !== 'string') return { ok: false, reason: 'author must be a string' };
+  const trimmed = raw.trim();
+  if (trimmed === '') return { ok: true, recordedBy: null };
+  if (Array.from(trimmed).length > RECORDED_BY_MAX_CHARS) {
+    return { ok: false, reason: `author must be at most ${RECORDED_BY_MAX_CHARS} characters after trimming` };
+  }
+  return { ok: true, recordedBy: redactString(trimmed) };
+}
+
 export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
   const { store, emitContractEvent, recordReceipt } = deps;
 
@@ -79,7 +102,8 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
   }
 
   // PUT /api/teams/white/roe — append one revision for the mission (default
-  // `latest`). Body: { text, actions, missionId? }.
+  // `latest`). Body: { text, actions, missionId?, author? }. `author` is caller-asserted
+  // provenance, recorded as given; it is not verified.
   async function putRoe(req: Request, res: Response): Promise<void> {
     const body = (req.body ?? {}) as Record<string, unknown>;
     const text = body.text;
@@ -98,6 +122,11 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       res.status(400).json({ error: mission.reason });
       return;
     }
+    const author = parseRecordedAuthor(body.author);
+    if (!author.ok) {
+      res.status(400).json({ error: author.reason });
+      return;
+    }
     const missionId = mission.missionId;
     if (Buffer.byteLength(text, 'utf8') > ROE_BODY_CAP_BYTES) {
       res.status(413).json({ error: 'ROE text exceeds the 64 KiB cap' });
@@ -107,10 +136,12 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       res.status(413).json({ error: 'ROE actions exceed the 64 KiB cap' });
       return;
     }
+    const recordedAt = new Date().toISOString();
+    const provenance: RecordedProvenance = { status: 'recorded', recordedAt, source: 'api', recordedBy: author.recordedBy };
     let appended: LedgerAppendResult;
     try {
       appended = await store.append(missionId, (previous) =>
-        buildRevision({ missionId, text, actions, previous, recordedAt: new Date().toISOString() }),
+        buildRevision({ missionId, text, actions, previous, recordedAt, provenance }),
       );
     } catch (error) {
       console.warn(`[purple-team] ROE ledger append failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -178,7 +209,7 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       return;
     }
     const parse = parseRoe(latest.text);
-    const provenance = { revision: latest.revision, textHash: latest.textHash, recordedAt: latest.recordedAt };
+    const provenance = { revision: latest.revision, textHash: latest.textHash, ...provenanceOf(latest) };
     if (!parse.ok) {
       res.json(redactSecrets({ ...parse, missionId, provenance }));
       return;
@@ -249,7 +280,7 @@ export function createRoeHandlers(deps: RoeRouteDeps): RoeHandlers {
       res.status(404).json(redactSecrets({ error: 'unknown ROE revision', missionId, revision }));
       return;
     }
-    res.json(redactSecrets(line));
+    res.json(redactSecrets({ ...line, provenance: provenanceOf(line) }));
   }
 
   return { putRoe, getRoe, getRoeRevisions, getRoeRevision };
