@@ -1,5 +1,25 @@
 # Purple Team Changelog
 
+## 2026-10-21 — Phase 39: ROE verdict ledger and revision history
+
+**New**
+- ROE text is an append-only verdict ledger. Each `PUT /api/teams/white/roe` appends one JSONL line to `<stateRoot>/roe-ledger/<missionId>.jsonl`. Earlier lines are never rewritten, truncated or pruned. Each line stores the redacted text and actions, the hashes, the `parseRoe` outcome, and the `roeAudit` verdicts at record time.
+- `missionId` (query on GET, body field on PUT) selects a mission ledger. It defaults to `latest` and must match `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`; anything else answers `400`.
+- `GET /api/teams/white/roe/revisions` lists the full revision history (per-revision hashes, timestamps, parse outcome and verdict counts). `GET /api/teams/white/roe/revisions/:revision` returns one full revision; an unknown revision answers `404`.
+- `PUT /api/teams/white/roe` also answers `missionId` next to `revision` and `textHash`.
+
+**Changed (breaking)**
+- `roeRecords` is removed from `state.json`; the ledger is the only ROE store. At startup a legacy `latest` row is imported once as its existing revision number, with its `textHash`, `actionsHash` and `createdAt` preserved. A legacy row whose stored hashes do not match its text is not imported: the migration logs a warning with the reason, and `GET /api/teams/white/roe` reports cannot-derive as it did before.
+- Ledger path: `<stateRoot>/roe-ledger/<missionId>.jsonl`. In memory state mode the ledger is held in memory, as the old slot was.
+- A corrupt ledger line fails the mission closed: GET answers cannot-derive with `ledger: { status: 'corrupt', line, reason }`, PUT answers `409` and appends nothing, and the history routes answer `409`.
+- Hashes are computed over the redacted text and actions. Secret-free text keeps the same `textHash`; text that contained a secret now hashes differently.
+
+**Known limitations**
+- A corrupt or torn ledger line, such as a torn final line after a crash, blocks GET, PUT and history for that mission until a person repairs the file by hand. There is no automatic repair tool in this phase.
+- Revisions are contiguous from the first line in each file. A migrated ledger starts at the legacy revision number; revisions 1 to N-1 are not reconstructed.
+- No cross-process lock: two server processes sharing one state directory are not protected against interleaved appends. `state.json` has the same limit.
+- No fsync: a power loss can drop the most recent append.
+
 ## 2026-10-20 — Chat Panel UX wave: autocomplete, 4 Hats tab, hardening
 
 **New**
