@@ -521,3 +521,50 @@ describe('inline artifact binding (T-26-02)', () => {
     expect(whiteAllowed).toContain('auditEvidenceChain');
   });
 });
+
+describe('white team: roeAudit out-of-scope rationale bound', () => {
+  it('names at most five allowed targets and counts the rest', () => {
+    const allowed = Array.from({ length: 1000 }, (_, i) => `host${i}.corp.example.net`);
+    const [verdict] = roeAudit([{ command: 'curl x', target: 'other.test' }], { allowedTargets: allowed });
+    expect(verdict.verdict).toBe('violation');
+    expect(verdict.rationale).toBe(
+      `target "other.test" is outside the ROE allowed targets (${allowed.slice(0, 5).join(', ')}, and 995 more)`,
+    );
+  });
+
+  it('prints a short allowed list exactly as before', () => {
+    const [verdict] = roeAudit([{ command: 'curl x', target: 'other.test' }], { allowedTargets: ['a.example.com', 'b.example.com'] });
+    expect(verdict.rationale).toBe('target "other.test" is outside the ROE allowed targets (a.example.com, b.example.com)');
+  });
+
+  it('cuts an allowed target longer than 64 characters and marks the cut', () => {
+    const long = `${'label-'.repeat(12)}example.com`;
+    const [verdict] = roeAudit([{ command: 'curl x', target: 'other.test' }], { allowedTargets: [long] });
+    expect(verdict.rationale).toBe(`target "other.test" is outside the ROE allowed targets (${long.slice(0, 64)}...)`);
+  });
+
+  it('leaves the decision, action index and conditions of every verdict unchanged', () => {
+    const allowed = Array.from({ length: 12 }, (_, i) => `h${i}.example.com`);
+    const verdicts = roeAudit(
+      [
+        { command: 'curl x', target: 'h0.example.com' },
+        { command: 'curl x', target: 'other.test' },
+      ],
+      { allowedTargets: allowed },
+    );
+    expect(verdicts.map((v) => [v.actionIndex, v.verdict])).toEqual([
+      [0, 'compliant'],
+      [1, 'violation'],
+    ]);
+    expect(verdicts[1].conditions).toEqual([
+      'remove the target from the plan, or amend the ROE with a signed scope change before execution',
+    ]);
+  });
+
+  it('redacts an allowed URL with credentials before cutting it, so no password prefix survives', () => {
+    const allowed = `postgres://operator:${'hunter2-'.repeat(10)}@db.example.com/app`;
+    const [verdict] = roeAudit([{ command: 'curl x', target: 'other.test' }], { allowedTargets: [allowed] });
+    expect(verdict.rationale).not.toContain('hunter2');
+    expect(verdict.rationale).toContain('[redacted]');
+  });
+});
