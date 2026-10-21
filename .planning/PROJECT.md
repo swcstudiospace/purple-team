@@ -28,10 +28,10 @@ Close-out follow-ups (v1.4 audit tech debt):
 - [ ] Stray repo-root artifact file `Heads-up: while wiring GET '` — delete or move on next touch
 
 Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
-- [ ] Persisted verdict ledger slot and ROE revision history — scheduled: Phase 39 (see `.planning/v2-REQUIREMENTS.md`)
-- [ ] Purple auto-consumption of recorded verdicts — scheduled: Phase 40 (see `.planning/v2-REQUIREMENTS.md`)
-- [ ] Text provenance (who/when/source) on ROE records — scheduled: Phase 40 (see `.planning/v2-REQUIREMENTS.md`)
-- [ ] Install-and-launch verification of the built `.deb`/AppImage — scheduled: Phase 41 (see `.planning/v2-REQUIREMENTS.md`)
+- [x] Persisted verdict ledger slot and ROE revision history — delivered in Phase 39 (PRs #13, #15)
+- [x] Purple auto-consumption of recorded verdicts — delivered in Phase 40 (PR #14)
+- [x] Text provenance (who/when/source) on ROE records — delivered in Phase 40 (PR #14); new records only, no backfill
+- [x] Install-and-launch verification of the built `.deb`/AppImage — delivered in Phase 41 (PR #12)
 - [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9)
 
 ## Requirements
@@ -63,10 +63,10 @@ Deferred v2 requirements (from v1.4 REQUIREMENTS.md):
 ### Active
 
 - [ ] Close the v1.4 audit follow-ups: F-20-01 prompt audit (retargeted to shipped doctrine sources), stale v1.3 Nyquist prose (refreshed), Phase 23 Tier-cell browser check (observed), F-25-01 lint scope (widened).
-- [ ] Persisted verdict ledger slot and ROE revision history.
-- [ ] Purple auto-consumption of recorded verdicts.
-- [ ] Text provenance (who/when/source) on ROE records.
-- [ ] Install-and-launch verification of the built `.deb`/AppImage.
+- [x] Persisted verdict ledger slot and ROE revision history (Phase 39, PRs #13, #15).
+- [x] Purple auto-consumption of recorded verdicts (Phase 40, PR #14).
+- [x] Text provenance (who/when/source) on ROE records (Phase 40, PR #14).
+- [x] Install-and-launch verification of the built `.deb`/AppImage (Phase 41, PR #12).
 - [x] Per-rule lint budgets and doctor-integrated lint gate (phase 38, PR #9).
 
 ### Deferred (not in v2)
