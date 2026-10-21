@@ -8543,6 +8543,12 @@ app.post('/api/mission/stop', (req: Request, res: Response) => {
       controller.abort();
     }
   }
+  // A targeted cancel that matched an in-flight repo download cancels only that
+  // download. It must not stop whatever mission is currently running.
+  if (requestedRunId !== undefined && cancelledRunIds.length > 0) {
+    res.json({ success: true, cancelledIngest: true, cancelledRunIds });
+    return;
+  }
   const cmd = getTempestCommand();
   if (!cmd) {
     if (cancelledRunIds.length > 0) {

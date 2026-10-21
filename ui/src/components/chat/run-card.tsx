@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type { PurpleRunCounters, PurpleRunEvent, PurpleRunEventState } from '../../lib/events';
+import { purpleRunMatches } from '../../../../src/chat/purple-run-match';
 const Markdown = lazy(() => import('./markdown'));
 /**
  * Inline Purple Team run progress (`data-purple-run` DataUIPart renderer).
@@ -241,7 +242,8 @@ export function mergePurpleRunData(
   // Mission-scoped emitters (tick progress, stop notice) send the mission id as runId and no repo.
   const missionId = event.missionId ?? prev?.missionId ?? (event.repo === undefined ? event.runId : undefined);
   return {
-    runId: event.runId,
+    // Keep the card's own id: later events match it, whichever id they carry.
+    runId: prev?.runId ?? event.runId,
     label: prev?.label ?? (event.repo !== undefined ? runLabel(event.repo) : `Mission ${event.runId}`),
     state: displayState,
     phases: derivePhases(livePhaseOf(event.state, prev), failedPhase, cancelledPhase),
@@ -281,7 +283,7 @@ export function upsertPurpleRun(messages: UIMessage[], event: PurpleRunEvent, no
     const message = messages[index];
     let touched = false;
     const parts = message.parts.map(part => {
-      if (part.type === 'data-purple-run' && isPurpleRunData(part.data) && part.data.runId === event.runId) {
+      if (part.type === 'data-purple-run' && isPurpleRunData(part.data) && purpleRunMatches(part.data, event)) {
         touched = true;
         return { ...part, data: mergePurpleRunData(part.data, event, now) };
       }
