@@ -60,10 +60,11 @@ export async function loadLintBudgets(path = resolve('lint-budgets.json')) {
 }
 
 export async function runEslintCensus(scope) {
-  const eslintBin = resolve('node_modules/.bin/eslint');
+  // Run ESLint's JS entry through Node: the node_modules/.bin shim cannot be exec'd on Windows.
+  const eslintEntry = resolve('node_modules/eslint/bin/eslint.js');
   let stdout;
   try {
-    ({ stdout } = await execFileAsync(eslintBin, ['--format', 'json', scope], { maxBuffer: 256 * 1024 * 1024 }));
+    ({ stdout } = await execFileAsync(process.execPath, [eslintEntry, '--format', 'json', scope], { maxBuffer: 256 * 1024 * 1024 }));
   } catch (error) {
     // ESLint exits non-zero whenever it reports errors; the JSON report is still on stdout.
     if (typeof error.stdout !== 'string' || error.stdout === '') throw error;
