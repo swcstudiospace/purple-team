@@ -68,17 +68,14 @@ record_artifact() { # <kind> <path>
     '{kind: $kind, file: $file, sha256: $sha256, bytes: $bytes}' >>"$ARTIFACTS" || RECORD_ERRORS=$((RECORD_ERRORS + 1))
 }
 
-finish() {
-  trap - EXIT
-  local overall=pass fails
-  fails="$(jq -s '[.[] | select(.status == "fail")] | length' "$CHECKS" 2>/dev/null || echo error)"
-  if [ "$RUN_COMPLETE" != 1 ] || [ "$RECORD_ERRORS" -ne 0 ] || [ ! -s "$CHECKS" ] || [ "$fails" != 0 ]; then
-    overall=fail
-  fi
+# write_receipt <overall>: writes receipt.json, then fails unless the bytes on disk
+# parse, carry the schema and verdict, and hold one entry per recorded check. A full
+# or read-only volume can leave an empty or partial file, so the saved file is checked.
+write_receipt() {
   jq -n \
     --arg schema "desktop-install-launch/v1" \
     --arg boundary "$CLAIM_BOUNDARY" \
-    --arg overall "$overall" \
+    --arg overall "$1" \
     --arg container_image "$CONTAINER_IMAGE" \
     --arg source_sha "$SOURCE_SHA" \
     --arg source_run_id "$SOURCE_RUN_ID" \
@@ -92,7 +89,20 @@ finish() {
       source: {sha: $source_sha, run_id: $source_run_id},
       ci_artifact: $ci_artifact,
       artifacts: $artifacts,
-      checks: $checks}' >"$RECEIPT_DIR/receipt.json"
+      checks: $checks}' >"$RECEIPT_DIR/receipt.json" || return 1
+  jq -e --arg overall "$1" --argjson expected "$(jq -s length "$CHECKS")" \
+    '.schema == "desktop-install-launch/v1" and .overall == $overall and (.checks | length) == $expected' \
+    "$RECEIPT_DIR/receipt.json" >/dev/null
+}
+
+finish() {
+  trap - EXIT
+  local overall=pass fails
+  fails="$(jq -s '[.[] | select(.status == "fail")] | length' "$CHECKS" 2>/dev/null || echo error)"
+  if [ "$RUN_COMPLETE" != 1 ] || [ "$RECORD_ERRORS" -ne 0 ] || [ ! -s "$CHECKS" ] || [ "$fails" != 0 ]; then
+    overall=fail
+  fi
+  # Summary first, receipt last: a receipt on disk implies the summary was written too.
   {
     echo "## Desktop install and launch (Linux, headless)"
     echo
@@ -103,7 +113,14 @@ finish() {
     echo "| Check | Status | Detail |"
     echo "| --- | --- | --- |"
     jq -r '"| \(.id) | \(.status) | \(.detail) |"' "$CHECKS"
-  } >"$RECEIPT_DIR/summary.md"
+  } >"$RECEIPT_DIR/summary.md" || {
+    echo "[desktop-check] FATAL: cannot write summary.md in $RECEIPT_DIR" >&2
+    exit 1
+  }
+  if ! write_receipt "$overall"; then
+    echo "[desktop-check] FATAL: receipt.json was not written or failed validation in $RECEIPT_DIR" >&2
+    exit 1
+  fi
   if [ "$overall" != pass ]; then
     echo "[desktop-check] FAILED: see $RECEIPT_DIR/receipt.json" >&2
     exit 1
@@ -150,27 +167,28 @@ start_sidecar_check() {
 }
 
 check_deb_linkage() { # <package>
-  local pkg="$1" path out rc checked=0 static=0
+  local pkg="$1" path out flat rc checked=0 static=0
   local -a missing=() broken=()
   while IFS= read -r path; do
     if [ ! -f "$path" ] || [ ! -x "$path" ]; then continue; fi
     [ "$(head -c 4 "$path")" = $'\177ELF' ] || continue
     out="$(ldd "$path" 2>&1)"
     rc=$?
+    flat="${out//$'\n'/ | }"
     if grep -q 'not found' <<<"$out"; then
-      missing+=("$path")
+      missing+=("$path: ${flat:-<no output>}")
     elif grep -qE 'not a dynamic executable|statically linked' <<<"$out"; then
       static=$((static + 1))
     elif [ "$rc" -ne 0 ]; then
-      broken+=("$path")
+      broken+=("$path (ldd exit $rc): ${flat:-<no output>}")
     else
       checked=$((checked + 1))
     fi
   done < <(dpkg -L "$pkg")
-  if [ "$checked" -eq 0 ] && [ "$static" -eq 0 ]; then
-    record_check deb-ldd fail "no ELF executables found in package $pkg"
-  elif [ "${#missing[@]}" -gt 0 ] || [ "${#broken[@]}" -gt 0 ]; then
+  if [ "${#missing[@]}" -gt 0 ] || [ "${#broken[@]}" -gt 0 ]; then
     record_check deb-ldd fail "ldd problems: not-found=[${missing[*]:-none}] failing=[${broken[*]:-none}]"
+  elif [ "$checked" -eq 0 ] && [ "$static" -eq 0 ]; then
+    record_check deb-ldd fail "no ELF executables found in package $pkg"
   else
     record_check deb-ldd pass "ldd reports no 'not found' for $checked dynamic and $static static ELF executable(s) in $pkg"
   fi
@@ -245,7 +263,10 @@ appimage_check() { # <path to .AppImage in artifact dir>
     record_check appimage-sidecar-health not-applicable "AppImage does not bundle t3mp3st-server; not a pass"
     return 0
   fi
-  chmod +x "$sidecar"
+  if [ ! -x "$sidecar" ]; then
+    record_check appimage-sidecar-health fail "AppImage t3mp3st-server is not executable in the extracted tree; permissions are not repaired"
+    return 0
+  fi
   while IFS= read -r path; do
     if [ -d "$path" ] && [ "$(basename "$path")" = docs ]; then
       resource_root="$(dirname "$path")"
