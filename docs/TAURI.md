@@ -198,10 +198,11 @@ the sidecar in `usr/bin`, where `linuxdeploy --appdir` rewrites the RPATH of
 every ELF with patchelf. patchelf inserts 8 KiB before the ELF section headers,
 which shifts the pkg payload appended to the sidecar, so the copy failed with
 `Pkg: Error reading from file` or a `SyntaxError`. The sidecar now ships outside
-`usr/bin` on Linux only: `src-tauri/tauri.linux.conf.json` sets
-`bundle.externalBin` to `null` and maps the sidecar with `bundle.linux.deb.files`
-(`usr/bin/t3mp3st-server`, the deb layout, unchanged) and
-`bundle.linux.appimage.files` (`usr/lib/t3mp3st-sidecar/t3mp3st-server`).
+`usr/bin` on Linux only. `src-tauri/tauri.linux.conf.json` sets `bundle.externalBin` to `null` and maps
+the sidecar from `binaries/t3mp3st-server`, the triple-free copy that
+`scripts/build-sidecar.mjs` writes for each Linux target. `bundle.linux.deb.files`
+keeps the deb layout (`usr/bin/t3mp3st-server`), and `bundle.linux.appimage.files`
+places it at `usr/lib/t3mp3st-sidecar/t3mp3st-server`.
 `sidecar_binary` in `src-tauri/src/lib.rs` looks next to the app binary first,
 then under `../lib/t3mp3st-sidecar`. The pkg payload format is unchanged. The
 install-launch check stays fail-closed and AC-41-06 is not relaxed.

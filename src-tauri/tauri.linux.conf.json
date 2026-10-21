@@ -4,12 +4,12 @@
     "linux": {
       "deb": {
         "files": {
-          "usr/bin/t3mp3st-server": "binaries/t3mp3st-server-x86_64-unknown-linux-gnu"
+          "usr/bin/t3mp3st-server": "binaries/t3mp3st-server"
         }
       },
       "appimage": {
         "files": {
-          "usr/lib/t3mp3st-sidecar/t3mp3st-server": "binaries/t3mp3st-server-x86_64-unknown-linux-gnu"
+          "usr/lib/t3mp3st-sidecar/t3mp3st-server": "binaries/t3mp3st-server"
         }
       }
     }
