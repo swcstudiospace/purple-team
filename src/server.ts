@@ -545,7 +545,15 @@ interface ParsedCommand {
 }
 
 const SHELL_META = /[|&;$<>`\\]/;
-const COMMAND_CONTROL = /[\x00-\x1F\x7F-\x9F\u2028\u2029]/;
+const COMMAND_CONTROL = {
+  test(value: string): boolean {
+    for (let i = 0; i < value.length; i++) {
+      const code = value.charCodeAt(i);
+      if (code <= 0x1F || (code >= 0x7F && code <= 0x9F) || code === 0x2028 || code === 0x2029) return true;
+    }
+    return false;
+  },
+};
 const CURL_TRANSPORT_OVERRIDE_FLAGS = new Set([
   '--resolve',
   '--connect-to',
@@ -8954,7 +8962,7 @@ function providerRunsKeyless(provider: string): boolean {
 
 function readPositiveTimeoutEnv(name: string): number | undefined {
   const raw = process.env[name];
-  if (raw == null || raw.trim() === '') return undefined;
+  if (raw === null || raw === undefined || raw.trim() === '') return undefined;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }

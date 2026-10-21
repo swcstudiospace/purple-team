@@ -77,7 +77,7 @@ D3-DLV,Harden,,Domain Logic Validation,,Validation of variable state in the cont
 D3-OLV,Harden,,,Operational Logic Validation,Validation of variable state in the context of the control logic of the operational application.
 D3-CS,Harden,,Credential Scrubbing,,The systematic removal of hard-coded credentials from source code to prevent accidental exposure and unauthorized access.
 D3-AA,Harden,Agent Authentication,,,
-D3-TBA,Harden,,Token-based Authentication,,"Token-based authentication is an authentication protocol where users verify their identity in exchange for a unique access token. Users can then access the website, application, or resource for the life of the token without having to re-enter their credentials."
+D3-TBA,Harden,,Token-based Authentication,,"Token-based authentication is an authentication protocol where users verify their identity in exchange for a\u00A0unique access token. Users can then access the website, application, or resource for the life of the token without having to re-enter their credentials."
 D3-PWA,Harden,,Password Authentication,,"Password authentication is a security mechanism used to verify the identity of a user or entity attempting to access a system or resource by requiring the input of a secret string of characters, known as a password, that is associated with the user or entity."
 D3-MFA,Harden,,Multi-factor Authentication,,Requiring proof of two or more pieces of evidence in order to authenticate a user.
 D3-CBAN,Harden,,Certificate-based Authentication,,Requiring a digital certificate in order to authenticate a user.

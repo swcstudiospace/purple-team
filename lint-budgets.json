@@ -1,0 +1,11 @@
+{
+  "scope": "src/**/*.ts",
+  "maxErrors": 0,
+  "rules": {
+    "@typescript-eslint/no-explicit-any": { "maxWarnings": 184 },
+    "@typescript-eslint/no-non-null-assertion": { "maxWarnings": 97 },
+    "@typescript-eslint/no-unused-vars": { "maxWarnings": 3 },
+    "curly": { "maxWarnings": 1 },
+    "parse": { "maxWarnings": 1 }
+  }
+}
