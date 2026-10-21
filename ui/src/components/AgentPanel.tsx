@@ -25,7 +25,7 @@ import { ConversationSidebar } from './workbench/ConversationSidebar';
 import { SlashPalette } from './workbench/SlashPalette';
 import { AGENT_LABEL } from './workbench/agent-labels';
 import { readPrefs, savePrefs } from './workbench/prefs';
-import { startedRunIds, useConversationsStore } from '../stores/conversations';
+import { newClientRunId, startedRunIds, useConversationsStore } from '../stores/conversations';
 import { useSelectedRepo } from '../stores/github';
 import './agent-panel.css';
 import './workbench/workbench.css';
@@ -139,7 +139,7 @@ function coerceArg(name: string, raw: string): Coerced {
   return { ok: true, value: trimmed };
 }
 
-function buildRequest(spec: CommandSpec, args: Record<string, string>): BuiltRequest {
+function buildRequest(spec: CommandSpec, args: Record<string, string>, clientRunId?: string): BuiltRequest {
   if (!spec.route) return { ok: false, error: 'This command is local only and has no route.' };
 
   const values: Record<string, unknown> = {};
@@ -180,7 +180,8 @@ function buildRequest(spec: CommandSpec, args: Record<string, string>): BuiltReq
             ...(typeof values.name === 'string' ? { name: values.name } : {}),
           })
     : values;
-  return { ok: true, method: 'POST', url: spec.route.path, body: JSON.stringify(body) };
+  const payload = clientRunId === undefined ? body : { ...body, clientRunId };
+  return { ok: true, method: 'POST', url: spec.route.path, body: JSON.stringify(payload) };
 }
 
 function parseJsonBody(text: string): ParsedBody {
@@ -389,13 +390,15 @@ export default function AgentPanel({ focusMode, onExitFocusMode }: AgentPanelPro
       return;
     }
 
-    const built = buildRequest(spec, finalArgs);
+    const clientRunId = spec.name === 'hunt' ? newClientRunId() : undefined;
+    const built = buildRequest(spec, finalArgs, clientRunId);
     if (!built.ok) {
       appendEntry({ ...base, status: 'error', error: built.error });
       return;
     }
 
     appendEntry(base);
+    if (clientRunId !== undefined) useConversationsStore.getState().recordRunOwners(thread, [clientRunId]);
     const start = Date.now();
     const controller = new AbortController();
     controllersRef.current.set(id, controller);

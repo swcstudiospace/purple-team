@@ -7826,6 +7826,12 @@ function emitRepoRunMission(runId: string, repo: RepoUrlIngestPack['repo'], miss
   broadcastEvent('purple-run', { runId, repo, state: 'completed', missionId });
 }
 
+/** Client-minted run id accepted for a run; anything else is ignored and the server id is kept. */
+const CLIENT_RUN_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
+function acceptClientRunId(value: unknown): string | undefined {
+  return typeof value === 'string' && CLIENT_RUN_ID_PATTERN.test(value) ? value : undefined;
+}
+
 type RepoUrlIngestOutcome =
   | { ok: true; pack: RepoUrlIngestPack }
   | { ok: false; error: RepoIngestError };
@@ -8081,6 +8087,9 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
       if (e instanceof StructuredStartError) { res.status(400).json({ error: e.message }); return; }
       throw e;
     }
+    // Client-minted run id (UI joins purple-run events to it before the POST returns).
+    const clientRunId = acceptClientRunId(startBody.clientRunId);
+    if (clientRunId !== undefined) start.runId = clientRunId;
 
     const structuredTargets: unknown[] = Array.isArray(targets) ? targets : [];
     if (!start.artifactOnly && structuredTargets.length === 0) {
@@ -8297,7 +8306,7 @@ app.post('/api/mission/start', async (req: Request, res: Response): Promise<void
   // Phase 35 repo-URL ingest (legacy branch): beside the repoPath block,
   // after guardAction approval. runId is minted at request acceptance and
   // echoed in the response so the UI can join purple-run SSE events to the POST.
-  const repoUrlRunId = `run-${randomUUID()}`;
+  const repoUrlRunId = acceptClientRunId(startBody.clientRunId) ?? `run-${randomUUID()}`;
   let repoUrlPack: RepoUrlIngestPack | undefined;
   if (repoUrlInput !== '') {
     const outcome = await runRepoUrlIngestPhase(repoUrlInput, repoUrlRunId, res);

@@ -123,6 +123,26 @@ export function startedRunIds(body: unknown): string[] {
     .filter((value): value is string => typeof value === 'string' && value !== '');
 }
 
+/**
+ * Client-minted runId for a repo start. crypto.randomUUID exists only in secure contexts
+ * (https or localhost), so LAN-bound plain-HTTP mode falls back to a time-plus-random id.
+ */
+export function newClientRunId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** runIds and missionIds of the data-purple-run cards persisted in a thread, so reloaded cards keep updating. */
+function persistedRunIds(messages: UIMessage[]): string[] {
+  const ids: string[] = [];
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'data-purple-run') ids.push(...startedRunIds(part.data));
+    }
+  }
+  return ids;
+}
+
 export const useConversationsStore = create<ConversationsState>()((set, get) => ({
   metas: [],
   streamingThreadId: null,
@@ -246,6 +266,7 @@ export const useConversationsStore = create<ConversationsState>()((set, get) => 
     try {
       const { meta, messages } = await getConversation(id);
       lastSyncedPayloads.set(id, JSON.stringify(messages));
+      get().recordRunOwners(id, persistedRunIds(messages));
       set(state => ({ metas: upsertMeta(state.metas, meta), error: null }));
       return messages;
     } catch (err: unknown) {
