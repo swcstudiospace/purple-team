@@ -1,5 +1,22 @@
 # Milestones
 
+## v1.7 GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel (Archived: 2026-10-21)
+
+**Phases completed:** 3 phases (34, 35, 36), 1 plan. Phases 35 and 36 have no PLAN files; their code shipped in 2c2feb5 and was gap-closed in 892d287.
+
+**Closeout:** Owner accepted R1 as carried validation debt and archived on 2026-10-21. Verification status is `human_needed` for phases 34, 35 and 36. Not shipped: no PR, no Greptile review, no merge.
+
+**Known gaps:** R1 live Claude Pro/Max login (34). D2 mission-level run before the legacy snippet inputs are removed (35). Live SSE drop and reconnect, private repo with a connected token, rate-limit window, repo above 64 MiB (35). Live streaming, regenerate on reload, keyboard pass, AgentPanel configure-dialog focus trap (36). Unplanned Chat Panel wave recorded in the audit.
+
+**Audit:** `.planning/milestones/v1.7-MILESTONE-AUDIT.md`. **Phase archive:** `.planning/milestones/v1.7-phases/`.
+
+**Key accomplishments:**
+- 34 · **Refs:** SPE-15995 · **Completed:** 2026-10-19 · **Branch:** `v1.7-github-claude-agentpanel`
+- 35 · **Refs:** SPE-15994, SPE-15992 · **Completed:** 2026-10-21 · **Branch:** v1.7-github-claude-agentpanel
+- 36 · **Refs:** SPE-15993 · **Completed:** 2026-10-21 · **Branch:** v1.7-github-claude-agentpanel
+
+---
+
 ## v1.5 Four-Hat Runtime Parity (Archived: 2026-10-15)
 
 **Closeout:** `override_closeout`. Owner selected `Accept gaps and archive` on 2026-10-15. Phase 29 verification stays `human_needed`. Audit status `gaps_found`.

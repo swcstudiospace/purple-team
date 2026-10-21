@@ -108,18 +108,15 @@ describe('GitHub API client + classifier', () => {
   describe('resolve URL parser', () => {
     it('accepts every documented form', () => {
       const base = { owner: 'octo-org', repo: 'purple-team' };
-      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team')).toEqual(base);
-      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team/')).toEqual(base);
-      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team.git')).toEqual(base);
-      expect(parseGitHubRepoUrl('https://www.github.com/octo-org/purple-team')).toEqual(base);
-      expect(parseGitHubRepoUrl('github.com/octo-org/purple-team')).toEqual(base);
-      expect(parseGitHubRepoUrl('octo-org/purple-team')).toEqual(base);
+      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team')).toEqual({ ok: true, value: base });
+      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team/')).toEqual({ ok: true, value: base });
+      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team.git')).toEqual({ ok: true, value: base });
+      expect(parseGitHubRepoUrl('https://www.github.com/octo-org/purple-team')).toEqual({ ok: true, value: base });
+      expect(parseGitHubRepoUrl('octo-org/purple-team')).toEqual({ ok: true, value: base });
       expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team/tree/v1.2.3'))
-        .toEqual({ ...base, ref: 'v1.2.3' });
-      expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team/blob/main/src/x.ts'))
-        .toEqual({ ...base, ref: 'main/src/x.ts' });
+        .toEqual({ ok: true, value: { ...base, ref: 'v1.2.3' } });
       expect(parseGitHubRepoUrl('https://github.com/octo-org/purple-team/tree/feature%2Fblue'))
-        .toEqual({ ...base, ref: 'feature/blue' });
+        .toEqual({ ok: true, value: { ...base, ref: 'feature/blue' } });
     });
 
     it('rejects other hosts, schemes, credentials, and malformed shapes', () => {
@@ -132,6 +129,7 @@ describe('GitHub API client + classifier', () => {
         'http://github.com/octo-org/purple-team',
         'https://user:token@github.com/octo-org/purple-team',
         'evil.com/octo-org/purple-team',
+        'github.com/octo-org/purple-team',
         'https://github.com/octo-org',
         'https://github.com/octo-org/purple-team/releases/tag/v1',
         'https://github.com/-badowner/purple-team',
@@ -140,8 +138,21 @@ describe('GitHub API client + classifier', () => {
         'https://github.com/octo-org/purple-team/tree/..',
         'x'.repeat(2049),
       ]) {
-        expect(parseGitHubRepoUrl(bad), `expected invalid: ${bad}`).toBeNull();
+        expect(parseGitHubRepoUrl(bad).ok, `expected invalid: ${bad}`).toBe(false);
       }
+    });
+
+    it('delegates to parseRepoTarget: a bare owner/repo gives the same owner and repo as the full URL', () => {
+      const full = parseGitHubRepoUrl('https://github.com/octo-org/purple-team');
+      const bare = parseGitHubRepoUrl('octo-org/purple-team');
+      expect(full).toEqual({ ok: true, value: { owner: 'octo-org', repo: 'purple-team' } });
+      expect(bare).toEqual(full);
+    });
+
+    it('delegates to parseRepoTarget: a /blob/ URL is rejected as an unsupported view', () => {
+      const result = parseGitHubRepoUrl('https://github.com/octo-org/purple-team/blob/main/src/x.ts');
+      if (result.ok) throw new Error('expected /blob/ to be rejected');
+      expect(result.message).toContain('/tree/');
     });
   });
 
@@ -328,5 +339,101 @@ describe('GitHub API client + classifier', () => {
   it('rejects a non-array /user/repos body as network-error', async () => {
     const f = fakeApiFetch(() => ({ ok: true, status: 200, body: { nope: true } }));
     await expect(listGitHubRepos({ token: TOKEN, fetchImpl: f })).rejects.toBeInstanceOf(GitHubApiError);
+  });
+
+  describe('resolve: slash-branch ref', () => {
+    const OWNER = 'octo-org';
+    const REPO = 'purple-team';
+
+    // Answers the branch probe (/branches/) and tag probe (/git/ref/tags/) for the listed names
+    // (404 otherwise), and the repo record for every other URL.
+    function refFetch(refs: { branches?: string[]; tags?: string[] }) {
+      const branches = refs.branches ?? [];
+      const tags = refs.tags ?? [];
+      return fakeApiFetch((url) => {
+        const tagProbe = url.split('/git/ref/tags/')[1];
+        const branchProbe = url.split('/branches/')[1];
+        if (tagProbe === undefined && branchProbe === undefined) return { ok: true, status: 200, body: repoRecord() };
+        const found = tagProbe !== undefined
+          ? tags.includes(decodeURIComponent(tagProbe))
+          : branches.includes(decodeURIComponent(branchProbe));
+        return found
+          ? { ok: true, status: 200, body: {} }
+          : { ok: false, status: 404, body: { message: 'Not Found' } };
+      });
+    }
+
+    // Ordered ref probes as "branch:<name>" / "tag:<name>".
+    function probes(f: { mock: { calls: unknown[][] } }): string[] {
+      return f.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes('/branches/') || url.includes('/git/ref/tags/'))
+        .map((url) => (url.includes('/git/ref/tags/')
+          ? `tag:${decodeURIComponent(url.split('/git/ref/tags/')[1])}`
+          : `branch:${decodeURIComponent(url.split('/branches/')[1])}`));
+    }
+
+    it('/tree/feature/blue resolves to the slash branch when the split ref is not a ref', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/feature/blue`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'feature', subpath: 'blue' });
+
+      const f = refFetch({ branches: ['feature/blue'] });
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'feature', subpath: 'blue', fetchImpl: f });
+      expect(r.ref).toBe('feature/blue');
+      expect(probes(f)).toEqual(['branch:feature', 'tag:feature', 'branch:feature/blue']);
+    });
+
+    it('/tree/main/src keeps ref main when main is a branch, and main/src is never probed', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/main/src`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'main', subpath: 'src' });
+
+      const f = refFetch({ branches: ['main'] });
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'main', subpath: 'src', fetchImpl: f });
+      expect(r.ref).toBe('main');
+      expect(probes(f)).toEqual(['branch:main']);
+    });
+
+    it('keeps the parsed ref when no candidate is a branch or tag', async () => {
+      const f = refFetch({});
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'v1.2.3', subpath: 'docs', fetchImpl: f });
+      expect(r.ref).toBe('v1.2.3');
+      expect(probes(f)).toEqual(['branch:v1.2.3', 'tag:v1.2.3', 'branch:v1.2.3/docs', 'tag:v1.2.3/docs']);
+    });
+
+    it('an encoded slash ref without a subpath is taken as written and never probed', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/feature%2Fblue`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'feature/blue' });
+
+      const f = refFetch({});
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'feature/blue', fetchImpl: f });
+      expect(r.ref).toBe('feature/blue');
+      expect(probes(f)).toEqual([]);
+    });
+
+    it('a tag that is a prefix of a branch-scoped path wins at the shorter candidate', async () => {
+      const parsed = parseGitHubRepoUrl(`https://github.com/${OWNER}/${REPO}/tree/v1/docs`);
+      if (!parsed.ok) throw new Error(parsed.message);
+      expect(parsed.value).toEqual({ owner: OWNER, repo: REPO, ref: 'v1', subpath: 'docs' });
+
+      const f = refFetch({ tags: ['v1'], branches: ['v1/docs'] });
+      const r = await resolveGitHubRepo({ owner: OWNER, repo: REPO, ref: 'v1', subpath: 'docs', fetchImpl: f });
+      expect(r.ref).toBe('v1');
+      expect(probes(f)).toEqual(['branch:v1', 'tag:v1']);
+    });
+
+    it('targets that used to share a cache entry each resolve to their own ref', async () => {
+      const branchScoped = { owner: OWNER, repo: REPO, ref: 'main', subpath: 'src' };
+      const tagScoped = { owner: OWNER, repo: REPO, ref: 'main/src' };
+      const f = refFetch({ branches: ['main'] });
+      expect((await resolveGitHubRepo({ ...branchScoped, fetchImpl: f })).ref).toBe('main');
+      expect((await resolveGitHubRepo({ ...tagScoped, fetchImpl: f })).ref).toBe('main/src');
+
+      __resetGitHubApiState();
+      expect((await resolveGitHubRepo({ ...tagScoped, fetchImpl: f })).ref).toBe('main/src');
+      expect((await resolveGitHubRepo({ ...branchScoped, fetchImpl: f })).ref).toBe('main');
+    });
   });
 });

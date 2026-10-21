@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { parseRepoTarget, type ParsedRepoTarget } from '../../../src/recon/repo-url';
 import { useSelectedRepo } from '../stores/github';
+import { newClientRunId, startedRunIds, useConversationsStore } from '../stores/conversations';
 import './repo-run-config.css';
 /**
  * Hunt run configuration.
@@ -62,6 +63,14 @@ const OPERATOR_GROUPS: ReadonlyArray<{ group: string; doctrine: string; roles: r
 
 const DEFAULT_ROLES: readonly string[] = ['scanner', 'auditor'];
 
+/** Datalist suggestions for the Operators field: exactly the operator ids HEAD's AgentPanel launches. */
+const ROLE_SUGGESTIONS: readonly string[] = [
+  'scanner', 'recon', 'exploiter', // Red
+  'blue', 'sentinel', // Blue
+  'white', 'auditor', // White
+  'black', 'specter', // Black
+];
+
 /** One branch row from GET /api/github/branches (fed to the ref datalist). */
 interface BranchSummary {
   name: string;
@@ -87,6 +96,7 @@ interface MissionStartBody {
   repoPath?: string;
   provider?: string;
   model?: string;
+  clientRunId?: string;
 }
 
 type TargetMode = 'url' | 'local';
@@ -151,6 +161,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
   const nameId = useId();
   const rolesId = useId();
   const branchListId = useId();
+  const rolesListId = useId();
   const pathId = useId();
   const providerFieldId = useId();
   const modelFieldId = useId();
@@ -413,6 +424,9 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
         payload.provider = choice.provider;
         payload.model = choice.model;
       }
+      const clientRunId = newClientRunId();
+      payload.clientRunId = clientRunId;
+      if (threadId !== undefined) useConversationsStore.getState().recordRunOwners(threadId, [clientRunId]);
       const response = await fetch('/api/mission/start', {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -435,6 +449,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
         if ('runId' in record && typeof record.runId === 'string') summary.runId = record.runId;
         if ('missionName' in record && typeof record.missionName === 'string') summary.missionName = record.missionName;
       }
+      if (threadId !== undefined) useConversationsStore.getState().recordRunOwners(threadId, startedRunIds(body));
       setStarted(summary);
       onStarted?.(summary);
     } catch (err) {
@@ -516,7 +531,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
               value={repoUrl}
               spellCheck={false}
               autoComplete="off"
-              placeholder="https://github.com/owner/repo"
+              placeholder="https://github.com/owner/repo (or paste a repo URL anywhere)"
               aria-describedby={`${urlId}-feedback`}
               onChange={event => handleUrlChange(event.target.value)}
             />
@@ -541,7 +556,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
               value={repoPath}
               spellCheck={false}
               autoComplete="off"
-              placeholder="/absolute/path/to/repo"
+              placeholder="/home/you/repos/your-repo"
               aria-describedby={`${pathId}-hint`}
               onChange={event => setRepoPath(event.target.value)}
             />
@@ -563,7 +578,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
                 disabled={!controlsAvailable}
                 spellCheck={false}
                 autoComplete="off"
-                placeholder="default branch (auto)"
+                placeholder="e.g. main, release/1.4, v2.0.1"
                 list={branchListId}
                 onChange={event => handleRefChange(event.target.value)}
               />
@@ -619,7 +634,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
                 disabled={!controlsAvailable || wholeRepo}
                 spellCheck={false}
                 autoComplete="off"
-                placeholder="src/"
+                placeholder="e.g. src/api or services/auth"
                 aria-label="Subdirectory path within the repository"
                 onChange={event => handleSubpathChange(event.target.value)}
               />
@@ -635,14 +650,22 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
             className="rrc-textarea"
             value={objective}
             rows={3}
-            placeholder="Assess this repository for exploitable weaknesses and hardening gaps."
+            placeholder="e.g. Find auth bypasses in the login flow and map which detections would catch them"
             onChange={event => setObjective(event.target.value)}
           />
+          <p className="rrc-hint">
+            Tip: name a specific surface and the outcome you want — the hats tailor operators to the objective.
+          </p>
         </div>
 
         <fieldset className="rrc-field rrc-roles" id={rolesId}>
           <legend className="rrc-label">Operators</legend>
           <p className="rrc-hint">Hats select roles. The header button toggles that hat&apos;s roles and never posts a role named red.</p>
+          <datalist id={rolesListId}>
+            {ROLE_SUGGESTIONS.map(role => (
+              <option key={role} value={role} />
+            ))}
+          </datalist>
           <div className="rrc-roles-groups">
             {OPERATOR_GROUPS.map(group => {
               const allSelected = group.roles.every(role => selectedRoles.includes(role));
@@ -728,7 +751,7 @@ export default function RepoRunConfig({ onStarted, threadId }: RepoRunConfigProp
             type="text"
             value={missionName}
             autoComplete="off"
-            placeholder="Operation …"
+            placeholder="e.g. Login-flow auth bypass hunt"
             onChange={event => setMissionName(event.target.value)}
           />
         </div>

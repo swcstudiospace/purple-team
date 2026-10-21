@@ -675,6 +675,7 @@ export interface CommandEvents {
   'target:owned': { target: Target; operatorId: string };
   'detection:triggered': DetectionEvent;
   'mission:phase_changed': { missionId: string; phase: KillChainPhase };
+  'mission:report': { missionId: string; report: string };
   'scan:progress': ScanProgressEvent;
   'abort:recommended': string;
   /** A capability-approval gate decision (allowed/denied) on an intrusive/dangerous tool — bridged to

@@ -18,7 +18,7 @@
  *     and ingestRepoToSourceContext ≡ ingestFetchedFilesToSourceContext
  */
 
-import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { gzipSync } from 'node:zlib';
 import { Readable } from 'node:stream';
 import tar from 'tar-stream';
@@ -751,6 +751,57 @@ describe('github-ingest — cancellation + timeout', () => {
     expect(repoErr.code).toBe('network');
     expect(repoErr.message).toContain('timeout after 25ms');
     expect(repoErr.message).toContain('T3MP3ST_REPO_TIMEOUT_MS');
+  });
+
+  it('one overall timeout bounds a fallback sequence — not one timeout per candidate', async () => {
+    const TIMEOUT_MS = 150;
+    process.env.T3MP3ST_REPO_TIMEOUT_MS = String(TIMEOUT_MS);
+    // /tree/feature/a/b/c grammar-splits to ref `feature` + subpath `a/b/c`,
+    // so four candidates follow. The first two answer 404 after 100 ms each
+    // (200 ms in total, longer than the timeout). The third never answers
+    // until its signal aborts. Per-attempt timers would stack to ~350 ms; the
+    // single overall timer settles the whole sequence at 150 ms. Fake timers
+    // make the bound exact: nothing may settle before 2 × timeout.
+    vi.useFakeTimers();
+    try {
+      const DEEP_BRANCH = mustTarget('https://github.com/octocat/Hello-World/tree/feature/a/b/c');
+      const urls: string[] = [];
+      setRepoIngestFetch((url, init) => {
+        urls.push(url);
+        const answersNotFound = urls.length <= 2;
+        return new Promise<RepoFetchResponseLike>((resolve, reject) => {
+          const timer = answersNotFound ? setTimeout(() => resolve(errorResponse(404)), 100) : undefined;
+          init.signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(timer);
+              reject(Object.assign(new Error('aborted'), { name: 'AbortError' }));
+            },
+            { once: true },
+          );
+        });
+      });
+      let settled = false;
+      let err: unknown;
+      const pending = fetchRepoFiles(DEEP_BRANCH).then(
+        () => {
+          settled = true;
+        },
+        (e: unknown) => {
+          settled = true;
+          err = e;
+        },
+      );
+      await vi.advanceTimersByTimeAsync(2 * TIMEOUT_MS - 1);
+      expect(settled).toBe(true);
+      await pending;
+      const repoErr = err as RepoIngestError;
+      expect(repoErr.code).toBe('network');
+      expect(repoErr.message).toContain(`timeout after ${TIMEOUT_MS}ms`);
+      expect(urls.length).toBeGreaterThanOrEqual(2); // the fallback really ran
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

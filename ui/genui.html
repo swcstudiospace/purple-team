@@ -6,16 +6,18 @@
     <!--
       Phase 36 §6.1 sandbox posture. The frame runs with sandbox="allow-scripts"
       (opaque origin), so scripts can never read the app's storage or DOM.
-      NOTE: an opaque origin NEVER matches the 'self' source expression, so
-      'self' here would block the frame's own bundle (verified: genui-ready
-      never fired and the parent fell back to raw source). The network cut is
-      default-src 'none' (covers connect-src); script/style/font loads are
-      unconstrained because the opaque sandbox already denies same-origin
-      access and only this document's own assets are referenced.
+      An opaque origin never matches the 'self' source expression, so the frame
+      bundle is allowed by loopback origin instead: script and style loads are
+      restricted to 127.0.0.1 and localhost on any port (the server binds
+      loopback only), so generated UI cannot pull code or fonts from external
+      hosts. connect-src 'none' cuts fetch, XHR and WebSocket, and img-src data:
+      blocks remote images, which are the other exfiltration channel. In
+      LAN-bound mode (T3MP3ST_HOST set to a non-loopback address) the frame
+      cannot load its bundle, and the thread falls back to the raw source view.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src *; style-src * 'unsafe-inline'; img-src data:; font-src *; connect-src 'none'"
+      content="default-src 'none'; script-src http://127.0.0.1:* http://localhost:*; style-src http://127.0.0.1:* http://localhost:* 'unsafe-inline'; font-src http://127.0.0.1:* http://localhost:*; img-src data:; connect-src 'none'"
     />
     <title>Generated UI sandbox</title>
   </head>

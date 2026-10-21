@@ -22,6 +22,7 @@ import {
   type GitHubResolveResponse,
 } from '../../api/client';
 import type { SelectedRepo } from '../../stores/github';
+import { useFocusTrap } from './focus';
 import '../agent-panel.css';
 
 /** Everything the configure step needs, in store-ready form. */
@@ -40,6 +41,9 @@ interface RepoEntryProps {
 }
 
 const PAGE_SIZE = 30;
+
+/** Escape is trapped inside the entry but dismisses nothing; the skip button is the exit. */
+const ignoreEscape = (): void => {};
 
 /** Row-shape → run target (default branch; the configure step edits the ref). */
 function targetFromSummary(repo: GitHubRepoSummary): RepoEntryTarget {
@@ -106,6 +110,7 @@ export function RepoEntry({ prefillUrl, onTarget, onSkip }: RepoEntryProps) {
 
   const pasteInputRef = useRef<HTMLInputElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -178,6 +183,11 @@ export function RepoEntry({ prefillUrl, onTarget, onSkip }: RepoEntryProps) {
     setPasteUrl(prefillUrl);
     void resolveUrl(prefillUrl);
   }, [prefillUrl]);
+
+  // Dialog focus trap: focus enters on mount, Tab loops, and focus returns to
+  // the opener on unmount. Declared before the focus effects below so their
+  // initial focus wins and the recorded opener is the real previous focus.
+  useFocusTrap(true, dialogRef, ignoreEscape);
 
   // Programmatic focus only (no autofocus attribute): the paste input wins
   // when a prefill arrived — it mounts one render after the mode switch, so
@@ -266,7 +276,7 @@ export function RepoEntry({ prefillUrl, onTarget, onSkip }: RepoEntryProps) {
   }
 
   return (
-    <div className="apx-entry" role="dialog" aria-modal="true" aria-label="Select a repository">
+    <div className="apx-entry" ref={dialogRef} role="dialog" aria-modal="true" aria-label="Select a repository">
       <div className="apx-entry-card">
         <header className="apx-entry-header">
           <h2 className="apx-entry-title">Select a repository</h2>

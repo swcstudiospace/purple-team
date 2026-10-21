@@ -1,33 +1,12 @@
 {
   "contract": "1.0.0",
   "flavor": "core",
-  "milestone": "v1.6 — Four-Hat Tooling, Composable Skills, UI & Desktop/Mobile Optimization",
-  "phases": [
-    {
-      "number": "30",
-      "name": "Four-Hat Architecture Audit & Milestone Alignment",
-      "status": "complete"
-    },
-    {
-      "number": "31",
-      "name": "Unified 4-Hat Tool Registry, Blue/White/Black Tools, Extra Utilities & Composable Skills",
-      "status": "complete"
-    },
-    {
-      "number": "32",
-      "name": "Upgraded 4-Hat UI Shell, WCAG 2.1 AA Hat Theming, Command Palette & Interactive Workspace",
-      "status": "complete"
-    },
-    {
-      "number": "33",
-      "name": "Desktop Multi-Pane & Native Mobile / PWA Ergonomics + Automated Verification",
-      "status": "complete"
-    }
-  ],
+  "milestone": "v1.7",
+  "phases": [],
   "next": {
     "command": "/gsd:progress",
     "label": "Show progress",
-    "reason": "Milestone v1.6 complete"
+    "reason": "Unsure of state — showing progress"
   },
-  "updated_at": "2026-10-15T21:40:00.000Z"
+  "updated_at": "2026-10-21T02:47:29.224Z"
 }

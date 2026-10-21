@@ -29,6 +29,13 @@ interface ConversationsState {
   activeId: string | null;
   status: ConversationsStatus;
   error: string | null;
+  /** Thread whose reply is streaming right now (null when none); the sidebar gates export on it. */
+  streamingThreadId: string | null;
+  setStreaming: (threadId: string, streaming: boolean) => void;
+  /** Thread that started each run (runId or missionId → threadId). In memory only; not persisted across reloads. */
+  runOwners: Record<string, string>;
+  /** Records the thread that started these runs; the first owner of a runId is kept. */
+  recordRunOwners: (threadId: string, runIds: string[]) => void;
   /** Loads the list and guarantees an active conversation (creating one when empty). */
   load: (preferredId?: string | null) => Promise<void>;
   createAndActivate: () => Promise<void>;
@@ -67,6 +74,9 @@ function upsertMeta(metas: ConversationMeta[], meta: ConversationMeta): Conversa
   return next;
 }
 
+/** In-flight PUTs per thread, so an export can await a request that already left. */
+const inFlightSyncs = new Map<string, Promise<void>>();
+
 /** Fires (and clears) the pending debounced PUT for one conversation, if any. */
 function flushSync(id: string): void {
   const timer = syncTimers.get(id);
@@ -79,7 +89,7 @@ function flushSync(id: string): void {
   pendingPayloads.delete(id);
   if (payload === lastSyncedPayloads.get(id)) return;
   lastSyncedPayloads.set(id, payload);
-  void putConversationMessages(id, JSON.parse(payload) as UIMessage[])
+  const request = putConversationMessages(id, JSON.parse(payload) as UIMessage[])
     .then(response => {
       useConversationsStore.setState(state => ({
         ...applyEvictions(state, response.evictedIds),
@@ -91,11 +101,69 @@ function flushSync(id: string): void {
       // The next settle re-schedules; surface the failure without blocking chat.
       lastSyncedPayloads.delete(id);
       useConversationsStore.setState({ error: errorMessage(err) });
+    })
+    .finally(() => {
+      if (inFlightSyncs.get(id) === request) inFlightSyncs.delete(id);
     });
+  inFlightSyncs.set(id, request);
+}
+
+/** Settles the thread's queued or in-flight PUT so an export reads the settled replies. */
+export async function flushPendingSync(id: string): Promise<void> {
+  flushSync(id);
+  await inFlightSyncs.get(id);
+}
+
+/** runId values a start response names: the run id and the mission id (mission ticks emit under the mission id). */
+export function startedRunIds(body: unknown): string[] {
+  if (body === null || typeof body !== 'object') return [];
+  const record: Record<string, unknown> = { ...body };
+  return ['runId', 'missionId']
+    .map(key => record[key])
+    .filter((value): value is string => typeof value === 'string' && value !== '');
+}
+
+/**
+ * Client-minted runId for a repo start. crypto.randomUUID exists only in secure contexts
+ * (https or localhost), so LAN-bound plain-HTTP mode falls back to a time-plus-random id.
+ */
+export function newClientRunId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  return `c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** runIds and missionIds of the data-purple-run cards persisted in a thread, so reloaded cards keep updating. */
+function persistedRunIds(messages: UIMessage[]): string[] {
+  const ids: string[] = [];
+  for (const message of messages) {
+    for (const part of message.parts) {
+      if (part.type === 'data-purple-run') ids.push(...startedRunIds(part.data));
+    }
+  }
+  return ids;
 }
 
 export const useConversationsStore = create<ConversationsState>()((set, get) => ({
   metas: [],
+  streamingThreadId: null,
+  setStreaming: (threadId, streaming) => {
+    if (streaming) {
+      set({ streamingThreadId: threadId });
+    } else if (get().streamingThreadId === threadId) {
+      set({ streamingThreadId: null });
+    }
+  },
+  runOwners: {},
+  recordRunOwners: (threadId, runIds) => {
+    const owners = { ...get().runOwners };
+    let changed = false;
+    for (const runId of runIds) {
+      if (runId === '' || owners[runId] !== undefined) continue;
+      owners[runId] = threadId;
+      changed = true;
+    }
+    if (changed) set({ runOwners: owners });
+  },
   activeId: null,
   status: 'idle',
   error: null,
@@ -198,6 +266,7 @@ export const useConversationsStore = create<ConversationsState>()((set, get) => 
     try {
       const { meta, messages } = await getConversation(id);
       lastSyncedPayloads.set(id, JSON.stringify(messages));
+      get().recordRunOwners(id, persistedRunIds(messages));
       set(state => ({ metas: upsertMeta(state.metas, meta), error: null }));
       return messages;
     } catch (err: unknown) {

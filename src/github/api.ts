@@ -6,17 +6,21 @@
  * Design invariants (35-RESEARCH-GITHUB-SECTION.md §4.8):
  * - Every upstream call is ONE request per user action (plus at most one
  *   forced refresh via onAuthFailure): the proxy never auto-retries, so it
- *   cannot trip GitHub's secondary limits by itself.
+ *   cannot trip GitHub's secondary limits by itself. The exception is a resolve
+ *   of a /tree/ URL with a subpath, which probes branch candidates in ingest
+ *   order until one matches: one request per candidate, at most segments + 1.
  * - Rate-limit classification follows GitHub's documented precedence:
  *   `Retry-After` (secondary) → `x-ratelimit-reset` (primary) → 60 s floor.
  * - 60 s in-memory LRU caches (repositories keyed by token fingerprint,
- *   resolve keyed by owner/repo/ref/mode) protect the anonymous 60 req/h
- *   budget and repeated resolve clicks.
+ *   resolve keyed by owner/repo/ref/subpath/mode) protect the anonymous 60 req/h
+ *   repeated resolve clicks.
  * - Error payloads are token-free by construction: status codes, classified
  *   codes, and retry epochs only.
  */
 
 import { createHash } from 'crypto';
+import { parseRepoTarget } from '../recon/repo-url.js';
+import { slashBranchRefCandidates } from '../recon/github-ingest.js';
 
 // =============================================================================
 // Errors + classifier
@@ -385,26 +389,51 @@ export async function resolveGitHubRepo(params: {
   owner: string;
   repo: string;
   ref?: string;
+  subpath?: string;
   token?: string;
   fetchImpl?: GitHubFetchLike;
   onAuthFailure?: () => Promise<string | undefined>;
 }): Promise<GitHubRepoResolution> {
   const mode = params.token ? 'token' : 'anonymous';
-  const cacheKey = `resolve:${mode}:${params.owner}/${params.repo}@${params.ref ?? ''}`;
+  const cacheKey = `resolve:${JSON.stringify([mode, params.owner, params.repo, params.ref ?? '', params.subpath ?? ''])}`;
   const cached = cacheGet(resolveCache, cacheKey);
   if (cached) return { ...cached };
 
   const path = `/repos/${encodeURIComponent(params.owner)}/${encodeURIComponent(params.repo)}`;
-  const fetchWith = (token: string | undefined) => ghApiGet(path, token, params.fetchImpl);
+  // One upstream call; on a token-expired failure it is retried once with the forced-refresh token.
+  const withAuthRetry = async <T>(call: (token: string | undefined) => Promise<T>): Promise<T> => {
+    try {
+      return await call(params.token);
+    } catch (e) {
+      const fresh = await refreshedTokenAfterAuthFailure(e, params.token, params.onAuthFailure);
+      if (!fresh) throw e;
+      return call(fresh);
+    }
+  };
+  // Whether the ref at `refPath` exists (a 404 means no; any other failure propagates).
+  const refExists = async (refPath: string): Promise<boolean> => {
+    try {
+      await withAuthRetry((token) => ghApiGet(refPath, token, params.fetchImpl));
+      return true;
+    } catch (e) {
+      if (e instanceof GitHubApiError && e.httpStatus === 404) return false;
+      throw e;
+    }
+  };
+  // The parser cannot tell where a slash ref ends, so probe the candidates in ingest order
+  // (shortest ref first). Each candidate checks a branch, then a tag, before a longer one is
+  // tried, mirroring the archive fetch, which accepts either. No match keeps the parsed ref.
+  const resolveRef = async (ref: string, subpath: string): Promise<string> => {
+    const canonical = `${params.owner}/${params.repo}@${ref}/${subpath}`;
+    for (const candidate of slashBranchRefCandidates({ owner: params.owner, repo: params.repo, ref, subpath, canonical })) {
+      const name = encodeURIComponent(candidate.ref);
+      if (await refExists(`${path}/branches/${name}`)) return candidate.ref;
+      if (await refExists(`${path}/git/ref/tags/${name}`)) return candidate.ref;
+    }
+    return ref;
+  };
 
-  let result: ApiCallResult;
-  try {
-    result = await fetchWith(params.token);
-  } catch (e) {
-    const fresh = await refreshedTokenAfterAuthFailure(e, params.token, params.onAuthFailure);
-    if (!fresh) throw e;
-    result = await fetchWith(fresh);
-  }
+  const result = await withAuthRetry((token) => ghApiGet(path, token, params.fetchImpl));
 
   const rec = (result.body && typeof result.body === 'object') ? result.body as RepoRecord : {};
   const s = summaryOf(rec);
@@ -413,7 +442,7 @@ export async function resolveGitHubRepo(params: {
   const value: GitHubRepoResolution = {
     owner: s.owner,
     repo: s.repo,
-    ref: params.ref || s.defaultBranch,
+    ref: params.ref && params.subpath ? await resolveRef(params.ref, params.subpath) : params.ref || s.defaultBranch,
     defaultBranch: s.defaultBranch,
     fullName: s.fullName,
     visibility: s.visibility,
@@ -521,82 +550,28 @@ export interface ParsedGitHubRepoUrl {
   owner: string;
   repo: string;
   ref?: string;
+  /** The /tree/ subpath, when the URL has one. Not part of the ref: the resolve step decides where a slash branch ends. */
+  subpath?: string;
 }
 
-const OWNER_RE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
-const REPO_RE = /^(?!-)(?!\.)(?!.*[.-]$)[A-Za-z0-9._-]{1,100}$/;
-const MAX_REF_LENGTH = 255;
-
-function hasControlChars(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    if (value.charCodeAt(i) <= 0x1f) return true;
-  }
-  return false;
-}
-
-function safeDecode(segment: string): string {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
+/** Bare `owner/repo[/…]`: a first segment with no scheme, host, or credential characters. */
+const BARE_OWNER_FORM = /^[^/:@.\s?#]+(\/|$)/;
 
 /**
- * Accepts `https://github.com/owner/repo`, `github.com/owner/repo`,
- * `owner/repo`, optional `.git` suffix, and `/tree/<ref>` / `/blob/<ref>/…`
- * suffixes (ref extracted, URL-decoded — branch slashes arrive %2F-encoded).
- * Clone URLs normalize to owner/repo. Everything else is invalid.
+ * Thin adapter over the shared validator (src/recon/repo-url.ts), the only URL
+ * parser. Accepts `https://github.com/owner/repo[/tree/<ref>[/<subpath>]]` and bare
+ * `owner/repo`. A rejection carries the validator's exact fault message, which the
+ * resolve route shows verbatim. The subpath is returned when present: a branch name
+ * may itself contain '/', so resolveGitHubRepo decides where the ref ends. A `HEAD`
+ * ref means the default branch, as when no ref is given.
  */
-export function parseGitHubRepoUrl(raw: string): ParsedGitHubRepoUrl | null {
-  const input = raw.trim();
-  if (!input || input.length > 2048) return null;
-
-  let path: string;
-  if (/^https?:\/\//i.test(input)) {
-    // Dot segments (., ..) are collapsed by the URL parser before we ever see
-    // the pathname (`/tree/..` normalizes to `/`), so screen the raw path up
-    // front instead of trusting the already-normalized result.
-    const rawSegments = input.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[?#]/)[0].split('/');
-    if (rawSegments.includes('.') || rawSegments.includes('..')) return null;
-    let u: URL;
-    try {
-      u = new URL(input);
-    } catch {
-      return null;
-    }
-    if (u.protocol !== 'https:') return null;
-    const host = u.hostname.toLowerCase();
-    if (host !== 'github.com' && host !== 'www.github.com') return null;
-    if (u.username || u.password) return null; // embedded credentials never round-trip
-    path = u.pathname;
-  } else {
-    const firstSegment = input.split('/')[0]?.toLowerCase() ?? '';
-    if (firstSegment === 'github.com' || firstSegment === 'www.github.com') {
-      path = input.slice(firstSegment.length);
-    } else if (firstSegment.includes('.')) {
-      return null; // some other host (gist.github.com, api.github.com, …)
-    } else {
-      path = `/${input}`; // bare owner/repo form
-    }
-  }
-
-  const segments = path.split('/').filter((s) => s.length > 0);
-  let ref: string | undefined;
-  if (segments.length >= 4 && (segments[2] === 'tree' || segments[2] === 'blob')) {
-    // /owner/repo/tree/<ref…> — everything after the view word is the ref
-    // (subdirectories are not part of the resolve contract).
-    ref = safeDecode(segments.slice(3).join('/'));
-    segments.length = 2;
-  }
-  if (segments.length !== 2) return null;
-
-  const owner = safeDecode(segments[0]);
-  let repo = safeDecode(segments[1]);
-  if (repo.endsWith('.git')) repo = repo.slice(0, -4);
-  if (!OWNER_RE.test(owner) || owner.includes('--') || !REPO_RE.test(repo)) return null;
-  if (ref !== undefined && (ref === '' || ref.startsWith('/') || ref.includes('..') || ref.length > MAX_REF_LENGTH || hasControlChars(ref))) {
-    return null;
-  }
-  return { owner, repo, ref: ref || undefined };
+export function parseGitHubRepoUrl(raw: string): { ok: true; value: ParsedGitHubRepoUrl } | { ok: false; message: string } {
+  const trimmed = raw.trim();
+  const input = BARE_OWNER_FORM.test(trimmed) ? `https://github.com/${trimmed}` : trimmed;
+  const result = parseRepoTarget(input);
+  if (!result.ok) return { ok: false, message: result.message };
+  const { owner, repo, ref, subpath } = result.value;
+  const value: ParsedGitHubRepoUrl = { owner, repo, ref: ref === 'HEAD' ? undefined : ref };
+  if (subpath !== '') value.subpath = subpath;
+  return { ok: true, value };
 }

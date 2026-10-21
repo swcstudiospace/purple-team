@@ -170,6 +170,15 @@ export interface MissionStatusResponse {
     summary: OperatorPoolSummary;
     details: unknown[];
   };
+  whitebox?: WhiteboxSummary;
+}
+
+/** POST /api/mission/start. Fields beyond runId/missionName are optional and additive. */
+export interface MissionStartResponse {
+  runId?: string;
+  missionName?: string;
+  whitebox?: WhiteboxSummary;
+  cancelledIngest?: boolean;
 }
 
 /** FindingRecord from src/server.ts (subset) */
@@ -254,6 +263,25 @@ export interface GitHubResolveResponse {
   htmlUrl: string;
   pushedAt?: string;
   accessible: 'token' | 'anonymous';
+}
+
+/** Error codes carried by repo-ingest run events (phase 35 §5.3). */
+export type RepoIngestErrorCode =
+  | 'invalid_url'
+  | 'repo_not_found'
+  | 'private_inaccessible'
+  | 'not_connected'
+  | 'rate_limited'
+  | 'oversized'
+  | 'network'
+  | 'cancelled';
+
+/** Whitebox ingest summary: units kept and dropped, with skip counts by reason. */
+export interface WhiteboxSummary {
+  includedUnits: number;
+  droppedUnits: number;
+  source?: string;
+  skipSummary?: { total: number; byReason: Record<string, number> };
 }
 
 export function listGitHubRepositories(params: {

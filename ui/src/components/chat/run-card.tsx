@@ -1,13 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { UIMessage } from 'ai';
 import type { PurpleRunCounters, PurpleRunEvent, PurpleRunEventState } from '../../lib/events';
-
+import { purpleRunMatches } from '../../../../src/chat/purple-run-match';
+const Markdown = lazy(() => import('./markdown'));
 /**
  * Inline Purple Team run progress (`data-purple-run` DataUIPart renderer).
  *
- * The SSE bus emits `purple-run` events in the pinned n5 wire shape
- * ({runId, repo, state: fetching|analyzing|completed|failed|cancelled,
- * counters, errorCode, message}); this module projects them onto the §5
+ * The SSE bus emits `purple-run` events ({runId, repo?, state, counters,
+ * errorCode, message, missionId?}). Repo-ingest states are fetching|analyzing|
+ * completed|failed|cancelled; mission states are executing|paused|stopped.
+ * This module projects them onto the §5
  * display model (labelled card, phase checklist, monotonic counters) and
  * provides the pure list operations ChatStream uses to upsert run parts
  * inside the thread. Run-card messages never reach the model —
@@ -37,6 +39,8 @@ export interface PurpleRunData {
   /** Skip summary (completed) or server-redacted display copy (failed). */
   summary?: string;
   errorCode?: string;
+  /** Mission the run belongs to; View Report requests its report and stays disabled without one. */
+  missionId?: string;
   /** Last wire state seen, so a later failure/cancel knows which phase was interrupted. */
   lastEventState: PurpleRunEventState;
 }
@@ -68,9 +72,12 @@ const PHASE_STATE_LABEL: Record<PurpleRunPhaseState, string> = {
 const EVENT_RANK: Record<PurpleRunEventState, number> = {
   fetching: 1,
   analyzing: 2,
+  executing: 2,
+  paused: 2,
   completed: 3,
   failed: 3,
   cancelled: 3,
+  stopped: 3,
 };
 
 /** Error codes that fail before any file is fetched — resolve-phase failures. */
@@ -79,6 +86,41 @@ const RESOLVE_ERROR_CODES: Record<string, true> = {
   private_inaccessible: true,
   not_connected: true,
   invalid_url: true,
+};
+
+/** Copy and retry text per ingest error code (phase 35 §5.3). Unknown codes show the raw code only. */
+const ERROR_GUIDANCE: Record<string, { copy: string; retry?: string }> = {
+  invalid_url: {
+    copy: 'The URL is not valid.',
+    retry: 'Fix the URL. The message above names the exact problem.',
+  },
+  repo_not_found: {
+    copy: 'Repository not found on github.com.',
+    retry: 'Check the spelling. If the repository is private, connect GitHub with the repo scope in Settings.',
+  },
+  private_inaccessible: {
+    copy: 'The repository is private, or it does not exist for this connection.',
+    retry: 'Connect GitHub with the repo scope in Settings, then retry.',
+  },
+  not_connected: {
+    copy: 'No GitHub connection is available for this repository.',
+    retry: 'Connect GitHub with the repo scope, set T3MP3ST_GITHUB_TOKEN, or pick a public repository.',
+  },
+  rate_limited: {
+    copy: 'GitHub rate limit reached.',
+    retry: 'Wait for the reset time, then retry. Do not retry in a loop.',
+  },
+  oversized: {
+    copy: 'The repository exceeds an ingest cap.',
+    retry: 'Narrow the URL to a /tree/<ref>/<subpath> scope, or raise the named T3MP3ST_REPO_* limit.',
+  },
+  network: {
+    copy: 'Could not fetch the repository from GitHub.',
+    retry: 'Check connectivity. Retrying is safe.',
+  },
+  cancelled: {
+    copy: 'Ingest cancelled.',
+  },
 };
 
 const PHASE_ORDER: readonly PurpleRunPhaseId[] = ['resolve', 'fetch', 'analyze'];
@@ -95,28 +137,48 @@ const COUNTER_SPECS: ReadonlyArray<{
 ];
 
 /** Builds the canonical run label from the event's repo descriptor. */
-export function runLabel(repo: PurpleRunEvent['repo']): string {
+export function runLabel(repo: NonNullable<PurpleRunEvent['repo']>): string {
   const base = `${repo.owner}/${repo.repo}@${repo.ref}`;
   if (repo.subpath === undefined) return base;
   const sub = repo.subpath.trim().replace(/^\/+/, '');
   return sub === '' ? base : `${base} · ${sub}`;
 }
 
+/** Phase the checklist currently shows as in progress, if any. */
+function activePhaseOf(data: PurpleRunData | undefined): PurpleRunPhaseId | undefined {
+  return data?.phases.find(phase => phase.state === 'active')?.id;
+}
+
 /** Which ingest phase a failure belongs to, branching on errorCode (never prose). */
 function failedPhaseFor(event: PurpleRunEvent, prev: PurpleRunData | undefined): PurpleRunPhaseId {
   if (event.errorCode !== undefined && RESOLVE_ERROR_CODES[event.errorCode] === true) return 'resolve';
-  if (prev !== undefined && prev.lastEventState === 'analyzing') return 'analyze';
-  return 'fetch';
+  return activePhaseOf(prev) ?? 'fetch';
 }
 
-/** Derives the phase checklist from the wire state plus failure/cancel position. */
+/**
+ * Ingest phase a live wire state sits in; null once the run is terminal.
+ * Mission states run during analyze; paused keeps the phase it interrupted.
+ */
+function livePhaseOf(state: PurpleRunEventState, prev: PurpleRunData | undefined): PurpleRunPhaseId | null {
+  switch (state) {
+    case 'fetching':
+      return 'fetch';
+    case 'analyzing':
+    case 'executing':
+      return 'analyze';
+    case 'paused':
+      return activePhaseOf(prev) ?? 'analyze';
+    default:
+      return null;
+  }
+}
+
+/** Derives the phase checklist from the live phase plus failure/cancel position. */
 export function derivePhases(
-  eventState: PurpleRunEventState,
+  currentPhase: PurpleRunPhaseId | null,
   failedPhase: PurpleRunPhaseId | null,
   cancelledPhase: PurpleRunPhaseId | null,
 ): PurpleRunPhase[] {
-  const currentPhase: PurpleRunPhaseId | null =
-    eventState === 'fetching' ? 'fetch' : eventState === 'analyzing' ? 'analyze' : null;
   return PHASE_ORDER.map(phase => {
     const position = PHASE_ORDER.indexOf(phase);
     let state: PurpleRunPhaseState;
@@ -153,6 +215,8 @@ function mergeCounters(
 /**
  * Projects one wire event onto the display model, merging with the previous
  * snapshot. Once a run is terminal, later (stale/replayed) events are ignored.
+ * Mission states share the card: executing/paused keep it ingesting (cancellable),
+ * stopped reads as cancelled.
  */
 export function mergePurpleRunData(
   prev: PurpleRunData | undefined,
@@ -162,33 +226,33 @@ export function mergePurpleRunData(
   if (prev !== undefined && prev.state !== 'ingesting') return prev;
   const terminal = EVENT_RANK[event.state] >= 3;
   const failedPhase = event.state === 'failed' ? failedPhaseFor(event, prev) : null;
-  const cancelledPhase =
-    event.state === 'cancelled'
-      ? prev !== undefined && prev.lastEventState === 'analyzing'
-        ? 'analyze'
-        : 'fetch'
-      : null;
+  const interrupted = event.state === 'cancelled' || event.state === 'stopped';
+  const cancelledPhase = interrupted ? (activePhaseOf(prev) ?? 'fetch') : null;
   const displayState: PurpleRunDisplayState =
     event.state === 'completed'
       ? 'done'
       : event.state === 'failed'
         ? 'error'
-        : event.state === 'cancelled'
+        : interrupted
           ? 'cancelled'
           : 'ingesting';
   const summary =
     event.message !== undefined ? event.message.replace(SECRET_VALUE, '[redacted]') : prev?.summary;
   const errorCode = event.errorCode ?? prev?.errorCode;
+  // Mission-scoped emitters (tick progress, stop notice) send the mission id as runId and no repo.
+  const missionId = event.missionId ?? prev?.missionId ?? (event.repo === undefined ? event.runId : undefined);
   return {
-    runId: event.runId,
-    label: prev?.label ?? runLabel(event.repo),
+    // Keep the card's own id: later events match it, whichever id they carry.
+    runId: prev?.runId ?? event.runId,
+    label: prev?.label ?? (event.repo !== undefined ? runLabel(event.repo) : `Mission ${event.runId}`),
     state: displayState,
-    phases: derivePhases(event.state, failedPhase, cancelledPhase),
+    phases: derivePhases(livePhaseOf(event.state, prev), failedPhase, cancelledPhase),
     counters: mergeCounters(prev?.counters, event.counters),
     startedAt: prev?.startedAt ?? now,
     ...(terminal ? { endedAt: now } : {}),
     ...(summary !== undefined ? { summary } : {}),
     ...(errorCode !== undefined ? { errorCode } : {}),
+    ...(missionId !== undefined ? { missionId } : {}),
     lastEventState: event.state,
   };
 }
@@ -203,7 +267,8 @@ export function isPurpleRunData(data: unknown): data is PurpleRunData {
     typeof record.label === 'string' &&
     (record.state === 'ingesting' || record.state === 'done' || record.state === 'error' || record.state === 'cancelled') &&
     Array.isArray(record.phases) &&
-    typeof record.startedAt === 'number'
+    typeof record.startedAt === 'number' &&
+    (record.missionId === undefined || typeof record.missionId === 'string')
   );
 }
 
@@ -218,7 +283,7 @@ export function upsertPurpleRun(messages: UIMessage[], event: PurpleRunEvent, no
     const message = messages[index];
     let touched = false;
     const parts = message.parts.map(part => {
-      if (part.type === 'data-purple-run' && isPurpleRunData(part.data) && part.data.runId === event.runId) {
+      if (part.type === 'data-purple-run' && isPurpleRunData(part.data) && purpleRunMatches(part.data, event)) {
         touched = true;
         return { ...part, data: mergePurpleRunData(part.data, event, now) };
       }
@@ -258,11 +323,7 @@ export function cancelPurpleRunInMessages(messages: UIMessage[], runId: string, 
             ...part.data,
             state: 'cancelled' as const,
             endedAt: now,
-            phases: derivePhases(
-              'cancelled',
-              null,
-              part.data.lastEventState === 'analyzing' ? 'analyze' : 'fetch',
-            ),
+            phases: derivePhases(null, null, activePhaseOf(part.data) ?? 'fetch'),
           },
         };
       }
@@ -297,11 +358,27 @@ export function formatElapsed(ms: number): string {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+/** Guidance line under a failed run's error text, keyed by the server's errorCode. */
+function RunErrorGuidance({ code }: { code: string }) {
+  const mapped = Object.prototype.hasOwnProperty.call(ERROR_GUIDANCE, code) ? ERROR_GUIDANCE[code] : undefined;
+  const retry = mapped?.retry;
+  return (
+    <p className="apx-run-error-guidance">
+      {mapped !== undefined ? <span className="apx-run-error-copy">{mapped.copy}</span> : <code>{code}</code>}
+      {retry !== undefined && <span className="apx-run-error-retry"> {retry}</span>}
+    </p>
+  );
+}
+
 export function RunCard({ data, onCancelRun }: { data: PurpleRunData; onCancelRun: (runId: string) => void }) {
   const active = data.state === 'ingesting';
   const [confirming, setConfirming] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const resetTimerRef = useRef<number | null>(null);
+
+  const [reportMd, setReportMd] = useState<string | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportErr, setReportErr] = useState<string | null>(null);
 
   useEffect(
     () => () => {
@@ -319,6 +396,41 @@ export function RunCard({ data, onCancelRun }: { data: PurpleRunData; onCancelRu
   }, [active]);
 
   const elapsedMs = (data.endedAt ?? (active ? nowTick : data.startedAt)) - data.startedAt;
+
+  async function handleViewReport() {
+    const missionId = data.missionId;
+    if (missionId === undefined) return;
+    setReportLoading(true);
+    setReportErr(null);
+    try {
+      const res = await fetch(`/api/mission/${encodeURIComponent(missionId)}/report`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        let errText = `HTTP ${res.status}`;
+        if (body && typeof body === 'object' && 'error' in body) {
+          const e = body.error;
+          if (typeof e === 'string') errText = e;
+        }
+        throw new Error(errText);
+      }
+      const body = await res.json();
+      let rpt = '';
+      if (body && typeof body === 'object' && 'report' in body) {
+        const v = body.report;
+        if (typeof v === 'string') rpt = v;
+      }
+      const md = rpt.trim() !== '' ? rpt : 'Run completed, no findings yet or generate.';
+      setReportMd(md);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to fetch report';
+      setReportErr(msg);
+      setReportMd('Run completed, no findings yet or generate.');
+    } finally {
+      setReportLoading(false);
+    }
+  }
 
   function requestCancel(): void {
     if (!confirming) {
@@ -388,8 +500,33 @@ export function RunCard({ data, onCancelRun }: { data: PurpleRunData; onCancelRu
           {data.errorCode !== undefined && <span className="apx-run-error-code"> · {data.errorCode}</span>}
         </p>
       )}
+      {data.state === 'error' && data.errorCode !== undefined && (
+        <RunErrorGuidance code={data.errorCode} />
+      )}
       {data.state === 'done' && data.summary !== undefined && <p className="apx-run-summary">{data.summary}</p>}
       {data.state === 'cancelled' && <p className="apx-run-summary">Run cancelled by the operator.</p>}
+      {data.state === 'done' && (
+        <div>
+          <button
+            type="button"
+            onClick={() => { void handleViewReport(); }}
+            disabled={reportLoading || data.missionId === undefined}
+            title={data.missionId === undefined ? 'No mission is linked to this run.' : undefined}
+            className="apx-run-report-btn"
+          >
+            {reportLoading ? 'Loading report…' : 'View Report'}
+          </button>
+          {reportErr ? <span style={{color:'red', marginLeft: '0.5em'}}>{reportErr}</span> : null}
+        </div>
+      )}
+      {reportMd !== null && (
+        <div style={{marginTop: '0.5em', border: '1px solid var(--border)', padding: '0.5em', maxHeight: '12em', overflow: 'auto', fontSize: '0.85em', background: 'var(--surface)', color: 'var(--text-primary)'}}>
+          <Suspense fallback={<span>Loading report…</span>}>
+            <Markdown text={reportMd} />
+          </Suspense>
+          <button type="button" onClick={() => setReportMd(null)} style={{fontSize:'0.7em', marginTop:'0.3em'}}>Close report</button>
+        </div>
+      )}
     </div>
   );
 }

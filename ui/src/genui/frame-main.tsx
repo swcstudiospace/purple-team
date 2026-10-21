@@ -12,7 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { Renderer } from '@openuidev/react-lang';
 import GenUiErrorBoundary from './GenUiErrorBoundary';
 import { genUiLibrary } from './library';
-import { clampFrameHeight, parseParentMessage, type GenUiFrameToParent } from './frameProtocol';
+import { clampFrameHeight, parseParentMessage, type GenUiFrameToParent } from '../../../src/genui/frameProtocol';
 import './genui.css';
 import './frame.css';
 

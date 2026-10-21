@@ -370,7 +370,7 @@ const NOT_FOUND_FETCH_CODES: Partial<Record<RepoIngestErrorCode, true>> = {
  * Canonical is invariant across candidates (the same path segments, only
  * the split point moves), so the run label never changes on a retry.
  */
-function slashBranchRefCandidates(target: ParsedRepoTarget): ParsedRepoTarget[] {
+export function slashBranchRefCandidates(target: ParsedRepoTarget): ParsedRepoTarget[] {
   if (target.subpath === '') return [target];
   const segments = target.subpath.split('/');
   const candidates: ParsedRepoTarget[] = [target];
@@ -384,6 +384,16 @@ function slashBranchRefCandidates(target: ParsedRepoTarget): ParsedRepoTarget[] 
     });
   }
   return candidates;
+}
+
+/**
+ * State shared by every candidate attempt of one ingest: the single abort
+ * controller, the wall-clock timeout flag, and the caps read once up front.
+ */
+interface IngestRun {
+  controller: AbortController;
+  caps: RepoIngestCaps;
+  timedOut: boolean;
 }
 
 /**
@@ -403,46 +413,55 @@ export async function fetchRepoFiles(
   opts: RepoIngestOptions = {},
 ): Promise<FetchedRepoFiles> {
   const candidates = slashBranchRefCandidates(target);
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await fetchRepoFilesOnce(candidates[attempt], opts);
-    } catch (err) {
-      if (
-        attempt + 1 >= candidates.length ||
-        !(err instanceof RepoIngestError) ||
-        NOT_FOUND_FETCH_CODES[err.code] !== true
-      ) {
-        throw err;
+  // One controller and one wall-clock timer span the whole ingest, including
+  // every branch-candidate attempt (35-CONTEXT §4): worst case is one timeout,
+  // not candidates × timeout. Caller aborts and cap breaches abort this controller.
+  const run: IngestRun = { controller: new AbortController(), caps: loadCaps(), timedOut: false };
+  const onExternalAbort = (): void => {
+    run.controller.abort();
+  };
+  if (opts.signal) {
+    if (opts.signal.aborted) run.controller.abort();
+    else opts.signal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+  const timer = setTimeout(() => {
+    run.timedOut = true;
+    run.controller.abort();
+  }, run.caps.timeoutMs);
+  try {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fetchRepoFilesOnce(candidates[attempt], opts, run);
+      } catch (err) {
+        if (
+          attempt + 1 >= candidates.length ||
+          !(err instanceof RepoIngestError) ||
+          NOT_FOUND_FETCH_CODES[err.code] !== true
+        ) {
+          throw err;
+        }
       }
     }
+  } finally {
+    clearTimeout(timer);
+    opts.signal?.removeEventListener('abort', onExternalAbort);
   }
 }
 
 /** Single-candidate fetch — the retry wrapper above drives the candidate list. */
 async function fetchRepoFilesOnce(
   target: ParsedRepoTarget,
-  opts: RepoIngestOptions = {},
+  opts: RepoIngestOptions,
+  run: IngestRun,
 ): Promise<FetchedRepoFiles> {
-  const caps = loadCaps();
+  const { caps, controller } = run;
   const fetchImpl = injectedFetch ?? (globalThis.fetch as unknown as RepoFetchLike);
   const token = resolveToken();
 
-  // Abort composition (runGuardedTool pattern, guardrails.ts): internal
-  // controller + external listener + wall-clock timer. Every abort path
-  // (timeout, caller cancel, cap breach) tears down the live socket.
-  const controller = new AbortController();
-  let timedOut = false;
-  const onExternalAbort = (): void => {
-    controller.abort();
-  };
-  if (opts.signal) {
-    if (opts.signal.aborted) controller.abort();
-    else opts.signal.addEventListener('abort', onExternalAbort, { once: true });
-  }
-  const timer = setTimeout(() => {
-    timedOut = true;
-    controller.abort();
-  }, caps.timeoutMs);
+  // The abort controller and wall-clock timer belong to the whole ingest
+  // (fetchRepoFiles); this attempt only listens to them. Every abort path
+  // (timeout, caller cancel, cap breach) tears the live socket down.
+  let streamAbortListener: (() => void) | undefined;
 
   const counters: RepoIngestCounters = { discovered: 0, fetched: 0, skipped: 0, bytes: 0 };
   const byReason: Record<string, number> = {};
@@ -452,7 +471,7 @@ async function fetchRepoFilesOnce(
   let settleStreams: (() => void) | undefined;
 
   const classifyAbort = (): RepoIngestError =>
-    timedOut
+    run.timedOut
       ? networkError(target, `timeout after ${caps.timeoutMs}ms (T3MP3ST_REPO_TIMEOUT_MS)`)
       : cancelledError(counters);
 
@@ -461,9 +480,7 @@ async function fetchRepoFilesOnce(
   };
 
   try {
-    const response = await followAllowedRedirects(target, token, fetchImpl, controller.signal, () =>
-      timedOut ? networkError(target, `timeout after ${caps.timeoutMs}ms (T3MP3ST_REPO_TIMEOUT_MS)`) : cancelledError(counters),
-    );
+    const response = await followAllowedRedirects(target, token, fetchImpl, controller.signal, classifyAbort);
     if (!response.body) throw networkError(target, 'empty response body');
 
     const nodeBody = Readable.fromWeb(response.body as unknown as NodeWebReadableStream<Uint8Array>);
@@ -485,6 +502,7 @@ async function fetchRepoFilesOnce(
       }
     };
     controller.signal.addEventListener('abort', onAbortDuringStream, { once: true });
+    streamAbortListener = onAbortDuringStream;
 
     const recordSkip = (reason: RepoIngestSkipReason, rel: string): void => {
       byReason[reason] = (byReason[reason] ?? 0) + 1;
@@ -724,8 +742,9 @@ async function fetchRepoFilesOnce(
     if (isAbortLike(err)) throw classifyAbort();
     throw networkError(target, transportErrorDetail(err));
   } finally {
-    clearTimeout(timer);
-    opts.signal?.removeEventListener('abort', onExternalAbort);
+    if (streamAbortListener !== undefined) {
+      controller.signal.removeEventListener('abort', streamAbortListener);
+    }
   }
 }
 

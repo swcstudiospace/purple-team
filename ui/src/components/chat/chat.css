@@ -323,6 +323,7 @@
 .chat-composer {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 9px 9px 9px 18px;
   border: 1px solid var(--border);
@@ -355,7 +356,8 @@
 }
 
 .chat-composer-textarea {
-  flex: 1 1 auto;
+  flex: 1 1 200px;
+  min-width: 0;
   min-height: 30px;
   max-height: 220px;
   padding: 6px 0;
@@ -661,6 +663,74 @@
   .chat-stream-retry,
   .chat-jump,
   .apx-run-cancel {
+    transition: none !important;
+  }
+}
+
+.apx-run-report-btn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.apx-run-report-btn:hover:not(:disabled) {
+  background: var(--surface-alt);
+}
+.apx-run-report-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ------------------------------------------------------------------ */
+/* Composer ghost text (inline autocomplete; Tab/ArrowRight accepts)    */
+/* ------------------------------------------------------------------ */
+
+/* Relative field wrapper keeps the textarea's flex sizing; the ghost mirror
+   sits behind it (aria-hidden, pointer-events: none) and repeats the draft
+   invisibly so the secondary-colored suggestion lands right after it. */
+.chat-composer-field {
+  position: relative;
+  display: flex;
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.chat-composer-field .chat-composer-textarea {
+  position: relative;
+  z-index: 1;
+}
+
+.chat-composer-ghost {
+  position: absolute;
+  top: 6px; /* matches .chat-composer-textarea padding */
+  bottom: 6px; /* clipped to the textarea's content box, never below the field */
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  user-select: none;
+  font: inherit;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow: hidden;
+  overflow-wrap: break-word;
+}
+
+.chat-composer-ghost-base {
+  color: transparent;
+}
+
+.chat-composer-ghost-hint {
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-composer-ghost,
+  .chat-composer-ghost-hint {
     transition: none !important;
   }
 }

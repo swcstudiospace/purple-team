@@ -349,6 +349,13 @@
   max-height: none;
 }
 
+.apx-chat-wrap .chat-log-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 /* Command palette popover, anchored above the embedded composer. The static
    offset is the pre-measurement fallback tuned to the bottom-pill composer
    (~52px pill + status/hints rows + 8px gap); SlashPalette's layout effect
@@ -609,4 +616,28 @@
   .apx-chat-wrap {
     padding: 8px 12px 4px;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sidebar: conversation search (export reuses .apx-sidebar-action)     */
+/* ------------------------------------------------------------------ */
+
+.apx-sidebar-search {
+  display: flex;
+}
+
+.apx-sidebar-search-input {
+  width: 100%;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.apx-sidebar-search-input::placeholder {
+  color: var(--text-secondary);
 }

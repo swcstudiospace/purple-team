@@ -7,7 +7,9 @@
  */
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { useConversationsStore } from '../../stores/conversations';
+import type { UIMessage } from 'ai';
+import { ApiError, getConversation } from '../../api/client';
+import { flushPendingSync, useConversationsStore } from '../../stores/conversations';
 import { useFocusTrap } from './focus';
 import { WorkbenchDialog } from './WorkbenchDialog';
 import './workbench.css';
@@ -32,7 +34,52 @@ function relativeTime(updatedAt: number, now: number): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.round(hours / 24);
   if (days < 7) return `${days}d ago`;
-  return new Date(updatedAt).toLocaleDateString();
+    return new Date(updatedAt).toLocaleDateString();
+}
+
+/** Turns a thread title into a safe download basename (falls back when empty). */
+function exportFileBase(title: string): string {
+  const safe = Array.from(title, ch => (ch.charCodeAt(0) < 0x20 ? ' ' : ch))
+    .join('')
+    .replace(/[<>:"/\\|?*]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '')
+    .slice(0, 80)
+    .trim();
+  return safe === '' ? 'conversation' : safe;
+}
+
+/** Joins a message's text parts; non-text parts (run cards, step markers) are skipped. */
+function messageText(message: UIMessage): string {
+  const texts: string[] = [];
+  for (const part of message.parts) {
+    if (part.type === 'text') texts.push(part.text);
+  }
+  return texts.join('\n\n');
+}
+
+/** Renders a thread as Markdown: title header, then one section per message. */
+function toMarkdown(title: string, messages: UIMessage[]): string {
+  const lines: string[] = [`# ${title}`];
+  for (const message of messages) {
+    const text = messageText(message);
+    if (text === '') continue;
+    lines.push('', `## ${message.role === 'user' ? 'You' : 'Model'}`, '', text);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+/** Saves a string through a Blob URL + temporary anchor click, revoking afterwards. */
+function downloadText(content: string, mediaType: string, fileName: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type: mediaType }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 export function ConversationSidebar({ id, open, onClose }: ConversationSidebarProps) {
@@ -40,6 +87,9 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
   const activeId = useConversationsStore(state => state.activeId);
   const status = useConversationsStore(state => state.status);
   const error = useConversationsStore(state => state.error);
+  const streaming = useConversationsStore(
+    state => state.streamingThreadId !== null && state.streamingThreadId === state.activeId,
+  );
   const createAndActivate = useConversationsStore(state => state.createAndActivate);
   const switchTo = useConversationsStore(state => state.switchTo);
   const rename = useConversationsStore(state => state.rename);
@@ -51,6 +101,16 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
   const [deleting, setDeleting] = useState<{ id: string; title: string } | null>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [now, setNow] = useState(() => Date.now());
+  const [search, setSearch] = useState('');
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  // Client-side title filter; an empty query keeps the full list and its keyboard behavior.
+  const searchQuery = search.trim().toLowerCase();
+  const visibleMetas =
+    searchQuery === ''
+      ? metas
+      : metas.filter(meta => (meta.title === '' ? 'New chat' : meta.title).toLowerCase().includes(searchQuery));
 
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const drawerPanelRef = useRef<HTMLDivElement | null>(null);
@@ -69,15 +129,15 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
   }, []);
 
   useEffect(() => {
-    if (focusedIndex > metas.length - 1) setFocusedIndex(Math.max(0, metas.length - 1));
-  }, [metas.length, focusedIndex]);
+    if (focusedIndex > visibleMetas.length - 1) setFocusedIndex(Math.max(0, visibleMetas.length - 1));
+  }, [visibleMetas.length, focusedIndex]);
 
   useFocusTrap(open && isDrawer, drawerPanelRef, onClose);
 
   if (!open) return null;
 
   function focusItem(index: number): void {
-    const count = metas.length;
+    const count = visibleMetas.length;
     if (count === 0) return;
     const next = ((index % count) + count) % count;
     setFocusedIndex(next);
@@ -85,7 +145,7 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
   }
 
   function handleListKeyDown(event: KeyboardEvent<HTMLUListElement>): void {
-    if (metas.length === 0) return;
+    if (visibleMetas.length === 0) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       focusItem(focusedIndex + 1);
@@ -97,7 +157,27 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
       focusItem(0);
     } else if (event.key === 'End') {
       event.preventDefault();
-      focusItem(metas.length - 1);
+      focusItem(visibleMetas.length - 1);
+    }
+  }
+
+  /** Fetches the thread exactly like hydration (GET /api/conversations/:id) and downloads MD + JSON. */
+  async function exportConversation(id: string, title: string): Promise<void> {
+    if (exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      await flushPendingSync(id);
+      const { messages } = await getConversation(id);
+      const base = exportFileBase(title);
+      downloadText(toMarkdown(title, messages), 'text/markdown', `${base}.md`);
+      downloadText(JSON.stringify(messages, null, 2), 'application/json', `${base}.json`);
+    } catch (err: unknown) {
+      setExportError(
+        err instanceof ApiError ? `Export failed: ${err.message}` : 'Export failed: the conversation store is unreachable.',
+      );
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -140,17 +220,44 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
         </button>
       </div>
 
+      <div className="apx-sidebar-search">
+        <label className="visually-hidden" htmlFor="apx-sidebar-search-input">
+          Search conversations
+        </label>
+        <input
+          id="apx-sidebar-search-input"
+          className="apx-sidebar-search-input"
+          type="search"
+          placeholder="Search conversations"
+          autoComplete="off"
+          value={search}
+          onChange={event => {
+            setSearch(event.target.value);
+            setFocusedIndex(0);
+          }}
+        />
+      </div>
+
       {error !== null && (
         <p className="apx-sidebar-error" role="alert">
           {error}
         </p>
       )}
+      {exportError !== null && (
+        <p className="apx-sidebar-error" role="alert">
+          {exportError}
+        </p>
+      )}
 
       {metas.length === 0 ? (
         <p className="apx-sidebar-empty">No conversations yet</p>
+      ) : visibleMetas.length === 0 ? (
+        <p className="apx-sidebar-empty" role="status">
+          No matches
+        </p>
       ) : (
         <ul className="apx-sidebar-list" aria-label="Conversation list" onKeyDown={handleListKeyDown}>
-          {metas.map((meta, index) => {
+          {visibleMetas.map((meta, index) => {
             const active = meta.id === activeId;
             const title = meta.title === '' ? 'New chat' : meta.title;
             return (
@@ -173,6 +280,17 @@ export function ConversationSidebar({ id, open, onClose }: ConversationSidebarPr
                   </span>
                 </button>
                 <span className="apx-sidebar-actions">
+                  {active && (
+                    <button
+                      type="button"
+                      className="apx-sidebar-action"
+                      aria-label={`Export conversation ${title}`}
+                      disabled={exporting || streaming}
+                      onClick={() => void exportConversation(meta.id, title)}
+                    >
+                      Export
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="apx-sidebar-action"

@@ -85,6 +85,15 @@ function fail(fault: RepoUrlFault, message: string): RepoUrlParseResult {
   return { ok: false, fault, message };
 }
 
+/** Percent-decodes one raw path segment; a malformed escape (e.g. "%zz") fails with the segment named. */
+function percentDecode(raw: string, role: string): { ok: true; value: string } | { ok: false; message: string } {
+  try {
+    return { ok: true, value: decodeURIComponent(raw) };
+  } catch {
+    return { ok: false, message: `${role} segment "${raw}" is not valid percent-encoding - each "%" must be followed by two hex digits` };
+  }
+}
+
 /** GitHub owner rules: 1–39 chars, [A-Za-z0-9-], no leading/trailing '-', no '--'. Returns the broken rule, or null. */
 function ownerRuleViolation(owner: string): string | null {
   if (owner.length < 1 || owner.length > 39) return `owner must be 1-39 characters (got ${owner.length})`;
@@ -125,6 +134,8 @@ function refRuleViolation(ref: string): string | null {
  * Accepted shapes (trailing '/' allowed, '.git' suffix stripped, leading 'www.' stripped):
  *   https://github.com/{owner}/{repo}
  *   https://github.com/{owner}/{repo}/tree/{ref}[/{subpath}…]
+ *
+ * Segments are percent-decoded after the raw path is split on '/', so "%2F" in a ref stays one segment. A malformed escape is bad-path-shape.
  *
  * Rejections return the exact fault plus a message naming the observed culprit.
  */
@@ -189,8 +200,12 @@ export function parseRepoTarget(input: string): RepoUrlParseResult {
     return fail('bad-path-shape', `path must be ${EXPECTED_PATH_SHAPE} - got "${pathname === '' ? '/' : pathname}"`);
   }
 
-  const owner = segments[0];
-  const repo = segments[1].endsWith('.git') ? segments[1].slice(0, -4) : segments[1];
+  const ownerSegment = percentDecode(segments[0], 'owner');
+  if (!ownerSegment.ok) return fail('bad-path-shape', ownerSegment.message);
+  const repoSegment = percentDecode(segments[1], 'repo');
+  if (!repoSegment.ok) return fail('bad-path-shape', repoSegment.message);
+  const owner = ownerSegment.value;
+  const repo = repoSegment.value.endsWith('.git') ? repoSegment.value.slice(0, -4) : repoSegment.value;
 
   let ref = 'HEAD';
   let subpathSegments: string[] = [];
@@ -200,7 +215,9 @@ export function parseRepoTarget(input: string): RepoUrlParseResult {
       if (segments[3] === undefined) {
         return fail('bad-path-shape', `/tree/ requires a ref - path must be ${EXPECTED_PATH_SHAPE}, got "${pathname}"`);
       }
-      ref = segments[3];
+      const refSegment = percentDecode(segments[3], 'ref');
+      if (!refSegment.ok) return fail('bad-path-shape', refSegment.message);
+      ref = refSegment.value;
       subpathSegments = segments.slice(4);
     } else if (view in UNSUPPORTED_VIEWS) {
       const guidance = view === 'blob'
@@ -219,13 +236,20 @@ export function parseRepoTarget(input: string): RepoUrlParseResult {
   const refFault = refRuleViolation(ref);
   if (refFault !== null) return fail('bad-ref', refFault);
 
-  const subpath = subpathSegments.join('/');
-  for (const segment of subpathSegments) {
-    // The URL parser counts percent-encoded dots as dot segments; so do we.
-    const dotlike = /%2e/i.test(segment) ? segment.replace(/%2e/gi, '.') : segment;
+  // Decode each segment, then split on the DECODED '/': an encoded slash
+  // ("..%2Fetc") must not hide a traversal from the per-segment checks below.
+  const subpathParts: string[] = [];
+  for (const raw of subpathSegments) {
+    const decoded = percentDecode(raw, 'subpath');
+    if (!decoded.ok) return fail('bad-path-shape', decoded.message);
+    subpathParts.push(...decoded.value.split('/'));
+  }
+  const subpath = subpathParts.join('/');
+  if (hasControlChars(subpath)) return fail('bad-path-shape', 'subpath contains control characters - percent-encoded control bytes are not allowed in a path');
+  for (const segment of subpathParts) {
     if (segment === '') return fail('subpath-traversal', `subpath "${subpath}" contains an empty segment ("//") - use a single slash-separated path`);
-    if (dotlike === '.') return fail('subpath-traversal', `subpath "${subpath}" contains a "." segment - remove it`);
-    if (dotlike === '..') return fail('subpath-traversal', `subpath "${subpath}" contains a ".." segment - traversal out of the repository is not allowed`);
+    if (segment === '.') return fail('subpath-traversal', `subpath "${subpath}" contains a "." segment - remove it`);
+    if (segment === '..') return fail('subpath-traversal', `subpath "${subpath}" contains a ".." segment - traversal out of the repository is not allowed`);
   }
 
   return {

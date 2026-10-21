@@ -9,11 +9,13 @@ import {
   type Ref,
 } from 'react';
 import { DefaultChatTransport, type ChatStatus, type UIMessage } from 'ai';
-import { subscribePurpleRuns } from '../lib/events';
+import { subscribePurpleRuns, type PurpleRunEvent } from '../lib/events';
 import { AnnounceContext } from './chat/announce';
 import { Composer, getChatModelChoice, setChatModelChoice, type ChatModelChoice } from './chat/composer';
 import { MessageItem } from './chat/message';
 import { cancelPurpleRunInMessages, upsertPurpleRun } from './chat/run-card';
+import { useConversationsStore } from '../stores/conversations';
+import { toWireMessages, trimHistory } from '../../../src/chat/wire';
 import './chat-stream.css';
 import './chat/chat.css';
 
@@ -131,52 +133,6 @@ function describeError(error: Error): ErrorView {
   return { title: `Chat request failed with HTTP ${statusCode}.`, detail };
 }
 
-/** Client-side history cap, kept under the server's `/api/chat` limits (60 messages, 64000 characters). */
-export const MAX_HISTORY_MESSAGES = 40;
-export const MAX_HISTORY_CHARS = 48000;
-
-function textLength(message: UIMessage): number {
-  let total = 0;
-  for (const part of message.parts) {
-    if (part.type === 'text') total += part.text.length;
-  }
-  return total;
-}
-
-/**
- * Returns the most recent contiguous messages that fit both history limits, dropping the oldest first.
- * Does not modify the input. May return an empty list if the newest message alone exceeds the character cap.
- */
-export function trimHistory(messages: UIMessage[]): UIMessage[] {
-  const kept: UIMessage[] = [];
-  let chars = 0;
-  for (let i = messages.length - 1; i >= 0 && kept.length < MAX_HISTORY_MESSAGES; i--) {
-    const size = textLength(messages[i]);
-    if (chars + size > MAX_HISTORY_CHARS) break;
-    chars += size;
-    kept.unshift(messages[i]);
-  }
-  return kept;
-}
-
-/**
- * Strips every non-text part (`data-purple-run`, `data-genui`, `step-start`, …)
- * and drops messages left with no text parts. The server forwards whatever it
- * receives to `convertToModelMessages`, which rejects unknown part types — a
- * thread containing a run card would 400 on the next send without this.
- * Applied after `trimHistory`, so the 40 msgs / 48k chars client window stays a
- * strict subset of the server's 60 / 64k.
- */
-export function toWireMessages(messages: UIMessage[]): UIMessage[] {
-  const wire: UIMessage[] = [];
-  for (const message of messages) {
-    const parts = message.parts.filter(part => part.type === 'text');
-    if (parts.length === 0) continue;
-    wire.push(parts.length === message.parts.length ? message : { ...message, parts });
-  }
-  return wire;
-}
-
 /** Joined text of the streaming assistant message (empty unless the last message is an assistant reply). */
 function lastAssistantText(messages: UIMessage[]): string {
   const last = messages[messages.length - 1];
@@ -214,6 +170,12 @@ function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNe
     transport,
   });
   const busy = status === 'submitted' || status === 'streaming';
+
+  // Publishes the streaming state so the conversation sidebar can gate export; cleared on thread change and unmount.
+  useEffect(() => {
+    useConversationsStore.getState().setStreaming(threadId, busy);
+    return () => useConversationsStore.getState().setStreaming(threadId, false);
+  }, [threadId, busy]);
   messageCountRef.current = messages.length;
 
   /** Shared send path for the imperative handle, the composer, and the AgentPanel palette. */
@@ -315,14 +277,46 @@ function ChatStream({ ref, threadId = DEFAULT_THREAD_ID, onThreadSettled, showNe
     [announce, setMessages],
   );
 
-  /** Inline run progress (§5): upsert data-purple-run parts from the shared SSE bus. */
-  useEffect(
-    () =>
-      subscribePurpleRuns(event => {
-        setMessages(prev => upsertPurpleRun(prev, event, Date.now()));
-      }),
-    [setMessages],
-  );
+  /**
+   * Inline run progress (§5): upsert data-purple-run parts for runs this thread started.
+   * Runs owned by another thread, or by no chat (Hats, direct API), never create cards.
+   * A start's events can arrive before its POST response records the owner, so events
+   * for a run with no owner yet wait here (bounded) and replay once the owner is recorded.
+   */
+  useEffect(() => {
+    const maxWaitingRuns = 50;
+    const maxWaitingEvents = 20;
+    const waiting = new Map<string, PurpleRunEvent[]>();
+    const apply = (event: PurpleRunEvent) => setMessages(prev => upsertPurpleRun(prev, event, Date.now()));
+    const unsubscribeEvents = subscribePurpleRuns(event => {
+      const owner = useConversationsStore.getState().runOwners[event.runId];
+      if (owner === threadId) {
+        apply(event);
+        return;
+      }
+      if (owner !== undefined) return;
+      const queue = waiting.get(event.runId) ?? [];
+      queue.push(event);
+      if (queue.length > maxWaitingEvents) queue.shift();
+      waiting.set(event.runId, queue);
+      if (waiting.size > maxWaitingRuns) {
+        const oldest = waiting.keys().next().value;
+        if (oldest !== undefined) waiting.delete(oldest);
+      }
+    });
+    const unsubscribeOwners = useConversationsStore.subscribe(state => {
+      for (const [runId, queue] of waiting) {
+        const owner = state.runOwners[runId];
+        if (owner === undefined) continue;
+        waiting.delete(runId);
+        if (owner === threadId) queue.forEach(apply);
+      }
+    });
+    return () => {
+      unsubscribeEvents();
+      unsubscribeOwners();
+    };
+  }, [threadId, setMessages]);
 
   /** Recomputes pinned state from the scroller's actual position. */
   const evaluatePin = useCallback(() => {

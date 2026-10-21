@@ -4,6 +4,8 @@ export interface ArgSpec {
   name: string;
   required: boolean;
   hint: string;
+  /** Inline suggestion for composer ghost-text and the slash palette hint area. */
+  example?: string;
 }
 
 export interface CommandSpec {
@@ -36,7 +38,7 @@ export const COMMANDS: readonly CommandSpec[] = [
         required: true,
         hint: 'web_api | cloud_infra | code_supply_chain | crypto_secrets | reporting_remediation | ai_red_team | agent_warfare',
       },
-      { name: 'artifactIds', required: true, hint: `${JSON_ARRAY} of artifact id strings` },
+      { name: 'artifactIds', required: true, hint: `${JSON_ARRAY} of artifact id strings`, example: '["A-1","A-2"]' },
       { name: 'artifactBytes', required: true, hint: 'string of the artifact bytes actually read' },
       { name: 'findings', required: true, hint: `${JSON_ARRAY} of coverage findings` },
       { name: 'telemetry', required: true, hint: `${JSON_ARRAY} of telemetry declarations` },
@@ -50,9 +52,9 @@ export const COMMANDS: readonly CommandSpec[] = [
     agent: 'black',
     summary: 'Run the black-team analysis workflow (exfil cost, noise budget, OPSEC review). Analysis only.',
     args: [
-      { name: 'actions', required: false, hint: `${JSON_ARRAY} of action strings` },
-      { name: 'paths', required: false, hint: `${JSON_ARRAY} of exfil paths` },
-      { name: 'egress', required: false, hint: `${JSON_ARRAY} of egress strings` },
+      { name: 'actions', required: false, hint: `${JSON_ARRAY} of action strings`, example: '["analysis"]' },
+      { name: 'paths', required: false, hint: `${JSON_ARRAY} of exfil paths`, example: '["/tmp/creds.json",".env"]' },
+      { name: 'egress', required: false, hint: `${JSON_ARRAY} of egress strings`, example: '["https://example.com/collect"]' },
       { name: 'routeEvidence', required: false, hint: `${JSON_ARRAY} of route evidence entries` },
       {
         name: 'requestKind',
@@ -68,7 +70,12 @@ export const COMMANDS: readonly CommandSpec[] = [
     agent: 'white',
     summary: 'Stage a rules-of-engagement audit with its proposed actions.',
     args: [
-      { name: 'roeText', required: true, hint: 'rules-of-engagement text' },
+      {
+        name: 'roeText',
+        required: true,
+        hint: 'rules-of-engagement text',
+        example: 'Read-only recon plus exploit attempts; no destructive payloads; stay in declared scope',
+      },
       { name: 'actions', required: true, hint: `${JSON_ARRAY} of proposed actions` },
       { name: 'meta', required: false, hint: `${JSON_OBJECT} of stage metadata` },
     ],
@@ -80,10 +87,15 @@ export const COMMANDS: readonly CommandSpec[] = [
     agent: 'purple',
     summary: 'Synthesize findings, detections, and verdicts into a purple-team summary.',
     args: [
-      { name: 'findings', required: true, hint: `${JSON_ARRAY} of findings` },
-      { name: 'detections', required: true, hint: `${JSON_ARRAY} of detections` },
-      { name: 'verdicts', required: true, hint: `${JSON_ARRAY} of verdicts` },
-      { name: 'verdictsByFinding', required: false, hint: `${JSON_OBJECT} of findingId to verdict` },
+      { name: 'findings', required: true, hint: `${JSON_ARRAY} of findings`, example: '["F-1","F-2"]' },
+      { name: 'detections', required: true, hint: `${JSON_ARRAY} of detections`, example: '["D-1","D-2"]' },
+      { name: 'verdicts', required: true, hint: `${JSON_ARRAY} of verdicts`, example: '["confirmed","plausible"]' },
+      {
+        name: 'verdictsByFinding',
+        required: false,
+        hint: `${JSON_OBJECT} of findingId to verdict`,
+        example: '{"F-1":"confirmed"}',
+      },
     ],
     route: { method: 'POST', path: '/api/teams/purple/synthesize' },
   },
@@ -93,9 +105,9 @@ export const COMMANDS: readonly CommandSpec[] = [
     agent: 'red',
     summary: 'Start a structured red-team mission against targets with the given operator roles.',
     args: [
-      { name: 'objective', required: true, hint: 'mission objective' },
-      { name: 'operators', required: true, hint: 'comma-separated operator roles' },
-      { name: 'targets', required: true, hint: 'comma-separated targets' },
+      { name: 'objective', required: true, hint: 'mission objective', example: 'Find auth bypasses in the login flow and report detection gaps' },
+      { name: 'operators', required: true, hint: 'comma-separated operator roles', example: 'recon,exploiter' },
+      { name: 'targets', required: true, hint: 'comma-separated targets', example: 'api.example.com,10.0.0.5' },
       { name: 'repoUrl', required: false, hint: 'github.com owner/repo[/tree/ref/subpath] URL' },
       { name: 'name', required: false, hint: 'mission name' },
     ],
@@ -165,7 +177,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: 'Run a registered 4-Hat or shared utility tool by id.',
     args: [
       { name: 'toolId', required: true, hint: 'tool id from /tools' },
-      { name: 'input', required: false, hint: `${JSON_OBJECT} of tool input` },
+      { name: 'input', required: false, hint: `${JSON_OBJECT} of tool input`, example: '{"target":"api.example.com"}' },
     ],
     route: { method: 'POST', path: '/api/teams/tools/run' },
   },
@@ -186,7 +198,7 @@ export const COMMANDS: readonly CommandSpec[] = [
     summary: 'Run a composable multi-Hat skill pipeline by id.',
     args: [
       { name: 'skillId', required: true, hint: 'skill id from /skills' },
-      { name: 'params', required: false, hint: `${JSON_OBJECT} of skill params` },
+      { name: 'params', required: false, hint: `${JSON_OBJECT} of skill params`, example: '{"depth":"quick"}' },
     ],
     route: { method: 'POST', path: '/api/teams/skills/run' },
   },

@@ -1,21 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: v1.7
-milestone_name: GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel
-status: complete
-stopped_at: Milestone complete — pending R1 live-login validation note below
-last_updated: "2026-10-19T17:00:00.000Z"
-last_activity: 2026-10-19
-last_activity_desc: Phases 34-36 complete; login-first UI redesign verified by live browser E2E (device-flow login, repo picker, GenUI, chat)
-state_head: 7a45008
+status: Awaiting next milestone
+last_updated: "2026-10-21T02:47:29.209Z"
+last_activity: 2026-10-21
+last_activity_desc: Milestone v1.7 completed and archived
+state_head: 892d287a70476ff1ef6acfcfd20263589864fbbb
 progress:
   total_phases: 3
   completed_phases: 3
   total_plans: 3
   completed_plans: 3
-  percent: 100
+milestone_name: GitHub Integration, Repo-URL Purple Team, Claude PKCE & Full-screen Agent Panel
 current_phase: 36
 current_phase_name: Full-screen Agent Panel & Generative UI Merge
+stopped_at: Milestone complete — pending R1 live-login validation note below
 ---
 
 # Project State
@@ -29,10 +28,10 @@ See: `.planning/PROJECT.md`, `.planning/ROADMAP.md`, `.planning/v1.7-SURVEY.md`,
 
 ## Current Position
 
-Phase: 36 of 36 — complete
-Status: milestone_closeout
-Last activity: 2026-10-19 — Phases 35/36 code shipped in `2c2feb5` (planning state had lagged); redesign wave verified end-to-end and committed.
-Progress: [██████████] 100% (3/3 phases complete)
+Phase: Milestone v1.7 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-10-21 — Milestone v1.7 completed and archived
 
 ## Completed Context (v1.7)
 
@@ -53,4 +52,7 @@ Progress: [██████████] 100% (3/3 phases complete)
 
 ## Operator Next Steps
 
-- Milestone v1.7 ready for `ultrathink-ship` on `v1.7-github-claude-agentpanel`.
+- R1 live Claude Pro/Max login: carried validation debt, accepted 2026-10-21. Run it through the Claude card. See `.planning/milestones/v1.7-phases/34-claude-oauth-pkce/34-VERIFICATION.md`.
+- D2 gate: mission-level public-URL run with saved artifacts, before the legacy snippet inputs are removed. See `.planning/milestones/v1.7-phases/35-github-integration-repo-url/35-VERIFICATION.md`.
+- Not shipped: `ultrathink-ship` (PR, Greptile review, merge) waits for an explicit go.
+- Start the next milestone with /gsd-new-milestone
