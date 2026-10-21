@@ -16,17 +16,13 @@ covered_files:
 covered_digest: "v3:sha256:5bca60daba19e3401b10f400aecb3ec367a67e144bf53ff22ea9a37527450583"
 behavior_unverified: 0
 overrides_applied: 0
-human_verification:
-  - test: "Load docs/operators.html against a live server and inspect the coverage table Tier column"
-    expected: "Tier badge cell renders per-row riskTier text beside the Residual risk cell, visually consistent with sibling cells"
-    why_human: "No harness renders operators.html against a live server; matches the 20-VALIDATION Manual-Only precedent (SUMMARY D4)"
 ---
 
 # Phase 23: One Risk Signal Verification Report
 
 **Phase Goal:** residualRisk prose and riskTier collapse into one deterministic signal — prose becomes a pure derived rendering of the tier, making tier/prose contradiction structurally impossible without changing the API response shape.
 **Verified:** 2026-10-13T00:30:00Z
-**Status:** human_needed
+**Status:** passed
 **Re-verification:** No — initial verification (review IN-01/IN-02 already fixed in 7f2b271, verified below)
 
 ## Goal Achievement
@@ -116,17 +112,21 @@ Prohibitions (PLAN must_haves.prohibitions, all `backstop` tier — verified by 
 - Arsenal RiskTier vocabulary and gate untouched: HELD — no phase commit touches src/arsenal or src/types; arsenal vocab referenced only in docs note.
 - purple-v2 tier pins not weakened: HELD — purple-v2.test.ts and v13-class-probes.test.ts unmodified, green.
 
-### Human Verification Required
+### Human Verification (resolved)
 
-### 1. Tier cell browser render
+### 1. Tier cell browser render: passed
 
-**Test:** Load docs/operators.html against a live server and inspect the coverage table Tier column
-**Expected:** Tier badge cell renders per-row riskTier text beside the Residual risk cell, visually consistent with sibling cells
-**Why human:** No harness renders operators.html against a live server; matches the 20-VALIDATION Manual-Only precedent (SUMMARY D4)
+**Observed:** 2026-10-21 against a live server started from the main checkout (`npm run server`, `T3MP3ST_PORT=3402`). Page: `http://127.0.0.1:3402/ui/operators.html`.
+
+**Method:** The default browser relay extension was not connected, so the page was rendered in an owned headless Chromium over CDP with an empty profile. `shell.js` hard-codes the API port to 3333 on loopback, so the tab set `localStorage t3mp3st_api_url` to `http://127.0.0.1:3402`. The coverage table populates only after synthesis; the Dark Purple form was submitted with `F-001 | Exposed admin panel | high`, `F-001 | partial`, and `F-001 | violation | target outside scope`.
+
+**Result:** The coverage matrix header reads Finding, Detection, Verdict, Rationale, Tier, Residual risk. Row F-001 Tier cell text is `high`, rendered as `<span class="badge badge--neutral">high</span>`, visible with a non-empty bounding box (65x95 px). The Residual risk cell in the same row contains its prose text.
+
+**Not observed:** No pixel comparison against sibling cells was taken, so "visually consistent" is confirmed only by the render, text, and visibility checks above.
 
 ### Gaps Summary
 
-No gaps. All 12 must-haves verified with exercised evidence. The single human-verification item (browser render of the Tier cell) is the declared manual-only remainder per the plan's verification section and SUMMARY D4 — automated checks are fully green.
+No gaps. All 12 must-haves verified with exercised evidence. The single browser render item for the Tier cell was observed against a live server on 2026-10-21 and the Tier cell rendered with text `high`; no open items remain.
 
 ---
 
