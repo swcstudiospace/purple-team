@@ -123,24 +123,29 @@ describe('ROE text provenance (phase 40)', () => {
   });
 
   it('refuses a non-string author or one over 128 characters with 400 and appends nothing; 128 is accepted', async () => {
+    // Word-separated text: a 128-character unbroken alphanumeric run is rewritten by redactString
+    // as a token, so the boundary values are built from spaced words instead.
+    const author128 = 'word '.repeat(26).slice(0, 128);
+    const author129 = 'word '.repeat(26).slice(0, 129);
+    expect(author128.trim()).toHaveLength(128);
     const { ledgerFile, store } = setup();
     const base = await mount(store);
     const numeric = await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS, author: 42 });
     expect(numeric.status).toBe(400);
     expect(numeric.body.error).toMatch(/author must be a string/);
-    const tooLong = await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS, author: 'a'.repeat(129) });
+    const tooLong = await request(base, 'PUT', '/api/teams/white/roe', { text: OK_TEXT, actions: ACTIONS, author: author129 });
     expect(tooLong.status).toBe(400);
     expect(tooLong.body.error).toMatch(/at most 128 characters/);
     expect(existsSync(ledgerFile)).toBe(false);
     const boundary = await request(base, 'PUT', '/api/teams/white/roe', {
       text: OK_TEXT,
       actions: ACTIONS,
-      author: ` ${'a'.repeat(128)} `,
+      author: ` ${author128} `,
     });
     expect(boundary.status).toBe(200);
     const lines = storedLines(ledgerFile);
     expect(lines).toHaveLength(1);
-    expect(lines[0].provenance?.recordedBy).toBe('a'.repeat(128));
+    expect(lines[0].provenance?.recordedBy).toBe(author128);
   });
 
   it('redacts a secret in the author before it is written to the ledger file', async () => {
